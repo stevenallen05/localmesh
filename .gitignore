@@ -1,6 +1,10 @@
 /www/node_modules
 /www/.next
+/server/target
 /agent/agent
+.env
+.env.*
+!.env.example
 scratch.*
 
 # Produces a lot of agentic noise
