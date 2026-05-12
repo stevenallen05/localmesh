@@ -1,6 +1,11 @@
 services:
   agent:
     build: ./agent
+    # Rule 1 (katenary top-seven): pin image: alongside build:. Katenary reads
+    # image: for the chart; `docker compose build` tags the locally-built
+    # image with this name so dev still works. Prod CI replaces these tags
+    # with registry-pushed digests.
+    image: metrics-stack/agent:0.1.0
     environment:
       AGENT_LOG_FORMAT: text
       # ${VAR:-} = pass through from shell, empty-string fallback. Used by §7.5
@@ -13,8 +18,18 @@ services:
     build:
       context: .
       dockerfile: server/Dockerfile
+    image: metrics-stack/server:0.1.0
     environment:
       SERVER_ADDR: 0.0.0.0:50051
+    labels:
+      # Rule 2: exactly one service drives Chart.yaml appVersion and identity.
+      # Server is the brain; www is a thin SSR shell over it.
+      katenary.v3/main-app: "true"
+      # Rule 3: depends_on targets need ports labeled so the generated init
+      # container has a TCP probe target. Without this, katenary rc6 silently
+      # emits no chart when www depends_on server.
+      katenary.v3/ports: |-
+        - 50051
     # TODO: server doesn't talk to db yet (v0 has no schema). Add DATABASE_URL +
     # readiness wiring once MetricsIngest lands.
 
@@ -24,21 +39,37 @@ services:
     build:
       context: .
       dockerfile: www/Dockerfile
+    image: metrics-stack/www:0.1.0
     environment:
+      # Plain `server:50051` resolves in compose but not in k8s, where katenary
+      # prefixes service names with `{{ .Release.Name }}-`. Rule 4's map-env
+      # rewrites the value at chart-render time.
       SERVER_ADDR: server:50051
     ports:
       - "3000:3000"
-    # NOTE: would normally `depends_on: [server]` here, but katenary rc6
-    # silently exits 0 emitting no chart when depends_on is present. Compose
-    # still starts services in declaration order so v0 dev UX is fine; restore
-    # `depends_on: { server: { condition: service_healthy } }` per CLAUDE.md
-    # once katenary upgrades or a healthcheck-aware gate lands.
+    depends_on:
+      - server
+    labels:
+      katenary.v3/map-env: |-
+        SERVER_ADDR: '{{ .Release.Name }}-server:50051'
+      # Rule 6: compose `ports:` becomes a ClusterIP service in k8s, never an
+      # Ingress. Placeholder hostname; prod overlays inject the real one via
+      # a values.yaml override.
+      katenary.v3/ingress: |-
+        hostname: www.example.com
+        port: 3000
 
   db:
     # TODO: pin to a digest once the base-image policy lands; swap for a
     # managed Timescale offering in prod (see DESIGN_DECISIONS.md storage).
     image: timescale/timescaledb:2.18.0-pg17
     environment:
-      # Dev-only credentials. Prod pulls from a real secrets manager.
+      # Dev-only credentials. Prod overlays inject the real value into the
+      # Secret generated via the katenary.v3/secrets label below.
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: tensorwave
+      POSTGRES_DB: metrics-stack
+    labels:
+      # Rule 5: katenary defaults env vars to a ConfigMap. Flag sensitive
+      # keys explicitly so they land in a Secret. Easy footgun to miss.
+      katenary.v3/secrets: |-
+        - POSTGRES_PASSWORD

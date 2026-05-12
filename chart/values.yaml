@@ -14,9 +14,9 @@ agent:
   # key: agent.repository
   repository:
     # key: agent.repository.image
-    image: ""
+    image: metrics-stack/agent
     # key: agent.repository.tag
-    tag: ""
+    tag: 0.1.0
   # key: agent.replicas
   replicas: 1
   # key: agent.nodeSelector
@@ -94,9 +94,12 @@ server:
   # key: server.repository
   repository:
     # key: server.repository.image
-    image: ""
+    image: metrics-stack/server
+    # This is the version of the main application.
+    # Leave it to blank to use the Chart "AppVersion" value.
     # key: server.repository.tag
     tag: ""
+
   # key: server.replicas
   replicas: 1
   # key: server.nodeSelector
@@ -130,9 +133,37 @@ www:
   # key: www.repository
   repository:
     # key: www.repository.image
-    image: ""
+    image: metrics-stack/www
     # key: www.repository.tag
-    tag: ""
+    tag: 0.1.0
+  # Default value for ingress.class annotation
+  # class: "-"
+  # If the value is "-", controller will not set ingressClassName
+  # If the value is "", Ingress will be set to an empty string, so
+  # controller will use the default value for ingressClass
+  # If the value is specified, controller will set the named class e.g. "nginx"
+  # key: www.ingress
+  ingress:
+    # key: www.ingress.annotations
+    annotations: {}
+    # key: www.ingress.host
+    host: www.example.com
+    # key: www.ingress.path
+    path: /
+    # key: www.ingress.class
+    class: '-'
+    # key: www.ingress.enabled
+    enabled: false
+    # Ingress TLS configuration
+    # If enabled, a secret containing the certificate and the key should be
+    # created by the ingress controller. If the name if emtpy, so the secret
+    # name is generated. You can specify the secret name to use your own secret.
+    # key: www.ingress.tls
+    tls:
+      # key: www.ingress.tls.enabled
+      enabled: true
+      # key: www.ingress.tls.secretName
+      secretName: ""
   # key: www.replicas
   replicas: 1
   # key: www.nodeSelector
