@@ -8,4 +8,3 @@ services:
       AGENT_ID: ${AGENT_ID:-}
     # v0: only the agent service. server, db, www land in subsequent specs.
     # Kept minimal so `katenary` has the shape it needs without extra hints.
-# This is a test of the commit hook
