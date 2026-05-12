@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -69,10 +71,13 @@ func loadConfig() (Config, *koanf.Koanf, error) {
 	if path == "" {
 		path = "./agent.toml"
 	}
-	if _, err := os.Stat(path); err == nil {
+	switch _, err := os.Stat(path); {
+	case err == nil:
 		if err := k.Load(file.Provider(path), toml.Parser()); err != nil {
 			return Config{}, nil, fmt.Errorf("toml %s: %w", path, err)
 		}
+	case !errors.Is(err, fs.ErrNotExist):
+		return Config{}, nil, fmt.Errorf("stat %s: %w", path, err)
 	}
 	envCb := func(s string) string {
 		s = strings.ToLower(strings.TrimPrefix(s, envPrefix))
@@ -93,7 +98,7 @@ func loadConfig() (Config, *koanf.Koanf, error) {
 	if cfg.ID == "" {
 		h, err := os.Hostname()
 		if err != nil {
-			return cfg, nil, fmt.Errorf("hostname: %w", err)
+			return Config{}, nil, fmt.Errorf("hostname: %w", err)
 		}
 		cfg.ID = h
 		_ = k.Set("id", h) // mirror into the snapshot so the dump shows the resolved value
