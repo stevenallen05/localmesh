@@ -1,5 +1,6 @@
 /www/node_modules
 /www/.next
+/agent/agent
 scratch.*
 
 # Produces a lot of agentic noise
