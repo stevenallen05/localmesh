@@ -1,7 +1,8 @@
 .PHONY: setup chart chart-lint
 
+# TODO: standardize how contributors install pipx; pending prod infra & provider choices.
 setup:
-	@command -v pipx >/dev/null || { echo "ERROR: pipx not found — install pipx (e.g. 'sudo apt install pipx') and re-run."; exit 1; }
+	@command -v pipx >/dev/null || { echo "ERROR: pipx not found — install pipx (e.g. 'python3 -m pip install --user pipx') and re-run."; exit 1; }
 	pipx run pre-commit install \
 		|| { echo "ERROR: pipx install pre-commit failed — fix and re-run."; exit 1; }
 

@@ -1,0 +1,16 @@
+repos:
+  - repo: local
+    hooks:
+      - id: katenary-convert
+        name: katenary convert -> chart/
+        language: system
+        entry: ./tools/katenary-3.0.0-rc6-linux-amd64 convert --force
+        files: ^(docker-compose\.ya?ml|katenary\.ya?ml)$
+        pass_filenames: false
+
+      - id: helm-lint
+        name: helm lint chart/
+        language: system
+        entry: ./tools/helm-v4.1.4-linux-amd64 lint chart
+        files: ^(docker-compose\.ya?ml|katenary\.ya?ml|chart/.*)$
+        pass_filenames: false
