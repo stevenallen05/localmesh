@@ -3,10 +3,8 @@ services:
     build: ./agent
     environment:
       AGENT_LOG_FORMAT: text
-      # Bare keys = pass through from the shell environment if set, omit
-      # otherwise. Used by §7.5 (AGENT_LOG_LEVEL=debug docker compose up)
-      # and §7.6 (AGENT_ID=overridden docker compose up).
-      AGENT_LOG_LEVEL:
-      AGENT_ID:
+      # ${VAR:-} = pass through from shell, empty-string fallback. Used by §7.5
+      # and §7.6. Bare-key form panicked katenary rc6; agent treats "" as default.
+      AGENT_ID: ${AGENT_ID:-}
     # v0: only the agent service. server, db, www land in subsequent specs.
     # Kept minimal so `katenary` has the shape it needs without extra hints.
