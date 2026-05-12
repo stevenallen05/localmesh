@@ -5,7 +5,7 @@ services:
     # image: for the chart; `docker compose build` tags the locally-built
     # image with this name so dev still works. Prod CI replaces these tags
     # with registry-pushed digests.
-    image: metrics-stack/agent:0.1.0
+    image: metrics-stack/agent:${IMAGE_TAG:-dev}
     environment:
       AGENT_LOG_FORMAT: text
       # ${VAR:-} = pass through from shell, empty-string fallback. Used by §7.5
@@ -18,7 +18,7 @@ services:
     build:
       context: .
       dockerfile: server/Dockerfile
-    image: metrics-stack/server:0.1.0
+    image: metrics-stack/server:${IMAGE_TAG:-dev}
     environment:
       SERVER_ADDR: 0.0.0.0:50051
     labels:
@@ -39,7 +39,7 @@ services:
     build:
       context: .
       dockerfile: www/Dockerfile
-    image: metrics-stack/www:0.1.0
+    image: metrics-stack/www:${IMAGE_TAG:-dev}
     environment:
       # Plain `server:50051` resolves in compose but not in k8s, where katenary
       # prefixes service names with `{{ .Release.Name }}-`. Rule 4's map-env

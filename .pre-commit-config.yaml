@@ -1,10 +1,25 @@
 repos:
   - repo: local
     hooks:
+      # Default behavior: image tags = current git branch. Regenerates .env on
+      # every checkout, merge, and rebase so `docker compose up` Just Works.
+      # File-checkout invocations re-write the same value (idempotent). Branch
+      # name is sanitized for docker tag rules (`/` -> `-`).
+      - id: refresh-image-tag
+        name: refresh .env IMAGE_TAG from current branch
+        language: system
+        entry: sh -c 'printf "# Auto-managed by pre-commit; do not edit.\nIMAGE_TAG=%s\n" "$(git rev-parse --abbrev-ref HEAD | tr / -)" > .env'
+        stages: [post-checkout, post-merge, post-rewrite]
+        always_run: true
+        pass_filenames: false
+
       - id: katenary-convert
         name: katenary convert -> chart/ (auto-stages chart/)
         language: system
-        entry: sh -c './tools/katenary-3.0.0-rc6-linux-amd64 convert --force && git add chart/'
+        # Source .env so the chart's appVersion (driven by main-app's image
+        # tag) matches what `docker compose` uses. Without this the chart bakes
+        # in `dev` regardless of branch.
+        entry: sh -c '[ -f .env ] && set -a && . ./.env && set +a; ./tools/katenary-3.0.0-rc6-linux-amd64 convert --force && git add chart/'
         files: ^(docker-compose\.ya?ml|katenary\.ya?ml)$
         pass_filenames: false
 
