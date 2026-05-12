@@ -1,0 +1,82 @@
+# Agent configuration.
+#
+# All values here can be overridden by environment variables prefixed AGENT_.
+# Precedence: defaults < this file < env vars.
+#
+# Env-var convention (Koanf-driven):
+#   - Strip AGENT_ prefix, lowercase.
+#   - For env keys whose prefix matches a known nested group
+#     (server, log, docker, collectors), replace remaining underscores
+#     with dots to resolve nesting. Otherwise the key stays flat.
+#
+# Examples:
+#   AGENT_ID                         -> id
+#   AGENT_MAX_BUFFER_SIZE            -> max_buffer_size       (top-level scalar)
+#   AGENT_SERVER_ADDR                -> server.addr           (nested)
+#   AGENT_COLLECTORS_DOCKER_ENABLED  -> collectors.docker.enabled
+#
+# Reference: docs/superpowers/specs/2026-05-12-metrics-system-design.md §2.2.
+
+# ─── Agent identity & lifecycle ───────────────────────────────────────────────
+
+# Unique identifier for this agent in the fleet. Empty = use os.Hostname().
+# Identity persistence is an orchestration-layer concern; see spec §2.5.
+id = ""
+
+# In-memory buffer cap, in bytes. 0 = unlimited (bounded only by available
+# memory). When full, collectors pause until the next ReportNow drains the
+# buffer. See spec §2.4.
+max_buffer_size = 0
+
+# Agent-side floor on report frequency, in seconds. A server-initiated
+# ReportNow arriving sooner than this is ignored, with notice surfaced via
+# AgentStatus. Set to 0 to disable the floor. See spec §2.4.
+min_reporting_interval = 300
+
+# Graceful shutdown deadline, in seconds. On SIGTERM/SIGINT the agent stops
+# collectors, drains the buffer in a final report, then exits. If the
+# deadline elapses, the agent force-exits with code 2. See spec §2.7.
+shutdown_timeout_seconds = 10
+
+# ─── Server connection ────────────────────────────────────────────────────────
+
+[server]
+addr = "server:50051"
+
+# ─── Agent's own logging (slog) ───────────────────────────────────────────────
+
+[log]
+level  = "info"   # debug | info | warn | error
+format = "json"   # json | text
+
+# ─── Docker connection (shared by 'docker' and 'logs' collectors) ─────────────
+
+[docker]
+socket = "unix:///var/run/docker.sock"
+
+# ─── Collectors ───────────────────────────────────────────────────────────────
+#
+# Each collector is a startup-only toggle. Values:
+#   "on"   — collector goroutine starts.
+#   "off"  — collector goroutine does not start.
+#   "cel"  — placeholder for predicate-driven collection (cel-go); currently
+#            logs "not yet implemented" and stops. See spec §2.3 for the
+#            implementation sketch.
+#
+# Changing a toggle requires restart. Reporting cadence is controlled
+# separately by the server via ReportNow (§2.4).
+
+[collectors.docker]
+enabled = "on"
+
+[collectors.host]
+enabled = "on"
+
+[collectors.cloudflared]
+enabled = "on"
+# Prometheus-format scrape endpoint exposed by cloudflared (or any equivalent
+# tunnel/proxy — designed to be swappable). See spec §2.1.
+url = "http://cloudflared:8081/metrics"
+
+[collectors.logs]
+enabled = "on"

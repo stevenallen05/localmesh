@@ -10,11 +10,11 @@ Current state of every important design choice, one line each. History in git. T
 |---|---|
 | Orchestration | `docker compose`; Helm via katenary as a derivative |
 | Agent language | Go (Docker SDK, cross-compile, `gopsutil`) |
-| Agent collectors | `docker_stats`, `host`, `cloudflared`, `docker_logs` — pluggable |
-| Agent config | TOML + env override via Koanf; precedence defaults < TOML < env |
+| Agent collectors | `docker`, `host`, `cloudflared`, `logs` — pluggable (V1: hardcoded `if cfg.collectors.X.enabled` branches) |
+| Agent config | **All** env config flows through Koanf (no raw `os.Getenv`). [`agent/agent.toml`](./agent/agent.toml) is the canonical defaults file; env vars prefixed `AGENT_` override. Precedence: defaults < TOML < env. |
 | Collector toggle | Startup-only 3-state: `on` / `off` / `cel` (placeholder, stub today) |
 | Reporting model | Server-initiated via bidi gRPC stream |
-| Buffer policy | `MAX_BUFFER_SIZE` env (0 = unlimited, pause-on-full); `MIN_REPORTING_INTERVAL` env (default 300s, agent-side floor) |
+| Buffer policy | `AGENT_MAX_BUFFER_SIZE` (0 = unlimited, pause-on-full); `AGENT_MIN_REPORTING_INTERVAL` (default 300s, agent-side floor) |
 | gRPC services | `MetricsIngest.Connect` (bidi, agent) + `MetricsQuery` (web) — split by access profile |
 | Report shape | Single `Report` with `repeated ReportItem { oneof MetricSample \| LogEntry }` |
 | Server | Rust + tonic; stateless (all durable state in Postgres) |
@@ -30,11 +30,12 @@ Current state of every important design choice, one line each. History in git. T
 | Metrics dashboard | **Basic HTML tables only** for V1. `TODO` comments mark where graphs/charts would expand. |
 | Tests | `go test` in `agent/`, `cargo test` in `server/`, `npm test` in `www/`. High-value tests only. |
 | Commit hygiene | Test changes and code changes **never** share a commit. Code commits require a green test tree. |
+| Agent shutdown | Graceful on SIGTERM/SIGINT: stop collectors → final drain report (bypasses `AGENT_MIN_REPORTING_INTERVAL`) → notify offline → exit. 10s soft deadline (`AGENT_SHUTDOWN_TIMEOUT_SECONDS`). Force-exit code `2` on timeout with data-loss log line. |
 | Bonuses | All six in scope |
 
 ## Open
 
-_None — all V1 decisions settled. New decisions surfaced during implementation get added back here._
+- **Agent in-flight data durability** — V1 buffer is in-memory only. Deployment-level durability (blue-green agent replacement) is solved by standard Helm/TF patterns; **in-flight buffer survival across an individual agent's crash/restart is the open question**. Adding WAL-to-disk or a sidecar queue (NATS / Kafka / Redis Streams) depends on compliance requirements, volume, and the related deferrals in spec §9.4 / §9.5. Revisited once production infra context lands. See spec §2.6.
 
 ## Deviations from `requirements.md`
 
