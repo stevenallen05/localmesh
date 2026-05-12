@@ -1,6 +1,10 @@
 services:
   agent:
-    build: ./agent
+    # build.context: . so proto/ is reachable (parity with server/www); agent
+    # will need it once MetricsIngest.Connect lands.
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
     # Rule 1: pinned PoC tag — prod CI replaces with a registry-pushed digest.
     image: metrics-stack/agent:0.1.0
     environment:

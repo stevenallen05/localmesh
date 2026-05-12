@@ -24,6 +24,9 @@ You can see this notes again by running:
 
 {{- $count := 0 -}}
 {{- $listOfURL := "" -}}
+{{- if and .Values.www.ingress .Values.www.ingress.enabled }}
+{{- $count = add1 $count -}}{{- $listOfURL = printf "%s\n- http://%s" $listOfURL (tpl .Values.www.ingress.host .) -}}
+{{- end }}
 {{- if and .Values.db.ingress .Values.db.ingress.enabled }}
 {{- $count = add1 $count -}}{{- $listOfURL = printf "%s\n- http://%s" $listOfURL (tpl .Values.db.ingress.host .) -}}
 {{- end }}
@@ -32,9 +35,6 @@ You can see this notes again by running:
 {{- end }}
 {{- if and .Values.server.ingress .Values.server.ingress.enabled }}
 {{- $count = add1 $count -}}{{- $listOfURL = printf "%s\n- http://%s" $listOfURL (tpl .Values.server.ingress.host .) -}}
-{{- end }}
-{{- if and .Values.www.ingress .Values.www.ingress.enabled }}
-{{- $count = add1 $count -}}{{- $listOfURL = printf "%s\n- http://%s" $listOfURL (tpl .Values.www.ingress.host .) -}}
 {{- end }}
 {{- if gt $count 0 }}
 

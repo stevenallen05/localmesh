@@ -16,7 +16,7 @@ webapp:
     katenary.v3/main-app: "true"
 ```
 
-> *PoC shortcut:* single chart, `server` is main-app. Prod splits each service into its own per-team chart (Conway's law) and this top-level chart becomes a meta-chart that depends on them.
+> *PoC shortcut:* single chart, `server` is main-app. Prod splits each service into its own per-service chart (Conway's law) and this top-level chart becomes a meta-chart that depends on them.
 
 **3. `katenary.v3/ports` on every `depends_on` target**
 

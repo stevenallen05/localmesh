@@ -1,0 +1,7 @@
+# Patterns are relative to the build context (repo root, per docker-compose.yml).
+# BuildKit picks this file up for agent/Dockerfile via the per-Dockerfile
+# `<Dockerfile>.dockerignore` convention.
+agent/agent
+agent/README.md
+agent/Dockerfile
+agent/Dockerfile.dockerignore
