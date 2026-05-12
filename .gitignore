@@ -1,3 +1,6 @@
 /www/node_modules
 /www/.next
 scratch.*
+
+# Produces a lot of agentic noise
+docs/superpowers
