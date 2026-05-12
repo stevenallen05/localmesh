@@ -2,9 +2,9 @@ repos:
   - repo: local
     hooks:
       - id: katenary-convert
-        name: katenary convert -> chart/
+        name: katenary convert -> chart/ (auto-stages chart/)
         language: system
-        entry: ./tools/katenary-3.0.0-rc6-linux-amd64 convert --force
+        entry: sh -c './tools/katenary-3.0.0-rc6-linux-amd64 convert --force && git add chart/'
         files: ^(docker-compose\.ya?ml|katenary\.ya?ml)$
         pass_filenames: false
 
