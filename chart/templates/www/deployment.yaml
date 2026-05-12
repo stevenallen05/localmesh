@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    katenary.v3/compose-hash: 4699ea1910dd933452c90a151d9ab423a1723f4f
+    katenary.v3/version: 3.0.0-rc6
+  labels:
+    {{- include "challenge.labels" . | nindent 4 }}
+    katenary.v3/component: www
+  name: '{{ include "challenge.fullname" . }}-www'
+spec:
+  replicas: {{ .Values.www.replicas }}
+  selector:
+    matchLabels:
+      {{- include "challenge.selectorLabels" . | nindent 6 }}
+      katenary.v3/component: www
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        {{- include "challenge.selectorLabels" . | nindent 8 }}
+        katenary.v3/component: www
+    spec:
+      containers:
+      - envFrom:
+        - configMapRef:
+            name: '{{ include "challenge.fullname" . }}-www'
+        image: '{{ tpl .Values.www.repository.image $ }}:{{ tpl .Values.www.repository.tag $ | default "latest" }}'
+        imagePullPolicy: {{ .Values.www.imagePullPolicy }}
+        name: www
+        ports:
+        - containerPort: 3000
+          name: port-3000
+        {{- if .Values.www.resources }}
+        resources:
+          {{ .Values.www.resources | toYaml | nindent 10 }}
+        {{- end }}
+      {{- if .Values.pullSecrets }}
+      imagePullSecrets:
+      {{- .Values.pullSecrets | toYaml | nindent 6 }}
+      {{- end }}
+      {{- if .Values.www.nodeSelector }}
+      nodeSelector:
+        {{- .Values.www.nodeSelector | toYaml | nindent 8 }}
+      {{- end }}
+      {{- if ne .Values.www.serviceAccount "" }}
+      serviceAccountName: {{ .Values.www.serviceAccount | quote }}
+      {{- end }}

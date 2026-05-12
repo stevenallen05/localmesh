@@ -45,6 +45,42 @@ agent:
   # key: agent.serviceAccount
   serviceAccount: ""
 
+# db configuration
+db:
+  # key: db.repository
+  repository:
+    # key: db.repository.image
+    image: timescale/timescaledb
+    # key: db.repository.tag
+    tag: 2.18.0-pg17
+  # key: db.replicas
+  replicas: 1
+  # key: db.nodeSelector
+  nodeSelector: {}
+  # Resources allows you to specify the resource requests and limits for a service.
+  # Resources are used to specify the amount of CPU and memory that 
+  # a container needs.
+  #
+  # e.g.
+  # resources:
+  #   requests:
+  #     memory: "64Mi"
+  #     cpu: "250m"
+  #   limits:
+  #     memory: "128Mi"
+  #     cpu: "500m"
+  # key: db.resources
+  resources: {}
+  # imagePullPolicy allows you to specify a policy to cache or always pull an image.
+  # You must provide a string value with one of the following values:
+  # - Always       -> will always pull the image
+  # - Never        -> will never pull the image, the image should be present on the node
+  # - IfNotPresent -> will pull the image only if it is not present on the node
+  # key: db.imagePullPolicy
+  imagePullPolicy: IfNotPresent
+  # key: db.serviceAccount
+  serviceAccount: ""
+
 # imagePullSecrets allows you to specify a name of an image pull secret.
 # You must provide a list of object with the name field set to the name of the
 # e.g.
@@ -52,5 +88,77 @@ agent:
 # - name: regcred
 # You are, for now, responsible for creating the secret.
 pullSecrets: []
+
+# server configuration
+server:
+  # key: server.repository
+  repository:
+    # key: server.repository.image
+    image: ""
+    # key: server.repository.tag
+    tag: ""
+  # key: server.replicas
+  replicas: 1
+  # key: server.nodeSelector
+  nodeSelector: {}
+  # Resources allows you to specify the resource requests and limits for a service.
+  # Resources are used to specify the amount of CPU and memory that 
+  # a container needs.
+  #
+  # e.g.
+  # resources:
+  #   requests:
+  #     memory: "64Mi"
+  #     cpu: "250m"
+  #   limits:
+  #     memory: "128Mi"
+  #     cpu: "500m"
+  # key: server.resources
+  resources: {}
+  # imagePullPolicy allows you to specify a policy to cache or always pull an image.
+  # You must provide a string value with one of the following values:
+  # - Always       -> will always pull the image
+  # - Never        -> will never pull the image, the image should be present on the node
+  # - IfNotPresent -> will pull the image only if it is not present on the node
+  # key: server.imagePullPolicy
+  imagePullPolicy: IfNotPresent
+  # key: server.serviceAccount
+  serviceAccount: ""
+
+# www configuration
+www:
+  # key: www.repository
+  repository:
+    # key: www.repository.image
+    image: ""
+    # key: www.repository.tag
+    tag: ""
+  # key: www.replicas
+  replicas: 1
+  # key: www.nodeSelector
+  nodeSelector: {}
+  # Resources allows you to specify the resource requests and limits for a service.
+  # Resources are used to specify the amount of CPU and memory that 
+  # a container needs.
+  #
+  # e.g.
+  # resources:
+  #   requests:
+  #     memory: "64Mi"
+  #     cpu: "250m"
+  #   limits:
+  #     memory: "128Mi"
+  #     cpu: "500m"
+  # key: www.resources
+  resources: {}
+  # imagePullPolicy allows you to specify a policy to cache or always pull an image.
+  # You must provide a string value with one of the following values:
+  # - Always       -> will always pull the image
+  # - Never        -> will never pull the image, the image should be present on the node
+  # - IfNotPresent -> will pull the image only if it is not present on the node
+  # key: www.imagePullPolicy
+  imagePullPolicy: IfNotPresent
+  # key: www.serviceAccount
+  serviceAccount: ""
 
 # vim: ft=yaml

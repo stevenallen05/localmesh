@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    katenary.v3/compose-hash: 4699ea1910dd933452c90a151d9ab423a1723f4f
+    katenary.v3/version: 3.0.0-rc6
+  labels:
+    {{- include "challenge.labels" . | nindent 4 }}
+    katenary.v3/component: www
+  name: '{{ include "challenge.fullname" . }}-www'
+spec:
+  ports:
+  - name: port-3000
+    port: 3000
+    protocol: TCP
+    targetPort: 3000
+  selector:
+    {{- include "challenge.selectorLabels" . | nindent 4 }}
+    katenary.v3/component: www

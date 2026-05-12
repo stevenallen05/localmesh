@@ -6,5 +6,39 @@ services:
       # ${VAR:-} = pass through from shell, empty-string fallback. Used by §7.5
       # and §7.6. Bare-key form panicked katenary rc6; agent treats "" as default.
       AGENT_ID: ${AGENT_ID:-}
-    # v0: only the agent service. server, db, www land in subsequent specs.
-    # Kept minimal so `katenary` has the shape it needs without extra hints.
+
+  server:
+    # Build context is the repo root so build.rs can reach ../proto/ at
+    # tonic-build time. Compose default (`build: ./server`) wouldn't work.
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    environment:
+      SERVER_ADDR: 0.0.0.0:50051
+    # TODO: server doesn't talk to db yet (v0 has no schema). Add DATABASE_URL +
+    # readiness wiring once MetricsIngest lands.
+
+  www:
+    # Same reason as server: @grpc/proto-loader reads proto/hello.proto at
+    # runtime, so the build needs proto/ in the context.
+    build:
+      context: .
+      dockerfile: www/Dockerfile
+    environment:
+      SERVER_ADDR: server:50051
+    ports:
+      - "3000:3000"
+    # NOTE: would normally `depends_on: [server]` here, but katenary rc6
+    # silently exits 0 emitting no chart when depends_on is present. Compose
+    # still starts services in declaration order so v0 dev UX is fine; restore
+    # `depends_on: { server: { condition: service_healthy } }` per CLAUDE.md
+    # once katenary upgrades or a healthcheck-aware gate lands.
+
+  db:
+    # TODO: pin to a digest once the base-image policy lands; swap for a
+    # managed Timescale offering in prod (see DESIGN_DECISIONS.md storage).
+    image: timescale/timescaledb:2.18.0-pg17
+    environment:
+      # Dev-only credentials. Prod pulls from a real secrets manager.
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: tensorwave
