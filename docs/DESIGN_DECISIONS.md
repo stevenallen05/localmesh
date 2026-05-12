@@ -8,7 +8,7 @@ Current state of every important design choice, one line each. History in git. T
 
 | Area | Choice |
 |---|---|
-| Orchestration | `docker compose`; Helm via katenary as a derivative |
+| Orchestration | `docker compose` is the source of truth; **katenary** auto-derives Helm charts via pre-commit hook (CI in prod). Compose is fast to author and review — well-suited to small teams, or large teams operating under Conway's law where each service owns its own deploy story. Hand-rolled charts are daunting by comparison. Mapping services to managed offerings (DBs → RDS/Cloud SQL) and minimum resource configs is a separate exercise driven by prod infra factors. |
 | Agent language | Go (Docker SDK, cross-compile, `gopsutil`) |
 | Agent collectors | `docker`, `host`, `cloudflared`, `logs` — pluggable (V1: hardcoded `if cfg.collectors.X.enabled` branches) |
 | Agent config | **All** env config flows through Koanf (no raw `os.Getenv`). [`agent/agent.toml`](./agent/agent.toml) is the canonical defaults file; env vars prefixed `AGENT_` override. Precedence: defaults < TOML < env. |
