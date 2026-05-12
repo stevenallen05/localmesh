@@ -17,15 +17,16 @@ Current state of every important design choice, one line each. History in git. T
 | Buffer policy | `AGENT_MAX_BUFFER_SIZE` (0 = unlimited, pause-on-full); `AGENT_MIN_REPORTING_INTERVAL` (default 300s, agent-side floor) |
 | gRPC services | `MetricsIngest.Connect` (bidi, agent) + `MetricsQuery` (web) — split by access profile |
 | Report shape | Single `Report` with `repeated ReportItem { oneof MetricSample \| LogEntry }` |
-| Server | Rust + tonic; stateless (all durable state in Postgres) |
-| Storage | TimescaleDB; unified `metrics` hypertable + separate `logs` hypertable; continuous aggregates as rollups |
+| Server | Rust + tonic; stateless (all durable state in Postgres). v0 ships a single `Greeter.SayHello` to exercise the NextJS-server → Rust path; `MetricsIngest` / `MetricsQuery` land in their own spec. |
+| Storage | TimescaleDB; unified `metrics` hypertable + separate `logs` hypertable; continuous aggregates as rollups. v0 compose runs the image with no schema and no server connection — schema + lazy connect land with `MetricsIngest`. |
 | Log filter UI | Structured form + `ILIKE`; no DSL. `query_dsl` slot reserved on the wire. |
 | Logs UI | Dedicated tab |
 | User attribution | Forward-auth header passthrough, configurable, **not enforced** |
 | Live demo | CloudFlare Zero Trust tunnel + Access |
 | Agent identity | Config value `agent.id`; defaults to hostname |
-| gRPC LB | **Deferred for take-home.** In prod: forward-auth + mTLS required; specific LB and auth-provider choice out of scope. |
-| Containers | Short single-stage Dockerfiles (`./agent/Dockerfile`, `./server/Dockerfile`, `./www/Dockerfile`); minimal compose (katenary defaults, no extra hints unless conversion fails). Hardening (multi-stage, distroless, non-root USER, healthchecks) **TODO'd** pending infra/compliance decisions. |
+| gRPC LB | **Deferred for take-home.** v0 wires the NextJS Server Component straight to the Rust server via `@grpc/grpc-js` — server-side only, no client browser ever touches gRPC. Prod swaps in a proper LB (envoy / grpc-web bridge / service mesh) plus forward-auth + mTLS; specific LB and auth-provider choice out of scope. |
+| Containers | Short single-stage Dockerfiles (`./agent/Dockerfile`, `./server/Dockerfile`, `./www/Dockerfile`); minimal compose (katenary defaults, no extra hints unless conversion fails). `server` and `www` use `build.context: .` so the shared `proto/` is reachable at build/runtime; agent stays `build: ./agent`. Hardening (multi-stage, distroless, non-root USER, healthchecks) and `depends_on: { condition: service_healthy }` **TODO'd** — katenary rc6 silently drops the chart when `depends_on` is present, so v0 relies on compose's declaration order. |
+| Proto codegen | Rust: `tonic-build` writes `server/src/proto/hello.rs` (committed) so reviewers see the wire shape in diffs and Docker builds stay hermetic. TypeScript: `@grpc/proto-loader` reads `proto/hello.proto` at runtime — no codegen step, no extra dep. Split is asymmetric on purpose; ts-proto would be a third dep just to mirror Rust's behavior. |
 | First-run cost | Minimized — single-stage builds, common base images, no upfront hardening. Cold start ~3–6 min, dominated by TimescaleDB pull + `cargo build --release`. |
 | Metrics dashboard | **Basic HTML tables only** for V1. `TODO` comments mark where graphs/charts would expand. |
 | Tests | `go test` in `agent/`, `cargo test` in `server/`, `npm test` in `www/`. High-value tests only. |
