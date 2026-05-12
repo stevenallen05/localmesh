@@ -16,7 +16,7 @@ agent:
     # key: agent.repository.image
     image: metrics-stack/agent
     # key: agent.repository.tag
-    tag: feat-server-www-containers
+    tag: 0.1.0
   # key: agent.replicas
   replicas: 1
   # key: agent.nodeSelector
@@ -135,7 +135,7 @@ www:
     # key: www.repository.image
     image: metrics-stack/www
     # key: www.repository.tag
-    tag: feat-server-www-containers
+    tag: 0.1.0
   # Default value for ingress.class annotation
   # class: "-"
   # If the value is "-", controller will not set ingressClassName

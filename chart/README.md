@@ -23,33 +23,33 @@ See the [Helm documentation](https://helm.sh/docs/intro/using_helm/) for more in
 
 The following table lists the configurable parameters of the challenge chart and their default values.
 
-| Parameter                    | Default                      |
-| ---------------------------- | ---------------------------- |
-| `agent.imagePullPolicy`      | `IfNotPresent`               |
-| `agent.replicas`             | `1`                          |
-| `agent.repository.image`     | `metrics-stack/agent`        |
-| `agent.repository.tag`       | `feat-server-www-containers` |
-| `agent.serviceAccount`       | ``                           |
-| `db.imagePullPolicy`         | `IfNotPresent`               |
-| `db.replicas`                | `1`                          |
-| `db.repository.image`        | `timescale/timescaledb`      |
-| `db.repository.tag`          | `2.18.0-pg17`                |
-| `db.serviceAccount`          | ``                           |
-| `server.imagePullPolicy`     | `IfNotPresent`               |
-| `server.replicas`            | `1`                          |
-| `server.repository.image`    | `metrics-stack/server`       |
-| `server.repository.tag`      | ``                           |
-| `server.serviceAccount`      | ``                           |
-| `www.imagePullPolicy`        | `IfNotPresent`               |
-| `www.ingress.class`          | `-`                          |
-| `www.ingress.enabled`        | `false`                      |
-| `www.ingress.host`           | `www.example.com`            |
-| `www.ingress.path`           | `/`                          |
-| `www.ingress.tls.enabled`    | `true`                       |
-| `www.ingress.tls.secretName` | ``                           |
-| `www.replicas`               | `1`                          |
-| `www.repository.image`       | `metrics-stack/www`          |
-| `www.repository.tag`         | `feat-server-www-containers` |
-| `www.serviceAccount`         | ``                           |
+| Parameter                    | Default                 |
+| ---------------------------- | ----------------------- |
+| `agent.imagePullPolicy`      | `IfNotPresent`          |
+| `agent.replicas`             | `1`                     |
+| `agent.repository.image`     | `metrics-stack/agent`      |
+| `agent.repository.tag`       | `0.1.0`                 |
+| `agent.serviceAccount`       | ``                      |
+| `db.imagePullPolicy`         | `IfNotPresent`          |
+| `db.replicas`                | `1`                     |
+| `db.repository.image`        | `timescale/timescaledb` |
+| `db.repository.tag`          | `2.18.0-pg17`           |
+| `db.serviceAccount`          | ``                      |
+| `server.imagePullPolicy`     | `IfNotPresent`          |
+| `server.replicas`            | `1`                     |
+| `server.repository.image`    | `metrics-stack/server`     |
+| `server.repository.tag`      | ``                      |
+| `server.serviceAccount`      | ``                      |
+| `www.imagePullPolicy`        | `IfNotPresent`          |
+| `www.ingress.class`          | `-`                     |
+| `www.ingress.enabled`        | `false`                 |
+| `www.ingress.host`           | `www.example.com`       |
+| `www.ingress.path`           | `/`                     |
+| `www.ingress.tls.enabled`    | `true`                  |
+| `www.ingress.tls.secretName` | ``                      |
+| `www.replicas`               | `1`                     |
+| `www.repository.image`       | `metrics-stack/www`        |
+| `www.repository.tag`         | `0.1.0`                 |
+| `www.serviceAccount`         | ``                      |
 
 
