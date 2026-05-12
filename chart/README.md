@@ -27,7 +27,7 @@ The following table lists the configurable parameters of the challenge chart and
 | ---------------------------- | ----------------------- |
 | `agent.imagePullPolicy`      | `IfNotPresent`          |
 | `agent.replicas`             | `1`                     |
-| `agent.repository.image`     | `metrics-stack/agent`      |
+| `agent.repository.image`     | `metrics-stack/agent`   |
 | `agent.repository.tag`       | `0.1.0`                 |
 | `agent.serviceAccount`       | ``                      |
 | `db.imagePullPolicy`         | `IfNotPresent`          |
@@ -37,7 +37,7 @@ The following table lists the configurable parameters of the challenge chart and
 | `db.serviceAccount`          | ``                      |
 | `server.imagePullPolicy`     | `IfNotPresent`          |
 | `server.replicas`            | `1`                     |
-| `server.repository.image`    | `metrics-stack/server`     |
+| `server.repository.image`    | `metrics-stack/server`  |
 | `server.repository.tag`      | ``                      |
 | `server.serviceAccount`      | ``                      |
 | `www.imagePullPolicy`        | `IfNotPresent`          |
@@ -48,7 +48,7 @@ The following table lists the configurable parameters of the challenge chart and
 | `www.ingress.tls.enabled`    | `true`                  |
 | `www.ingress.tls.secretName` | ``                      |
 | `www.replicas`               | `1`                     |
-| `www.repository.image`       | `metrics-stack/www`        |
+| `www.repository.image`       | `metrics-stack/www`     |
 | `www.repository.tag`         | `0.1.0`                 |
 | `www.serviceAccount`         | ``                      |
 
