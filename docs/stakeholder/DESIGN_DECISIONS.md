@@ -44,7 +44,7 @@ V0 questions still in flux. Production-scope questions live in [`PRODUCTION_DISC
 - **Rust gRPC API surface beyond v0.** Health, metric-getter, streaming, auth, error mapping.
 - **mTLS demonstration depth.** Minimum: server logs successful connection at startup. Reviewer-visible: on-demand gRPC method + UI button.
 - **Collector → TSDB mTLS on the dev path.** Plain HTTP for now; uniform with the Rust→TSDB hop is possible at small cost.
-- **Application metrics on the Rust + www path.** v0 had `say_hello_total` + `say_hello_duration_seconds`; both removed in chunk 5b. Re-design pending — likely per-method gRPC duration + status distribution, instrumented via middleware not hand-rolled.
+- **Application metrics on the Rust + www path.** v0 had `say_hello_total` + `say_hello_duration_seconds`; both removed in chunk 5b. Re-design pending — likely per-method gRPC duration + status distribution.
 
 ## Deviations from `requirements.md`
 
