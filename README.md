@@ -21,6 +21,9 @@ Stakeholder-facing context — read these regardless of role:
 - [`docs/stakeholder/PRODUCTION_DISCUSSIONS.md`](./docs/stakeholder/PRODUCTION_DISCUSSIONS.md) —
   the **discovery framework** for a real prod engagement, sized by the
   complexity of your business.
+- [`docs/stakeholder/PRODUCTION_DECISION_MATRIX.md`](./docs/stakeholder/PRODUCTION_DECISION_MATRIX.md) —
+  empty research scaffold for evaluating candidate solutions to each of
+  those decisions (3-star ratings × ≤7 dimensions).
 - [`docs/stakeholder/DESIGN_DECISIONS.md`](./docs/stakeholder/DESIGN_DECISIONS.md) —
   current state of every design choice, one row each (dev choice,
   rationale, production-considerations signposts).

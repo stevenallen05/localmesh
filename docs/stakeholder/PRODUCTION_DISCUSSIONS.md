@@ -14,6 +14,9 @@ conversation about taking this pattern to production.
 [`ENGINEERING_RULES.md`](./ENGINEERING_RULES.md) — the rules that drove
 the architecture. [`DESIGN_DECISIONS.md`](./DESIGN_DECISIONS.md) — current
 state of each decision.
+[`PRODUCTION_DECISION_MATRIX.md`](./PRODUCTION_DECISION_MATRIX.md) —
+empty research scaffold for evaluating candidate solutions to the
+decisions below.
 
 **How to read each topic:**
 
@@ -110,10 +113,16 @@ Use this to triage which conversations to invest in first.
 - **How much metric cardinality can each team consume?** Per-team
   budgets and enforcement; what teams see when they exceed.
   *— Matters more with shared-infrastructure pressure.*
-- **How do we roll back when something breaks?** Per-component — image
-  rollback for stateless services, config rollback for catalogue
-  modules, schema reversibility for stateful ones. *— Matters more with
-  deploy frequency and change-failure tolerance.*
+- **How do teams roll back when something breaks?** The mechanism
+  depends on what the ops/platform team has built and given to teams —
+  it's an *available-tooling* question, not a per-team design choice.
+  Safe assumption: image rollback for stateless services is universal.
+  Beyond that — config rollback for catalogue modules, schema
+  reversibility for stateful services, progressive-delivery rollback
+  (Argo Rollouts / Flagger / equivalent) — depends on the ops team's
+  larger investment. *— Matters more with deploy frequency,
+  change-failure tolerance, stateful-workload prevalence, and the
+  organization's appetite for progressive-delivery tooling.*
 
 ## Storage, data lifecycle & residency
 
