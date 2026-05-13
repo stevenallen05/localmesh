@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
+use std::time::Instant;
 use opentelemetry::global;
-use opentelemetry::metrics::Counter;
+use opentelemetry::metrics::{Counter, Histogram};
 use tonic::{transport::Server, Request, Response, Status};
 use tracing::instrument;
 
@@ -9,6 +10,7 @@ use tracing::instrument;
 pub mod hello {
     include!("proto/hello.rs");
 }
+mod grpc_interceptor;
 mod telemetry;
 
 use hello::greeter_server::{Greeter, GreeterServer};
@@ -16,6 +18,7 @@ use hello::{HelloReply, HelloRequest};
 
 struct GreeterSvc {
     hello_counter: Counter<u64>,
+    hello_duration: Histogram<f64>,
 }
 
 #[tonic::async_trait]
@@ -25,12 +28,16 @@ impl Greeter for GreeterSvc {
         &self,
         req: Request<HelloRequest>,
     ) -> Result<Response<HelloReply>, Status> {
+        let start = Instant::now();
         let name = req.into_inner().name;
         let name = if name.is_empty() { "world".to_string() } else { name };
         self.hello_counter.add(1, &[]);
-        Ok(Response::new(HelloReply {
+        let reply = HelloReply {
             message: format!("hello, {name}"),
-        }))
+        };
+        self.hello_duration
+            .record(start.elapsed().as_secs_f64(), &[]);
+        Ok(Response::new(reply))
     }
 }
 
@@ -43,6 +50,10 @@ async fn main() -> anyhow::Result<()> {
         .u64_counter("say_hello_total")
         .with_description("Total say_hello gRPC requests")
         .build();
+    let hello_duration = meter
+        .f64_histogram("say_hello_duration_seconds")
+        .with_description("say_hello handler duration in seconds")
+        .build();
 
     let addr: SocketAddr = std::env::var("SERVER_ADDR")
         .unwrap_or_else(|_| "0.0.0.0:50051".to_string())
@@ -50,7 +61,13 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!(%addr, "server: listening");
 
     Server::builder()
-        .add_service(GreeterServer::new(GreeterSvc { hello_counter }))
+        .add_service(GreeterServer::with_interceptor(
+            GreeterSvc {
+                hello_counter,
+                hello_duration,
+            },
+            grpc_interceptor::extract_trace_context,
+        ))
         .serve(addr)
         .await?;
 

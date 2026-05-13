@@ -50,6 +50,9 @@ pub fn init() -> Result<TelemetryGuard> {
         .build();
     global::set_meter_provider(meter_provider.clone());
 
+    // B3 single-header propagator for distributed tracing across www → server.
+    global::set_text_map_propagator(opentelemetry_zipkin::Propagator::new());
+
     // tracing-subscriber: fmt + OTel bridge.
     tracing_subscriber::registry()
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
