@@ -185,7 +185,7 @@ services:
     # Reviewer-debug: `curl http://localhost:8428/health` from host.
 
   tempo:
-    image: grafana/tempo:2.10
+    image: grafana/tempo:2.10.5
     container_name: tempo
     command: ["-config.file=/etc/tempo/tempo.yaml"]
     configs:
