@@ -14,7 +14,7 @@ This repo is a reference implementation of the **microservice-template + service
 |---|---|---|---|
 | Vision | One team's microservice + a stub catalogue module. | Demonstrates the org-scale pattern: platform owns catalogue, product owns compose. | Catalogue becomes a real platform product. |
 | Orchestration | Compose is source of truth; pre-commit hook generates the Helm chart. | Compose is the practical ceiling for self-service teams; chart is build output. | Chart generation runs in CI; published to an internal registry. |
-| Module composition | Compose `include:` pulls `modules/observability/` from the catalogue. | Required and optional modules added by reference, not copy-paste. | Include path swaps to a platform-published location. |
+| Module composition | Compose `include:` pulls `service_catalog/observability/` from the catalogue. | Required and optional modules added by reference, not copy-paste. | Include path swaps to a platform-published location. |
 | Observability module | Off-the-shelf collector + exporters + TSDB (Time-Series Database) + dashboards. | All battle-tested; team adds no value building these. | TSDB swaps to a managed/clustered equivalent at scale. |
 | Server | Rust gRPC, one v0 endpoint, traces + metrics. | Preserves the original template wire-shape; instrumentation makes it visible. | Demo endpoint replaced by real product methods. |
 | Server → metrics DB | mTLS (mutual TLS), certificates injected by the catalogue's secrets layer. | Worked example of the inter-service mTLS pattern. | File-mounted certs replaced by mesh-issued short-lived identities. |
