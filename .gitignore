@@ -7,5 +7,8 @@
 !.env.example
 scratch.*
 
+/www/*.tsbuildinfo
+
 # Produces a lot of agentic noise
 docs/superpowers
+
