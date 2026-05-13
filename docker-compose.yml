@@ -1,17 +1,7 @@
-services:
-  agent:
-    # build.context: . so proto/ is reachable (parity with server/www); agent
-    # will need it once MetricsIngest.Connect lands.
-    build:
-      context: .
-      dockerfile: agent/Dockerfile
-    # Rule 1: pinned PoC tag — prod CI replaces with a registry-pushed digest.
-    image: metrics-stack/agent:0.1.0
-    environment:
-      AGENT_LOG_FORMAT: text
-      # ${VAR:-} = pass-through, empty fallback (bare keys panic katenary rc6).
-      AGENT_ID: ${AGENT_ID:-}
+include:
+  - path: service_catalog/observability/docker-compose.yml
 
+services:
   server:
     # build.context: . so build.rs can reach ../proto/ at tonic-build time.
     build:
@@ -20,6 +10,12 @@ services:
     image: metrics-stack/server:0.1.0  # Rule 1
     environment:
       SERVER_ADDR: 0.0.0.0:50051
+    healthcheck:
+      # bash built-in TCP test — no extra packages on bookworm.
+      test: ["CMD", "bash", "-c", "</dev/tcp/localhost/50051"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     labels:
       # Rule 2: prod would split services into per-team charts; PoC keeps one
       # chart and tags server as the application identity.
@@ -27,8 +23,6 @@ services:
       # Rule 3: depends_on target needs a port label or katenary rc6 emits no chart.
       katenary.v3/ports: |-
         - 50051
-    # TODO: no db connection yet (v0 has no schema). Wire DATABASE_URL +
-    # readiness once MetricsIngest lands.
 
   www:
     # Same reason as server: proto/ must be in the build context.
@@ -39,26 +33,22 @@ services:
     environment:
       # Rule 4 rewrites this to `{{ .Release.Name }}-server:50051` in k8s.
       SERVER_ADDR: server:50051
+      HOSTNAME: ${HOSTNAME:-}
     ports:
       - "3000:3000"
     depends_on:
-      - server
+      server:
+        condition: service_healthy
+    healthcheck:
+      # BusyBox wget ships in Node alpine.
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     labels:
       katenary.v3/map-env: |-
         SERVER_ADDR: '{{ .Release.Name }}-server:50051'
       # Rule 6: placeholder domain — prod overlay injects the real hostname.
       katenary.v3/ingress: |-
-        hostname: www.example.com
+        hostname: ${HOSTNAME:-}
         port: 3000
-
-  db:
-    # TODO: pin to a digest; swap for managed Timescale in prod.
-    image: timescale/timescaledb:2.18.0-pg17
-    environment:
-      # Dev plaintext — prod overlay injects via the Secret (see Rule 5 label).
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: metrics-stack
-    labels:
-      # Rule 5: route sensitive vars to a Secret instead of the default ConfigMap.
-      katenary.v3/secrets: |-
-        - POSTGRES_PASSWORD
