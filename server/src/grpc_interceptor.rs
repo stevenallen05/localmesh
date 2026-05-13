@@ -1,11 +1,11 @@
 use opentelemetry::global;
 use opentelemetry::propagation::Extractor;
-use tonic::metadata::KeyRef;
-use tonic::{metadata::MetadataMap, Request, Status};
-use tracing::Span;
-use tracing_opentelemetry::OpenTelemetrySpanExt;
+use opentelemetry::Context;
+use tonic::metadata::{KeyRef, MetadataMap};
 
-struct MetadataExtractor<'a>(&'a MetadataMap);
+/// Wraps a tonic `MetadataMap` so the OTel propagator can read B3 / W3C
+/// headers off the incoming gRPC request.
+pub struct MetadataExtractor<'a>(pub &'a MetadataMap);
 
 impl<'a> Extractor for MetadataExtractor<'a> {
     fn get(&self, key: &str) -> Option<&str> {
@@ -22,14 +22,12 @@ impl<'a> Extractor for MetadataExtractor<'a> {
     }
 }
 
-/// Tonic interceptor — extracts B3 headers from incoming metadata and
-/// attaches the propagated OpenTelemetry context to the current span so
-/// the handler's `#[instrument]`-created span becomes a child of the
-/// upstream trace.
-pub fn extract_trace_context<T>(req: Request<T>) -> Result<Request<T>, Status> {
-    let cx = global::get_text_map_propagator(|prop| {
-        prop.extract(&MetadataExtractor(req.metadata()))
-    });
-    let _ = Span::current().set_parent(cx);
-    Ok(req)
+/// Extract the upstream OpenTelemetry context from incoming gRPC metadata.
+/// Call from inside the handler body (not from a tonic interceptor — the
+/// interceptor runs before the handler's #[instrument] span is created, so
+/// set_parent there has nothing to attach to).
+pub fn parent_context(metadata: &MetadataMap) -> Context {
+    global::get_text_map_propagator(|prop| {
+        prop.extract(&MetadataExtractor(metadata))
+    })
 }
