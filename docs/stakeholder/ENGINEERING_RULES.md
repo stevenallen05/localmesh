@@ -82,8 +82,8 @@ configuration surface, versioning policy — defined by the catalogue.
 **Business need.** Reduce misconfiguration incidents; shorten
 time-to-value for new teams; keep audit-relevant configuration auditable
 rather than buried under override layers; avoid the configuration sprawl
-where each team's `values.yaml` runs hundreds of lines because nothing has
-a default.
+where each team's configuration file runs hundreds of lines because nothing
+has a default.
 
 **Assumption.** Default-setters (the platform team) have more context
 about the organization-wide right answer than default-consumers (product

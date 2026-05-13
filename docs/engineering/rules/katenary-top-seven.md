@@ -4,7 +4,7 @@ In rough order of "if you skip this, your chart is silently broken":
 
 Katenary references images from a registry; it can't run a build. `build: .` will either error or produce a chart pointing at nothing useful. Always use `image: registry/repo:explicit-tag` — not `:latest`, not bare names. The tag becomes part of the Helm chart's deploy contract.
 
-> *PoC shortcut:* hardcoded `0.1.0`, no registry prefix. Prod evolution in [`PROJECT_SCOPE.md`](../PROJECT_SCOPE.md).
+> *PoC shortcut:* hardcoded `0.1.0`, no registry prefix. Prod evolution in [`PROJECT_SCOPE.md`](../../stakeholder/PROJECT_SCOPE.md).
 
 **2. `katenary.v3/main-app` on exactly one service**
 
@@ -16,7 +16,7 @@ webapp:
     katenary.v3/main-app: "true"
 ```
 
-> *PoC shortcut:* single chart with `server` as main-app. Per-service charts (Conway's-law shaped) are a [`PROJECT_SCOPE.md`](../PROJECT_SCOPE.md) item.
+> *PoC shortcut:* single chart with `server` as main-app. Per-service charts (Conway's-law shaped) are a [`PROJECT_SCOPE.md`](../../stakeholder/PROJECT_SCOPE.md) item.
 
 **3. `katenary.v3/ports` on every `depends_on` target**
 
@@ -29,7 +29,7 @@ database:
       - 5432
 ```
 
-> *PoC shortcut:* port label only; no real readiness probe. Prod pairs with `katenary.v3/health-check` — see [`PROJECT_SCOPE.md`](../PROJECT_SCOPE.md).
+> *PoC shortcut:* port label only; no real readiness probe. Prod pairs with `katenary.v3/health-check` — see [`PROJECT_SCOPE.md`](../../stakeholder/PROJECT_SCOPE.md).
 
 **4. `katenary.v3/map-env` for any cross-service hostname**
 
@@ -59,7 +59,7 @@ database:
       - POSTGRES_PASSWORD
 ```
 
-> *PoC shortcut:* label is set, but the dev password sits in compose plaintext. Prod uses a real secrets backend — see [`PROJECT_SCOPE.md`](../PROJECT_SCOPE.md).
+> *PoC shortcut:* label is set, but the dev password sits in compose plaintext. Prod uses a real secrets backend — see [`PROJECT_SCOPE.md`](../../stakeholder/PROJECT_SCOPE.md).
 
 **6. `katenary.v3/ingress` for anything externally reachable**
 
@@ -73,7 +73,7 @@ webapp:
       port: 80
 ```
 
-> *PoC shortcut:* placeholder hostname `www.example.com` baked in. Prod uses `values.yaml` override + cert-manager — see [`PROJECT_SCOPE.md`](../PROJECT_SCOPE.md).
+> *PoC shortcut:* placeholder hostname `www.example.com` baked in. Prod uses `values.yaml` override + cert-manager — see [`PROJECT_SCOPE.md`](../../stakeholder/PROJECT_SCOPE.md).
 
 **7. `katenary.v3/ignore` on every dev-only service**
 

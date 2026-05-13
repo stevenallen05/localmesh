@@ -9,6 +9,12 @@ the size and complexity of your business.
 in this take-home. They are the prompts you'd use to start a kickoff
 conversation about taking this pattern to production.
 
+**Companion docs:**
+[`PROJECT_SCOPE.md`](./PROJECT_SCOPE.md) — what's in / out of scope.
+[`ENGINEERING_RULES.md`](./ENGINEERING_RULES.md) — the rules that drove
+the architecture. [`DESIGN_DECISIONS.md`](./DESIGN_DECISIONS.md) — current
+state of each decision.
+
 **How to read each topic:**
 
 - The **bold headline** is the question you'll need to answer.

@@ -11,29 +11,28 @@ generated from compose, not hand-maintained.
 
 ## Read these first
 
-- [`docs/ENGINEERING_RULES.md`](./docs/ENGINEERING_RULES.md) — the design
-  rules and assumptions underlying every decision in the repo. Each rule
-  is tied to a business need and stays generic; no project-specific
-  references. Read these to understand the *why*.
-- [`docs/PROJECT_SCOPE.md`](./docs/PROJECT_SCOPE.md) — the boundary
-  between what this take-home actually ships and what a production
-  deployment would assume. Read this before treating any "PoC shortcut"
-  or "dev-only" caveat as a gap.
-- [`docs/PRODUCTION_DISCUSSIONS.md`](./docs/PRODUCTION_DISCUSSIONS.md) —
-  stakeholder-facing **discovery framework**. The conversations a prod
-  engagement would start with, sized by the complexity of your
-  business. Pairs with Scope: Scope is the *what*, Discussions is the
-  *what to talk through* (and how deep that talk goes for your situation).
-- [`docs/DESIGN_DECISIONS.md`](./docs/DESIGN_DECISIONS.md) — current state
-  of every design choice, one row each. The dev/rationale/prod columns
-  give you the shape of the system in a couple of minutes.
+Stakeholder-facing context — read these regardless of role:
 
-## Project documentation
+- [`docs/stakeholder/ENGINEERING_RULES.md`](./docs/stakeholder/ENGINEERING_RULES.md) —
+  the design rules tied to business needs. Read these to understand the *why*.
+- [`docs/stakeholder/PROJECT_SCOPE.md`](./docs/stakeholder/PROJECT_SCOPE.md) —
+  the boundary between what this take-home actually ships and what a
+  production deployment would assume.
+- [`docs/stakeholder/PRODUCTION_DISCUSSIONS.md`](./docs/stakeholder/PRODUCTION_DISCUSSIONS.md) —
+  the **discovery framework** for a real prod engagement, sized by the
+  complexity of your business.
+- [`docs/stakeholder/DESIGN_DECISIONS.md`](./docs/stakeholder/DESIGN_DECISIONS.md) —
+  current state of every design choice, one row each (dev choice,
+  rationale, production-considerations signposts).
+
+Engineering-side material (code-facing implementation rules):
+
+- [`docs/engineering/rules/`](./docs/engineering/rules/) — stack-specific
+  style notes for Rust and the compose→Helm tool (katenary).
+
+## All project documentation
 
 - [`requirements.md`](./requirements.md) — original take-home requirements (read-only reference).
-- [`docs/ENGINEERING_RULES.md`](./docs/ENGINEERING_RULES.md) — north-star design rules. Generic; tied to business needs.
-- [`docs/PROJECT_SCOPE.md`](./docs/PROJECT_SCOPE.md) — dev/prod scope boundary.
-- [`docs/PRODUCTION_DISCUSSIONS.md`](./docs/PRODUCTION_DISCUSSIONS.md) — stakeholder-facing discovery framework; pre-prod discussion agenda sized by business complexity.
-- [`docs/DESIGN_DECISIONS.md`](./docs/DESIGN_DECISIONS.md) — current shape of each design choice.
-- [`docs/rules/`](./docs/rules/) — stack-specific style notes (Rust, katenary).
+- [`docs/stakeholder/`](./docs/stakeholder/) — stakeholder-facing documents (rules, scope, discussions, decisions).
+- [`docs/engineering/`](./docs/engineering/) — engineer-facing implementation rules.
 - [`docs/superpowers/`](./docs/superpowers/) — exploration artifacts, design specs, plans, and other agentic/research material. Detailed technical specs live under `docs/superpowers/specs/`.
