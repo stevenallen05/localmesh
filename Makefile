@@ -1,3 +1,5 @@
+# Begin ops team responsibility
+
 .PHONY: setup chart chart-lint
 
 # TODO: standardize how contributors install pipx; pending prod infra & provider choices.
@@ -12,3 +14,14 @@ chart:
 
 chart-lint:
 	./tools/helm-v4.1.4-linux-amd64 lint chart
+
+# End ops team responsibility
+
+# Begin individual team responsibility
+
+test:
+ echo "To be done per-project"
+
+# Others could include `lint`, `build`, etc. 
+
+# End individual team responsibility
