@@ -1,0 +1,14 @@
+# Catalogue aggregator — modules every team's stack pulls in unconditionally.
+# Top-level docker-compose.yml `include:`s this file; this file `include:`s
+# each required module.
+#
+# Adding a required module:
+#   1. Land its compose file under `service_catalog/<module>/docker-compose.yml`.
+#   2. Append it below.
+#
+# Optional modules (logs, tracing-storage tier-2, etc.) get their own
+# aggregator when they show up.
+
+include:
+  - path: observability/docker-compose.yml
+  - path: security/docker-compose.yml

@@ -1,0 +1,19 @@
+# Security catalogue module — required, currently a stub.
+#
+# Future-tense placeholders for what this module would wire up:
+#
+#   - Dev CA (e.g., step-ca) — mints per-service certs on `up` so local
+#     mTLS matches prod. Today: `make mtls` out-of-band.
+#   - Prod CA wiring — katenary labels pointing at cert-manager /
+#     Vault PKI / private ACME so the generated chart picks the right issuer.
+#   - User-auth gateway — oauth2-proxy (or equivalent) + the org IdP in
+#     front of www. Today: CloudFlare Zero Trust tunnel handles this.
+#   - Secrets backend sidecar — pulls from Vault / Secrets Manager / GSM
+#     into a shared tmpfs. Today: env-injected.
+#   - Policy + admission — OPA / Kyverno baseline for egress, image
+#     provenance, capabilities. Mostly a chart-time concern; dev-time
+#     approximations land here.
+#
+# Empty `services:` so compose treats this as a valid includable file.
+
+services: {}

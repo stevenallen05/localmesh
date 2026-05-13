@@ -1,5 +1,8 @@
+# `service_catalog/` is inlined in this repo for demo legibility. In a real
+# org this would arrive either from an ops-team git repo (vendored, or via
+# git submodule / sparse-checkout) or a katenary plugin provided by ops.
 include:
-  - path: service_catalog/observability/docker-compose.yml
+  - path: service_catalog/required.compose.yaml
 
 services:
   server:
