@@ -17,31 +17,38 @@ configuration are author-specific).
 
 ## Out of scope — the production assumption set
 
-> **Production deployment** of the same architecture assumes infrastructure
-> this take-home does not ship: a **service mesh** (Istio / Linkerd /
-> Cilium) with workload-identity-issued mTLS (SPIFFE/SPIRE or equivalent)
-> for cross-service authentication; a **real secrets backend** (External
-> Secrets Operator, Sealed Secrets, Vault CSI, or cloud KMS) replacing
-> the bind-mounted dev `secrets/` directory; an **OCI registry** for
-> image distribution with signed builds, SBOMs, and provenance
-> attestation; **multi-stage hardened container images** (distroless
-> base, non-root USER, real healthchecks); a **CI/CD pipeline** that
-> regenerates the Helm chart on each merge and publishes signed
-> artifacts; **cluster ingress** with cert-manager and an organizational
-> identity provider; **named storage classes** provisioned by Longhorn or
-> a managed equivalent (`soc2_sensitive`, `fault_tolerant_cache`, etc.);
-> **horizontal-scale-friendly topology** (multiple collector replicas,
-> TSDB cluster mode, stateless web tier behind a CDN); a **real gRPC
-> load balancer** (Envoy, grpc-web bridge, or mesh sidecar) replacing
-> the dev direct-dial; **structured observability backends** with
-> retention, audit, and PII redaction (e.g., a logs module added to the
-> catalogue); **per-service chart structure** (each service its own
-> chart, top-level chart as meta) once Conway's-law boundaries solidify;
-> and **linter rules enforcing catalogue compliance** on team PRs.
-> **Provider choices** — cloud vs. on-prem, managed services for the
-> data tier, regional posture, compliance class — are all out of scope
-> and would be the decisions a production engagement *starts* with, not
-> ends with.
+Production deployment of the same architecture assumes infrastructure this
+take-home does not ship:
+
+- **Service mesh** (Istio / Linkerd / Cilium) with workload-identity-issued
+  mTLS (SPIFFE/SPIRE or equivalent) for cross-service authentication.
+- **Real secrets backend** (External Secrets Operator, Sealed Secrets,
+  Vault CSI, or cloud KMS) replacing the bind-mounted dev `secrets/`
+  directory.
+- **OCI registry** for image distribution, with signed builds, SBOMs, and
+  provenance attestation.
+- **Hardened container images** — multi-stage builds, distroless base,
+  non-root `USER`, real healthchecks.
+- **CI/CD pipeline** that regenerates the Helm chart on each merge and
+  publishes signed artifacts.
+- **Cluster ingress** with cert-manager and an organizational identity
+  provider.
+- **Named storage classes** (e.g., `soc2_sensitive`,
+  `fault_tolerant_cache`) provisioned by Longhorn or a managed equivalent.
+- **Horizontal-scale topology** — multiple collector replicas, TSDB
+  cluster mode, stateless web tier behind a CDN.
+- **Real gRPC load balancer** — Envoy, grpc-web bridge, or mesh sidecar —
+  replacing the dev direct-dial.
+- **Structured observability backends** with retention, audit, and PII
+  redaction (e.g., a logs catalogue module).
+- **Per-service chart structure** — each service its own chart, top-level
+  chart as meta — once Conway's-law boundaries solidify.
+- **Linter rules** enforcing catalogue compliance on team PRs.
+- **Provider choices** — cloud vs. on-prem, managed services for the data
+  tier, regional posture, compliance class.
+
+Provider choices in particular would be the decisions a production
+engagement *starts* with, not ends with.
 
 ## Implications for reviewers
 
