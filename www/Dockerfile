@@ -12,7 +12,7 @@ FROM node:22-alpine
 WORKDIR /app
 COPY www/package.json www/package-lock.json ./
 RUN npm ci
-COPY www/tsconfig.json www/next-env.d.ts ./
+COPY www/tsconfig.json www/next-env.d.ts www/next.config.ts ./
 COPY www/pages ./pages
 COPY www/instrumentation.ts ./
 COPY proto /app/proto
