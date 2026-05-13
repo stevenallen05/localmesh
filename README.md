@@ -20,8 +20,10 @@ generated from compose, not hand-maintained.
   deployment would assume. Read this before treating any "PoC shortcut"
   or "dev-only" caveat as a gap.
 - [`docs/PRODUCTION_DISCUSSIONS.md`](./docs/PRODUCTION_DISCUSSIONS.md) —
-  the open conversations a prod engagement would start with. Pairs with
-  Scope: Scope is the *what*, Discussions is the *what to talk through*.
+  stakeholder-facing **discovery framework**. The conversations a prod
+  engagement would start with, sized by the complexity of your
+  business. Pairs with Scope: Scope is the *what*, Discussions is the
+  *what to talk through* (and how deep that talk goes for your situation).
 - [`docs/DESIGN_DECISIONS.md`](./docs/DESIGN_DECISIONS.md) — current state
   of every design choice, one row each. The dev/rationale/prod columns
   give you the shape of the system in a couple of minutes.
@@ -31,7 +33,7 @@ generated from compose, not hand-maintained.
 - [`requirements.md`](./requirements.md) — original take-home requirements (read-only reference).
 - [`docs/ENGINEERING_RULES.md`](./docs/ENGINEERING_RULES.md) — north-star design rules. Generic; tied to business needs.
 - [`docs/PROJECT_SCOPE.md`](./docs/PROJECT_SCOPE.md) — dev/prod scope boundary.
-- [`docs/PRODUCTION_DISCUSSIONS.md`](./docs/PRODUCTION_DISCUSSIONS.md) — canonical pre-prod discussion agenda.
+- [`docs/PRODUCTION_DISCUSSIONS.md`](./docs/PRODUCTION_DISCUSSIONS.md) — stakeholder-facing discovery framework; pre-prod discussion agenda sized by business complexity.
 - [`docs/DESIGN_DECISIONS.md`](./docs/DESIGN_DECISIONS.md) — current shape of each design choice.
 - [`docs/rules/`](./docs/rules/) — stack-specific style notes (Rust, katenary).
 - [`docs/superpowers/`](./docs/superpowers/) — exploration artifacts, design specs, plans, and other agentic/research material. Detailed technical specs live under `docs/superpowers/specs/`.

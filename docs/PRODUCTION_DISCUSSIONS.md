@@ -1,143 +1,228 @@
 # Production discussions
 
-Canonical agenda for the conversations that would precede taking this
-architecture to production. **Not commitments, not decisions** — the
-discussions we'd need to have, at the level of detail useful for a
-project-shape conversation rather than implementation.
+This document is a **discovery framework** for stakeholders. It surfaces the
+conversations that would precede taking this architecture to production —
+not as a list of work items, but as a map of decisions to weigh against
+the size and complexity of your business.
 
-Pairs with:
+**This is not a project plan.** None of the topics below are committed work
+in this take-home. They are the prompts you'd use to start a kickoff
+conversation about taking this pattern to production.
 
-- [`ENGINEERING_RULES.md`](./ENGINEERING_RULES.md) — the rules each
-  resulting decision should respect.
-- [`PROJECT_SCOPE.md`](./PROJECT_SCOPE.md) — the assumption set
-  separating dev from prod.
-- [`DESIGN_DECISIONS.md`](./DESIGN_DECISIONS.md) — the dev-side current
-  state of each choice.
+**How to read each topic:**
+
+- The **bold headline** is the question you'll need to answer.
+- The plain text is the context — what's at stake, what the common
+  answers look like.
+- The *italic line* at the end tells you when that question stops being
+  trivial.
+
+---
+
+## When do these conversations matter?
+
+Most of these conversations have a near-trivial answer for a small,
+simple organization, and a load-bearing answer for an enterprise. The
+same architecture serves both — what scales is the **depth of
+conversation** behind each topic.
+
+| Your situation | What this document looks like for you |
+|---|---|
+| **Small / simple** (1–3 teams, single region, internal users only) | Most topics have an obvious default. The conversations are short. Focus on Security, Reliability, and Provider & cost. |
+| **Mid-stage** (10–50 teams, B2B customers, some regulatory exposure) | Half the topics become load-bearing. Catalogue Governance and CI/CD & Release Management start mattering at this stage. |
+| **Enterprise** (100+ teams, multi-tenant SaaS, regulated, multi-region) | Every topic is on the table. None of the answers are nominal. |
+
+**Scaling factors that drive conversation depth:**
+
+- **Team count.** A few teams can share defaults; many teams need a
+  catalogue and governance.
+- **Customer profile.** Internal-only is forgiving; enterprise customers
+  demand compliance proofs.
+- **Regulatory exposure.** GDPR, HIPAA, SOC2, PCI each add their own
+  required answers.
+- **Geographic spread.** Single-region is simple; multi-region adds
+  residency, replication, and failover.
+- **Workload variety.** One product is a different shape from a platform
+  hosting many.
+
+Use this to triage which conversations to invest in first.
 
 ---
 
 ## Security, compliance & identity
 
-- **SSO-scoped observability.** Production metrics and logs scoped by the
-  same dimension that gates the source code (GitHub repo permissions,
-  team membership, environment label) via SSO. *If you can't see the repo
-  or environment, you can't see its data in the dashboards.* Scales
-  horizontally with team count; produces a clean enterprise-customer
-  compliance story without bespoke per-tenant work.
-- **Embedded-dashboard auth.** How iframe-embedded panels inherit the
-  user's session — forward-auth from the front-door identity provider,
-  OIDC directly into Grafana, or a shared cookie domain.
-- **Workload identity.** SPIFFE/SPIRE vs. cloud-native IAM-for-service-accounts
-  vs. mesh-native primitives. Which CA trust chain is canonical; SVID
-  rotation timing.
-- **Service-to-service permissions.** Mesh-policy-backed RBAC; what the
-  human-readable interface is (CRDs, Rego, mesh-native syntax).
-- **Operator auth & audit.** Who can touch the cluster, registries,
-  Vault, the catalogue. Where actions get logged. Integration with the
-  org's SIEM.
-- **Secrets backend.** ESO / Sealed Secrets / Vault CSI / cloud KMS —
-  driven by what other workloads in the org already use.
-- **PII redaction.** Where it happens in the pipeline (collector
-  processor, log aggregator, application code). Policy-driven via tags
-  vs. per-team contracts.
-- **Per-workload compliance class.** A single human-reviewable label
-  (`soc2_sensitive`, `hipaa`, `pci`, `gdpr`, `internal`) flows from team
-  to storage class, audit retention window, and mesh policy strictness.
+- **Who can see whose data?** Reuse the same SSO that gates source-code
+  access (GitHub, Okta, Active Directory, etc.) to gate observability —
+  *if you can't see the repo, you can't see its metrics or logs*. Scales
+  horizontally with team count and produces a clean enterprise-compliance
+  story without bespoke per-tenant work. *— Matters more with team count
+  and customer mix.*
+- **How does a user log into an embedded dashboard?** Iframed dashboards
+  need an auth handoff: forward-auth from the front-door identity
+  provider, direct SSO into the dashboard tool, or a shared cookie
+  domain. *— Matters more for customer-facing dashboards.*
+- **How does a service prove its identity to another?** Service-to-service
+  authentication needs a substrate: mesh-issued workload identity, cloud
+  IAM-for-service-accounts, or mesh-native primitives. *— Matters more
+  with zero-trust posture and regulatory exposure.*
+- **Which service is allowed to call which?** Per-service authorization
+  rules expressed as mesh policy or policy-as-code. *— Matters more with
+  service count and blast-radius concerns.*
+- **Who has the keys to the kingdom?** Operator access to clusters,
+  registries, secrets vaults, and the catalogue. Where those actions are
+  logged. Integration with the security team's existing SIEM. *— Matters
+  more with operator count and regulatory exposure.*
+- **Where do secrets live?** Pick a backend that matches what other
+  workloads in the organization already use — Vault, External Secrets,
+  Sealed Secrets, cloud KMS. Avoid running multiple. *— Matters more
+  with workload count and audit requirements.*
+- **What gets redacted, where, and by whom?** PII filtering happens
+  somewhere in the logging pipeline — at the collector, the aggregator,
+  or in the application. Policy-driven or per-team contract. *— Matters
+  more with user-data sensitivity and regulatory exposure.*
+- **What compliance tier is each workload?** A single human-readable
+  label (`soc2`, `hipaa`, `pci`, `internal`, etc.) on each team's
+  workload, flowing automatically to storage class, audit retention, and
+  policy strictness. *— Matters more with regulatory diversity.*
 
 ## Reliability, scale & multi-region
 
-- **SLOs per layer.** Availability + latency budgets per service tier;
-  error budgets; how budgets attach to alerting.
-- **Multi-region posture.** Active-active / active-passive /
-  single-region. Replication semantics for the TSDB and the catalogue.
-- **Horizontal-scale topology.** Per-component replica/cluster patterns
-  (collector replicas, TSDB cluster mode, stateless web tier behind CDN);
-  scaling triggers.
-- **Capacity planning model.** How teams estimate resource needs;
-  whether the catalogue ships small/medium/large presets.
-- **Cardinality budgets.** Per-team metric cardinality limits;
-  enforcement model; what teams see when they exceed.
-- **Rollback strategy.** Per-component — image rollback for app servers,
-  config rollback for catalogue modules, schema-migration reversibility
-  for stateful services.
+- **What service levels do customers expect?** Per-tier availability and
+  latency targets; how error budgets shape alerting and release
+  cadence. *— Matters more with customer SLA commitments.*
+- **What's the geographic posture?** Active-active, active-passive, or
+  single-region. Replication semantics for storage and the catalogue.
+  *— Matters more with geographic customer spread and regulatory
+  residency.*
+- **How does the stack scale horizontally?** Per-component patterns —
+  collector replicas, time-series clustering, stateless web tier behind
+  a CDN. Auto-scaling triggers. *— Matters more with traffic volume and
+  team count.*
+- **How do teams know how big to ask?** Catalogue presets (small /
+  medium / large) vs. team-driven estimation. *— Matters more with
+  resource pressure and team count.*
+- **How much metric cardinality can each team consume?** Per-team
+  budgets and enforcement; what teams see when they exceed.
+  *— Matters more with shared-infrastructure pressure.*
+- **How do we roll back when something breaks?** Per-component — image
+  rollback for stateless services, config rollback for catalogue
+  modules, schema reversibility for stateful ones. *— Matters more with
+  deploy frequency and change-failure tolerance.*
 
 ## Storage, data lifecycle & residency
 
-- **Named storage class registry.** Canonical list, what each class
-  enforces (encryption, redundancy, audit, region pinning), who owns
-  additions.
-- **Retention policy.** Per data class — metrics, logs, traces —
-  retention windows; downsampling thresholds; cold-storage handoff.
-- **Backup & DR.** Cadence per workload class; restore-time objectives;
-  tabletop frequency.
-- **Tenant isolation.** Shared TSDB with label-based scoping vs.
-  namespace-isolated vs. dedicated tenancy per compliance class.
-- **Data residency.** Which regions hold which workload classes;
-  cross-region transit gating.
+- **What named storage classes does the catalogue offer?** Canonical
+  list (e.g., `soc2_sensitive`, `fault_tolerant_cache`,
+  `ephemeral_scratch`); what each enforces (encryption, replication,
+  audit, region); who can add new classes. *— Matters more with workload
+  variety and compliance class diversity.*
+- **How long do we keep what?** Per-data-type retention — metrics, logs,
+  traces — windows, downsampling, cold-storage handoff. *— Matters more
+  with regulatory retention and storage cost.*
+- **What's the backup and DR posture?** Cadence per workload class;
+  restore-time objectives; tabletop exercise frequency. *— Matters more
+  with revenue-at-risk and compliance obligations.*
+- **How are tenants isolated?** Label-scoped on a shared store,
+  namespace-isolated, or dedicated tenancy per compliance class.
+  *— Matters more with multi-tenancy and customer-data segregation
+  requirements.*
+- **Which data lives in which region?** Region pinning per workload
+  class; gating cross-region transit. *— Matters more with geographic
+  customer base and regulatory residency.*
 
 ## CI/CD & release management
 
-- **Promotion path.** Dev → staging → prod environments; which gates
-  automatic, which human.
-- **Trigger conventions.** Push to main vs. tagged release vs. PR labels;
-  per-team overrides.
-- **Deployment strategy.** Canary / blue-green / rolling — per-component
-  defaults; opt-outs.
-- **Supply-chain security.** Image signing (cosign / sigstore); SBOM
-  generation; provenance attestation; vulnerability-scan thresholds that
-  block promotion.
-- **Per-team CI contract.** What teams owe the catalogue's CI hooks
-  (`make test`, `make build`, `make verify`, etc.) and what the catalogue
-  provides in return.
+- **What's the promotion path?** Dev → staging → prod environments;
+  automatic gates vs. human gates. *— Matters more with deploy
+  frequency and change-risk profile.*
+- **What triggers a deploy?** Push to main, tagged release, PR
+  label-driven, scheduled. Per-team overrides. *— Matters more with
+  team variety.*
+- **What deployment strategy?** Canary, blue-green, rolling — per
+  component, with opt-outs. *— Matters more with change-failure cost.*
+- **What does the supply chain require?** Image signing, SBOMs,
+  provenance attestation, vulnerability-scan promotion gates.
+  *— Matters more with regulatory exposure and enterprise customer
+  demands.*
+- **What's the contract between team and catalogue?** What teams owe the
+  catalogue's CI hooks (`make test`, `make build`, `make verify`) and
+  what the catalogue provides back. *— Matters more with team count.*
 
 ## Catalogue governance
 
-- **Module versioning.** SemVer; per-module release cadence; how
-  breaking changes are flagged to consuming teams.
-- **Migration paths.** When a module ships a breaking change, the
-  consuming team's runway; codemod / automated-PR support.
-- **Module deprecation.** Sunsetting policy; support window for
-  deprecated modules; replacement discoverability.
-- **Linter rule severity.** Which catalogue-compliance rules block merge
-  vs. warn; how exemptions are granted and audited.
-- **Ownership model.** Per module — platform team, SRE rotation, or a
-  specific team. Handoff process when ownership changes.
-- **Contribution flow.** How a team proposes a new module; how a module
-  becomes "official."
-- **Module dev↔prod swap mechanic.** URL include / OCI-distributed
-  compose snippet / CI substitution / Helm chart dependency — which one
-  is canonical; how it interacts with versioning.
+- **How are catalogue modules versioned?** SemVer; per-module release
+  cadence; how breaking changes are communicated to consuming teams.
+  *— Matters more with module count and team count.*
+- **How do teams migrate when a module breaks?** Runway for breaking
+  changes; codemod or automated-PR support. *— Matters more with
+  breaking-change frequency.*
+- **How do modules retire?** Deprecation policy; support windows;
+  replacement discoverability. *— Matters more with module-lineage
+  complexity.*
+- **Which catalogue rules block merge?** Severity model — what's a
+  hard-stop vs. a warning; how exemptions are granted and audited.
+  *— Matters more with compliance enforcement.*
+- **Who owns each module?** Platform team, SRE rotation, or a specific
+  team. Handoff process when ownership changes. *— Matters more with
+  module count and personnel churn.*
+- **How do teams contribute new modules?** Proposal flow; promotion to
+  "official." *— Matters more with desire for democratic platform
+  evolution.*
+- **How do dev includes become prod includes?** URL-based includes,
+  OCI-distributed snippets, CI substitution, Helm chart dependencies.
+  *— Matters more with multi-environment promotion strictness.*
 
 ## Observability hardening
 
-- **Logs catalogue module.** Loki / ELK / vendor — packaged as a
-  catalogue module alongside the metrics module.
-- **Tracing backend.** Tempo / Jaeger / vendor; head- vs. tail-based
-  sampling decisions; cross-service trace propagation expectations.
-- **Alerting infrastructure.** Grafana Alerting / Alertmanager / vendor;
-  how alert rules are versioned (alongside the dashboard module).
-- **Dashboard provisioning.** Dashboards-as-code vs. UI-edited;
-  per-team vs. catalogue-shared library; review path for changes.
-- **On-call tooling.** PagerDuty / OpsGenie / vendor; how teams declare
-  their rotation.
+- **Where do logs go?** A logs catalogue module — Loki / ELK / vendor —
+  packaged the same way as the metrics module. *— Matters more with
+  audit and debugging volume.*
+- **Where do traces go?** Tempo / Jaeger / vendor; head- vs.
+  tail-based sampling. *— Matters more with service count.*
+- **How are alerts authored and versioned?** Alongside dashboards-as-code
+  or separate. Integration with the on-call system. *— Matters more
+  with on-call team size and SLO strictness.*
+- **Are dashboards code or UI-edited?** Per-team vs. shared library;
+  review path for changes. *— Matters more with dashboard count and
+  governance requirements.*
+- **How do humans get paged?** PagerDuty, OpsGenie, vendor. How teams
+  declare their rotation. *— Matters more with team count and SLA
+  commitments.*
 
 ## Networking
 
-- **Ingress strategy.** Mesh-native gateway / cloud LB / Kubernetes
-  ingress controller. Per-environment defaults.
-- **East-west traffic.** Mesh sidecar vs. ambient mesh; mTLS enforcement
-  scope (everywhere vs. selected hops).
-- **Egress controls.** Per-team allowlists for cluster-external
-  destinations; how the catalogue exposes them.
+- **What's the ingress strategy?** Mesh-native gateway, cloud load
+  balancer, or Kubernetes ingress controller. *— Matters more with
+  public-facing surface area.*
+- **Where does mTLS get enforced?** Mesh sidecar everywhere, ambient
+  mesh, or selectively at certain hops. *— Matters more with zero-trust
+  posture.*
+- **Can teams reach external services?** Per-team egress allowlists;
+  how the catalogue exposes them. *— Matters more with security and
+  compliance enforcement.*
 
 ## Provider & cost
 
-- **Cloud / on-prem / hybrid.** Top-level provider posture;
-  vendor-locked vs. portable services.
-- **Managed vs. self-hosted.** Per-service decision matrix — when does
-  managed Grafana / Postgres / Vault beat the self-hosted catalogue
-  module.
-- **Per-team chargeback.** Cost attribution model; team spend
-  visibility; budget alarms.
-- **Resource quotas.** Per-team limits on CPU, memory, storage, metric
-  cardinality.
+- **Cloud, on-prem, or hybrid?** Top-level provider posture; vendor-lock
+  tolerance; portability requirements. *— Matters more with regulatory
+  or commercial constraints on hosting.*
+- **What do we run, what do we buy?** Per-service managed vs.
+  self-hosted decision matrix — managed Grafana, managed Postgres,
+  managed Vault. *— Matters more with operational headcount and total
+  cost of ownership.*
+- **How is cost attributed back to teams?** Chargeback model; team
+  spend visibility; budget alarms. *— Matters more with team count and
+  finance-team scrutiny.*
+- **What can a team consume?** Per-team CPU, memory, storage, and
+  cardinality quotas. *— Matters more with shared-cluster pressure.*
+
+---
+
+## What to do with this document
+
+In a kickoff conversation with stakeholders, walk the sections relevant
+to your situation (use the *— Matters more with* tags to triage), and
+capture which questions have known answers, which need investment, and
+which can be deferred. The output becomes a real project plan; this
+document remains the source-of-truth checklist the plan can be reviewed
+against.
