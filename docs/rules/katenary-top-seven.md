@@ -2,9 +2,9 @@ In rough order of "if you skip this, your chart is silently broken":
 
 **1. How to `build:` with `image:` tags**
 
-Katenary references images from a registry; it can't run a build. `build: .` will either error or produce a chart pointing at nothing useful. Always use `image: registry/repo:explicit-tag` — not `:latest`, not bare names. The tag becomes part of the Helm chart's deploy contract. Build context
+Katenary references images from a registry; it can't run a build. `build: .` will either error or produce a chart pointing at nothing useful. Always use `image: registry/repo:explicit-tag` — not `:latest`, not bare names. The tag becomes part of the Helm chart's deploy contract.
 
-> *PoC shortcut:* hardcoded `0.1.0` placeholder, no registry prefix, no CI tag derivation. Prod CI sets the tag from a git release and pushes to a real registry (`ghcr.io/...`, `<account>.dkr.ecr...`).
+> *PoC shortcut:* hardcoded `0.1.0`, no registry prefix. Prod evolution in [`PROJECT_SCOPE.md`](../PROJECT_SCOPE.md).
 
 **2. `katenary.v3/main-app` on exactly one service**
 
@@ -16,7 +16,7 @@ webapp:
     katenary.v3/main-app: "true"
 ```
 
-> *PoC shortcut:* single chart, `server` is main-app. Prod splits each service into its own per-service chart (Conway's law) and this top-level chart becomes a meta-chart that depends on them.
+> *PoC shortcut:* single chart with `server` as main-app. Per-service charts (Conway's-law shaped) are a [`PROJECT_SCOPE.md`](../PROJECT_SCOPE.md) item.
 
 **3. `katenary.v3/ports` on every `depends_on` target**
 
@@ -29,7 +29,7 @@ database:
       - 5432
 ```
 
-> *PoC shortcut:* port label only; no actual readiness probe behind it. Prod pairs this with `katenary.v3/health-check` so the init container waits on real readiness rather than TCP-open.
+> *PoC shortcut:* port label only; no real readiness probe. Prod pairs with `katenary.v3/health-check` — see [`PROJECT_SCOPE.md`](../PROJECT_SCOPE.md).
 
 **4. `katenary.v3/map-env` for any cross-service hostname**
 
@@ -44,7 +44,7 @@ webapp:
       DB_HOST: "{{ .Release.Name }}-database"
 ```
 
-> *PoC shortcut:* one cross-service hostname (`www → server`), rewritten inline. Sufficient for the single-release demo; once multiple releases or namespaces are in play, prefer a shared ConfigMap of service endpoints over duplicating these labels.
+> *PoC shortcut:* cross-service hostnames rewritten inline per service. Multi-release setups should switch to a shared ConfigMap of endpoints.
 
 **5. `katenary.v3/secrets` for sensitive env vars**
 
@@ -59,7 +59,7 @@ database:
       - POSTGRES_PASSWORD
 ```
 
-> *PoC shortcut:* label is set, but the dev password (`postgres`) sits in compose plaintext. Prod replaces it with an overlay that wires the chart's Secret to External Secrets / Sealed Secrets / Vault.
+> *PoC shortcut:* label is set, but the dev password sits in compose plaintext. Prod uses a real secrets backend — see [`PROJECT_SCOPE.md`](../PROJECT_SCOPE.md).
 
 **6. `katenary.v3/ingress` for anything externally reachable**
 
@@ -73,7 +73,7 @@ webapp:
       port: 80
 ```
 
-> *PoC shortcut:* placeholder hostname `www.example.com` baked in. Prod overrides via `values.yaml` and pairs with cert-manager (or the cluster's standard TLS issuer) for the actual certificate.
+> *PoC shortcut:* placeholder hostname `www.example.com` baked in. Prod uses `values.yaml` override + cert-manager — see [`PROJECT_SCOPE.md`](../PROJECT_SCOPE.md).
 
 **7. `katenary.v3/ignore` on every dev-only service**
 
@@ -86,7 +86,7 @@ mailhog:
     katenary.v3/ignore: "true"
 ```
 
-> *PoC shortcut:* nothing to label — no dev-only services in compose yet. When the first one lands (adminer, mailhog, a debug proxy), add the label in the same edit that adds the service.
+> *PoC shortcut:* nothing to label — no dev-only services yet. Add the label in the same edit that introduces the first one.
 
 **Honorable mentions** worth knowing about once the seven above are habit:
 
