@@ -16,7 +16,7 @@ This repo is a reference implementation of the **microservice-template + service
 | Orchestration | Compose is source of truth; pre-commit hook generates the Helm chart. | Compose is the practical ceiling for self-service teams; chart is build output. | Chart generation runs in CI; published to an internal registry. |
 | Module composition | Compose `include:` pulls `service_catalog/observability/` from the catalogue. | Required and optional modules added by reference, not copy-paste. | Include path swaps to a platform-published location. |
 | Observability module | Off-the-shelf collector + exporters + TSDB (Time-Series Database) + dashboards. | All battle-tested; team adds no value building these. | TSDB swaps to a managed/clustered equivalent at scale. |
-| Server | Rust gRPC, one v0 endpoint, traces + metrics. | Preserves the original template wire-shape; instrumentation makes it visible. | Demo endpoint replaced by real product methods. |
+| Server | Rust gRPC, one v0 endpoint, traces (application metrics pending re-design). | Preserves the original template wire-shape; trace instrumentation visible end-to-end. | Demo endpoint replaced by real product methods; metric surface added once chosen. |
 | Server → metrics DB | mTLS (mutual TLS), certificates injected by the catalogue's secrets layer. | Worked example of the inter-service mTLS pattern. | File-mounted certs replaced by mesh-issued short-lived identities. |
 | www | Next.js front-end, traces enabled, dashboard panels embedded inline. | Pages, API routes, middleware all emit traces; Grafana owns dashboard chrome. | Iframe embeds wrapped by an auth gateway. |
 | gRPC load balancing | Next.js backend calls Rust directly, server-side. | Browser → HTTPS → Next.js → gRPC → Rust. The gRPC hop stays server-side. | Mesh-aware LB (Load Balancer) or grpc-web bridge. |
@@ -29,7 +29,7 @@ This repo is a reference implementation of the **microservice-template + service
 | Compose-to-Helm labels | Standard label set from [`katenary-top-seven.md`](../engineering/rules/katenary-top-seven.md). | Each label flips one specific compose→Helm translation. | May extend with org-specific custom labels. |
 | README scope | `docker compose up`; runs in GitHub Codespaces per the take-home requirements. | Codespaces is the most predictable demo environment for reviewers. | Deployment runs via the org's standard CI/CD. |
 | Live demo | CloudFlare Zero Trust tunnel + Access to author's K8s cluster. | Easy public URL with an auth gate; no warranty for other clusters. | Real ingress with cert-manager + org IdP (Identity Provider). |
-| Logging | Rust structured logs ride the telemetry pipe; off-the-shelf services log to stdout. | One observability surface; no parallel pipeline. | Add a logs catalogue module (Loki, etc.) for retention/audit. |
+| Logging | Rust prints lifecycle events to stdout; off-the-shelf services log to stdout. | Minimal surface; one observability pipe via traces, no separate logs pipeline. | Add a logs catalogue module (Loki, etc.) for retention/audit; structured logs added if/when their absence bites. |
 | Bonuses | All six items from `requirements.md` in scope. | OTel (OpenTelemetry)-everywhere carries logging and error handling; catalogue argument carries data design. | Per-bonus mapping in the spec. |
 
 ### Process notes (not architecture)
@@ -44,6 +44,7 @@ V0 questions still in flux. Production-scope questions live in [`PRODUCTION_DISC
 - **Rust gRPC API surface beyond v0.** Health, metric-getter, streaming, auth, error mapping.
 - **mTLS demonstration depth.** Minimum: server logs successful connection at startup. Reviewer-visible: on-demand gRPC method + UI button.
 - **Collector → TSDB mTLS on the dev path.** Plain HTTP for now; uniform with the Rust→TSDB hop is possible at small cost.
+- **Application metrics on the Rust + www path.** v0 had `say_hello_total` + `say_hello_duration_seconds`; both removed in chunk 5b. Re-design pending — likely per-method gRPC duration + status distribution, instrumented via middleware not hand-rolled.
 
 ## Deviations from `requirements.md`
 

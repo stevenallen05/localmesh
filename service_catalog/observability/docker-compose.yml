@@ -128,21 +128,19 @@ configs:
     content: |
       {
         "uid": "say-hello",
-        "title": "Say-hello demo",
+        "title": "Demo placeholder",
         "schemaVersion": 39,
         "version": 1,
-        "refresh": "5s",
-        "time": { "from": "now-5m", "to": "now" },
         "panels": [
           {
             "id": 1,
-            "type": "timeseries",
-            "title": "say_hello requests / s",
-            "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
-            "datasource": { "type": "prometheus", "uid": "vm" },
-            "targets": [
-              { "expr": "rate(say_hello_total[1m])", "refId": "A" }
-            ]
+            "type": "text",
+            "title": "Metrics TBD",
+            "gridPos": { "h": 6, "w": 24, "x": 0, "y": 0 },
+            "options": {
+              "mode": "markdown",
+              "content": "Application metrics have been removed pending re-design.\n\nInfra metrics from node-exporter and cadvisor still flow to VictoriaMetrics — see Grafana → Explore → VictoriaMetrics.\n\nTraces continue to flow to Tempo — see Grafana → Explore → Tempo, or the Service Graph view."
+            }
           }
         ]
       }
