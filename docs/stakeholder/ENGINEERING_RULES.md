@@ -143,12 +143,50 @@ known. **Over** making the "right" call with insufficient information.
 
 ---
 
-## Applying these rules
+## Conway's Law is the substrate, not the enemy
 
-The rules form a coherent posture: a platform that **doesn't ask product
-teams to become deploy experts**, that **scales its decisions
-horizontally** across teams, and that **defers irreversible commitments
-until the data arrives**.
+**Conway's Law** says any system reflects the communication structure of
+the organization that built it. Most failed platform efforts try to
+*fight* this — design a unified system that ignores team boundaries —
+and get the predictable result: cross-team merge conflicts, integration
+stalls, ownership ambiguity, and architecture that drifts back toward
+team-shaped fault lines anyway.
+
+The rules above are designed to **push with Conway's Law**, not against
+it. Each one removes a place where the architecture could fight the org
+structure:
+
+- Each team owns one declarative deployment file (**Rule 1**) → the
+  team becomes the deployment boundary, by design.
+- Cross-cutting concerns live in shared, catalogued modules
+  (**Rules 2 and 3**) → no team re-invents the same observability /
+  auth / data-tier stack, and the platform team can roll out
+  cross-cutting changes in one place.
+- Defaults are set centrally (**Rule 4**) → platform owns the *shape*;
+  product teams own the *product*. The seam runs where the headcount
+  seam runs.
+- Compliance-relevant choices surface alongside the service definition
+  (**Rule 5**) → cross-team reviewers (SREs, security, audit) read
+  along the team boundary, not around it.
+- Off-the-shelf for undifferentiated work, custom for differentiated
+  (**Rule 6**) → the org's engineering hours go where the org actually
+  differentiates, not into rebuilding things every other org has
+  already built.
+- Defer over-determined choices (**Rule 7**) → the architecture stays
+  responsive to whichever team owns the new context when it arrives,
+  instead of being shaped by an early decision made before that team
+  existed.
+
+The architecture *is* the team structure. New team → new repo. Team
+merger → repo merge. Team split → repo split. Org-chart changes are
+deployment changes — a feature, not a bug.
+
+This is why the seven rules form a coherent posture rather than seven
+unrelated preferences. Each one closes a path where the platform could
+have ended up fighting Conway's Law; what's left lines up with how the
+work actually flows.
+
+## When these rules don't apply
 
 If your organization is small enough that the platform team can write
 everyone's Helm chart by hand, the trade-offs invert: the cost of
