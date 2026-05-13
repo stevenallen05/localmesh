@@ -18,7 +18,7 @@ export default function Home() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ test_before: input }),
+        body: JSON.stringify({ name: input }),
       });
 
       const data = await res.json();
@@ -27,7 +27,7 @@ export default function Home() {
         throw new Error(data.error || 'Failed to call gRPC service');
       }
 
-      setResponse(data.test_after);
+      setResponse(data.message);
     } catch (err: any) {
       setError(err.message);
     } finally {

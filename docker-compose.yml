@@ -10,6 +10,11 @@ services:
     image: metrics-stack/server:0.1.0  # Rule 1
     environment:
       SERVER_ADDR: 0.0.0.0:50051
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_SERVICE_NAME: server
+    depends_on:
+      otel-collector:
+        condition: service_started
     healthcheck:
       # bash built-in TCP test — no extra packages on bookworm.
       test: ["CMD", "bash", "-c", "</dev/tcp/localhost/50051"]
@@ -33,12 +38,16 @@ services:
     environment:
       # Rule 4 rewrites this to `{{ .Release.Name }}-server:50051` in k8s.
       SERVER_ADDR: server:50051
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: www
       HOSTNAME: ${HOSTNAME:-}
     ports:
       - "3000:3000"
     depends_on:
       server:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     healthcheck:
       # BusyBox wget ships in Node alpine.
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]

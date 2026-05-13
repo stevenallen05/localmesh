@@ -14,6 +14,8 @@ COPY www/package.json www/package-lock.json ./
 RUN npm ci
 COPY www/tsconfig.json www/next-env.d.ts ./
 COPY www/pages ./pages
+COPY www/instrumentation.ts ./
+COPY proto /app/proto
 RUN npm run build
 EXPOSE 3000
 CMD ["npm", "start"]
