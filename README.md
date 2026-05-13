@@ -9,45 +9,66 @@ generated from compose, not hand-maintained. Architecture record:
 [`docs/DESIGN_DECISIONS.md`](./docs/DESIGN_DECISIONS.md). Full design:
 [`docs/superpowers/specs/2026-05-13-microservice-template-design.md`](./docs/superpowers/specs/2026-05-13-microservice-template-design.md).
 
-## Design posture
+## Design rules
 
-A few rules, applied throughout:
+Heuristics for choosing A vs B in the decisions below. They assume an
+organization large enough that no single platform team can hand-hold every
+product team's deploy; in a smaller org, the trade-offs invert.
 
-- **If you want people to do it, you have to make it easy.** Compose is the
-  practical ceiling of what most product teams will reasonably maintain on
-  their own. Asking them to also own Helm charts, Kubernetes manifests, mesh
-  policy, Vault roles, and Grafana datasources is how platform teams burn
-  out trying to onboard new ones. Compose `include:` lets a team write
-  *one* file and pull pre-built pieces from a catalogue.
+**1. Compose-as-ceiling.** Prefer designs that bottom out at a
+`docker-compose.yml` the team owns, over designs that require teams to
+maintain Kubernetes manifests, Helm charts, or mesh policy directly.
+- *Assumes:* product teams let infra they don't understand rot.
+- *Decides:* `katenary` auto-derives the Helm chart from compose; teams never
+  hand-edit charts.
 
-- **Making complexity easy requires being prescriptive.** A "catalogue
-  module" is a defined shape — compose snippet, katenary labels, env
-  interface, published version — not "whatever you want to call a module."
-  The prescription is what makes the result composable across teams instead
-  of N bespoke observability stacks growing in parallel.
+**2. Catalogue over copy-paste.** Prefer published, versioned, ops-maintained
+modules that teams `include:` over per-team reinvention of the same stack.
+- *Assumes:* without a shared source, *N* teams converge on *N* divergent
+  forks of the same observability/auth/cache layer.
+- *Decides:* observability lives in `modules/observability/` as a catalogue
+  module, not inline in the team's compose.
 
-- **Sensible defaults over infinite configuration.** Volume classes are
-  named (`soc2_sensitive`, `fault_tolerant_cache`), not free-form. mTLS has
-  *one* dev workflow (`make mtls`). Image tags get *one* placeholder until CI
-  knows better. Every defaulted choice can be overridden; almost none should
-  need to be.
+**3. Prescription beats flexibility for composable things.** Prefer a fixed
+module shape — compose snippet + katenary labels + env interface + version —
+over "module = whatever you call a module."
+- *Assumes:* without prescription, every team renegotiates the integration
+  contract from scratch.
+- *Decides:* the catalogue is opinionated about a module's shape; teams use
+  the shape, they don't redesign it.
 
-- **Human-reviewable in PR labels, not buried in YAML.** The decisions that
-  matter — what storage class this volume needs, which secrets are
-  sensitive, which services get ingress, which need mTLS — surface as
-  `katenary.v3/*` labels next to the service definition. A reviewer reads
-  the labels; the generated chart is build output.
+**4. Defaults over knobs.** Prefer one sensible default that 80% of teams
+accept over an exhaustive configuration surface that 100% of teams
+misconfigure.
+- *Assumes:* default-setters (ops) have more context than default-consumers
+  (product teams).
+- *Decides:* volume classes are *named* (`soc2_sensitive`,
+  `fault_tolerant_cache`); image tags are *one* placeholder; mTLS has *one*
+  dev workflow (`make mtls`).
 
-- **Off-the-shelf where possible; custom where it differentiates.** The
-  observability stack is entirely off-the-shelf (OpenTelemetry Collector,
-  VictoriaMetrics, Grafana, node-exporter, cadvisor). The Rust gRPC API is
-  custom — that's the team's product. Build-vs-buy is decided per slot, not
-  per repo.
+**5. Labels over YAML for review surface.** Prefer surfacing important
+decisions as labels next to the service definition over leaving them in
+generated chart output.
+- *Assumes:* reviewer attention is finite; what they read is what they
+  catch.
+- *Decides:* `katenary.v3/*` labels carry storage class, secret-vs-configmap
+  routing, ingress, and mTLS wiring. The generated chart is build output.
 
-- **Storage decisions defer to where production context exists.** Picking a
-  TSDB schema without knowing volume, retention SLA, query patterns, or
-  tenancy model is premature. The catalogue ships a battle-tested default;
-  the specifics are an ops-team conversation, not a team-onboarding burden.
+**6. Off-the-shelf for undifferentiated; custom for differentiated.** Prefer
+mature OSS where the team adds no value by building.
+- *Assumes:* every dependency you maintain is one you pay for later, in
+  on-call.
+- *Decides:* the observability stack is bought (OpenTelemetry Collector,
+  VictoriaMetrics, Grafana, the standard infra exporters); the Rust gRPC API
+  is built — that's the team's product.
+
+**7. Defer over-determined choices.** Prefer the battle-tested default over
+making the "right" call with insufficient production context.
+- *Assumes:* premature optimization compounds badly; reversibility is
+  cheaper than precision.
+- *Decides:* the TSDB ships unconfigured; schema, retention, and tenancy
+  choices belong in a follow-up driven by real volume — not in the
+  onboarding burden.
 
 ## Project documentation
 
