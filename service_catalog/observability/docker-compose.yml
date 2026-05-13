@@ -57,11 +57,44 @@ configs:
       apiVersion: 1
       datasources:
         - name: VictoriaMetrics
+          uid: vm
           type: prometheus
           access: proxy
           url: http://victoriametrics:8428
           isDefault: true
           editable: false
+
+  grafana_dashboards_provider:
+    content: |
+      apiVersion: 1
+      providers:
+        - name: default
+          type: file
+          options:
+            path: /etc/grafana/dashboards
+
+  grafana_say_hello_dashboard:
+    content: |
+      {
+        "uid": "say-hello",
+        "title": "Say-hello demo",
+        "schemaVersion": 39,
+        "version": 1,
+        "refresh": "5s",
+        "time": { "from": "now-5m", "to": "now" },
+        "panels": [
+          {
+            "id": 1,
+            "type": "timeseries",
+            "title": "say_hello requests / s",
+            "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+            "datasource": { "type": "prometheus", "uid": "vm" },
+            "targets": [
+              { "expr": "rate(say_hello_total[1m])", "refId": "A" }
+            ]
+          }
+        ]
+      }
 
 services:
   otel-collector:
@@ -126,9 +159,16 @@ services:
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+      # Required for the www page's iframe — Grafana otherwise sets
+      # X-Frame-Options: SAMEORIGIN and the embed renders blank.
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
     configs:
       - source: grafana_vm_datasource
         target: /etc/grafana/provisioning/datasources/vm.yaml
+      - source: grafana_dashboards_provider
+        target: /etc/grafana/provisioning/dashboards/default.yaml
+      - source: grafana_say_hello_dashboard
+        target: /etc/grafana/dashboards/say-hello.json
     volumes:
       - grafana-data:/var/lib/grafana
     healthcheck:
