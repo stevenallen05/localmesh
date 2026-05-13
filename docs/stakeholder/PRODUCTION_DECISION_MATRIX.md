@@ -22,35 +22,36 @@ using a **3-star rating scale**:
 
 **Conventions:**
 
-- Candidate lists are **examples, not exhaustive** — real research
+- **Dimensions are 1-2 words.** Sharp axes beat verbose ones.
+- **Candidate lists** are examples, not exhaustive — real research
   surfaces the real candidates.
-- Dimensions are **chosen per decision** — pick the ≤7 that matter most
-  for the organization's situation; don't force every decision into the
-  same shape.
-- Empty cells are correct at design time. They get filled in by real
+- **Empty cells are correct at design time.** They get filled in by real
   engineering investigation.
+- **Pick up to 7 dimensions per decision** — don't force every decision
+  into the same shape.
 
 ---
 
-## Example: service mesh
+## Example: choosing a cluster OS (bare-metal)
 
-Underlying conversation:
-[`PRODUCTION_DISCUSSIONS.md`](./PRODUCTION_DISCUSSIONS.md) §Security,
-compliance & identity → *"How does a service prove its identity to
-another?"*
+The shape of a bare-metal Kubernetes deployment is set by which OS
+underpins the cluster. Underlying conversation:
+[`PRODUCTION_DISCUSSIONS.md`](./PRODUCTION_DISCUSSIONS.md) §Reliability,
+scale & multi-region → *"How are hardware drivers versioned and
+updated?"* + §Provider & cost → *"Cloud, on-prem, or hybrid?"*
 
 **Candidate solutions** (non-exhaustive):
-Istio, Linkerd, Cilium Service Mesh, Consul Connect, AWS App Mesh.
+TalosOS, RHEL CoreOS, Ubuntu Server LTS, Rocky Linux, openSUSE Leap Micro.
 
-| Dimension | Istio | Linkerd | Cilium | Consul Connect | AWS App Mesh |
+| Dimension | TalosOS | RHEL CoreOS | Ubuntu LTS | Rocky | openSUSE |
 |---|---|---|---|---|---|
-| Low operational complexity | | | | | |
-| Workload-identity (SPIFFE) integration | | | | | |
-| Multi-cluster / multi-region support | | | | | |
-| Documentation maturity | | | | | |
-| Community size & activity | | | | | |
-| Total cost of ownership | | | | | |
-| Existing team skill fit | | | | | |
+| Immutable | | | | | |
+| API surface | | | | | |
+| Hardware breadth | | | | | |
+| Driver story | | | | | |
+| Air-gap | | | | | |
+| Maturity | | | | | |
+| Cost | | | | | |
 
 ---
 
@@ -58,20 +59,25 @@ Istio, Linkerd, Cilium Service Mesh, Consul Connect, AWS App Mesh.
 
 Each major decision from
 [`PRODUCTION_DISCUSSIONS.md`](./PRODUCTION_DISCUSSIONS.md) gets its own
-matrix. A real engagement copies the structure above with dimensions and
-candidates relevant to the decision. Some likely starting points:
+matrix. Likely starting points, oriented toward a bare-metal /
+datacenter deployment:
 
-| Decision | Underlying conversation | Example candidates (non-exhaustive) |
+| Decision | Conversation | Example candidates (non-exhaustive) |
 |---|---|---|
-| **Secrets backend** | Security & identity → "Where do secrets live?" | HashiCorp Vault, External Secrets Operator, Sealed Secrets, AWS Secrets Manager, GCP Secret Manager, Doppler |
-| **Time-series database** | Observability hardening + Storage | Prometheus, VictoriaMetrics, Mimir, Thanos, InfluxDB, ClickHouse |
-| **Logs aggregation backend** | Observability hardening → "Where do logs go?" | Loki, ELK, ClickHouse, Datadog, Splunk |
-| **Tracing backend** | Observability hardening → "Where do traces go?" | Tempo, Jaeger, Honeycomb, Datadog APM |
-| **Rollback tooling tier** | Reliability → "How do teams roll back?" | Manual (kubectl rollout undo), GitOps-driven (Argo CD / Flux), Progressive delivery (Argo Rollouts / Flagger), Vendor-managed (Spinnaker / Harness) |
-| **Image registry** | CI/CD → "Supply-chain security" | Harbor, GHCR, ECR, GCR, ACR, Quay, Artifactory |
-| **CI/CD orchestrator** | CI/CD → "Promotion path" + "Trigger conventions" | GitHub Actions, GitLab CI, Tekton, Argo Workflows, Buildkite, CircleCI |
-| **Dashboard provisioning model** | Observability hardening → "Dashboards as code vs. UI" | Grafana (UI-edited), Grafana (provisioned via dashboards-as-code), Perses, vendor-managed |
-| **Cluster ingress** | Networking → "Ingress strategy" | NGINX Ingress, Traefik, Istio Gateway, Envoy Gateway, cloud-vendor LB |
+| **Cluster OS** | (example above) | TalosOS, RHEL CoreOS, Ubuntu LTS, Rocky, openSUSE Micro |
+| **CNI / pod networking** | Networking → "ingress strategy" | Cilium, Calico, Flannel, Weave |
+| **Bare-metal load balancer** | Networking → "ingress strategy" | MetalLB, Cilium LB, Kube-VIP |
+| **Distributed storage** | Storage → "named storage classes" | Longhorn, Rook/Ceph, OpenEBS, Portworx, MayaStor |
+| **Hardware lifecycle / provisioning** | Reliability → "driver versioning" | Tinkerbell, Metal3, Rancher Elemental, vendor BMC tooling |
+| **Service mesh** | Security → "service identity" | Istio, Linkerd, Cilium SM, Consul Connect |
+| **Operational isolation tier** | Security → "customer vs. company isolation" | Shared cluster, dedicated namespaces, dedicated node pools, dedicated clusters, physical separation |
+| **Secrets backend** | Security → "where do secrets live" | Vault, External Secrets Operator, Sealed Secrets, HSM-backed |
+| **Logs aggregation** | Observability → "where do logs go" | Loki, ELK, ClickHouse, vendor (Datadog, Splunk) |
+| **Tracing backend** | Observability → "where do traces go" | Tempo, Jaeger, Honeycomb |
+| **Rollback tooling tier** | Reliability → "how do teams roll back" | Manual, GitOps (Argo CD / Flux), Progressive delivery (Argo Rollouts / Flagger), Vendor-managed |
+| **Image registry** | CI/CD → "supply-chain security" | Harbor, GHCR, ECR, GCR, Quay, Artifactory |
+| **CI/CD orchestrator** | CI/CD → "promotion path" | GitHub Actions, GitLab CI, Tekton, Argo Workflows, Buildkite |
+| **Dashboard provisioning** | Observability → "dashboards as code" | Grafana (UI-edited), Grafana (provisioned), Perses, vendor-managed |
 
-For each: pick up to 7 dimensions, list the real candidates, leave the
+For each: pick up to 7 sharp dimensions, list real candidates, leave the
 cells empty for the research phase.

@@ -89,10 +89,26 @@ Use this to triage which conversations to invest in first.
   somewhere in the logging pipeline — at the collector, the aggregator,
   or in the application. Policy-driven or per-team contract. *— Matters
   more with user-data sensitivity and regulatory exposure.*
-- **What compliance tier is each workload?** A single human-readable
-  label (`soc2`, `hipaa`, `pci`, `internal`, etc.) on each team's
-  workload, flowing automatically to storage class, audit retention, and
-  policy strictness. *— Matters more with regulatory diversity.*
+- **What compliance flags apply to each workload?** Per-workload
+  **boolean labels** that compose rather than tier:
+  `sensitive_data`, `personally_identifiable`, `export_controlled`,
+  `regulated_health`, `payment_card`, and so on. A workload can carry
+  any combination. Each flag has an **enforcement mode** — *self-attested*
+  (team declares), *enforced* (technical controls block), or *audited*
+  (after-the-fact verification). Flags flow automatically to storage
+  class, audit retention, and policy strictness. *— Matters more with
+  regulatory diversity and customer-driven compliance cascades.*
+- **How isolated are customer workloads from company workloads?** When
+  the company's own services share infrastructure with customer
+  workloads, a single operational mistake can cascade into a
+  customer-visible outage — Facebook's 2021 DNS outage locking employees
+  out of the building is the canonical case. The spectrum runs from
+  shared-everything (single cluster, mixed workloads) through
+  namespace-level isolation, dedicated node pools, dedicated clusters,
+  all the way to physical separation (different racks, different
+  datacenters). *— Matters more with risk tolerance, customer-driven
+  compliance cascades (ITAR, GDPR, etc. cascade virally from customer
+  contracts), and cost sensitivity.*
 
 ## Reliability, scale & multi-region
 
@@ -123,6 +139,15 @@ Use this to triage which conversations to invest in first.
   larger investment. *— Matters more with deploy frequency,
   change-failure tolerance, stateful-workload prevalence, and the
   organization's appetite for progressive-delivery tooling.*
+- **How are hardware drivers versioned and updated?** Specialized
+  hardware — GPUs, FPGAs, smart NICs, NVMe accelerators, custom ASICs —
+  depends on kernel modules whose versions have to match the OS image
+  and the workloads using them. Driver upgrades coordinate with
+  workload-side compatibility, OS image bakes, and per-hardware-tier
+  validation testing. The driver lifecycle becomes a first-class
+  scheduling concern, not a one-time install. *— Matters more with
+  hardware diversity, specialized-hardware fleet size, and bare-metal
+  posture.*
 
 ## Storage, data lifecycle & residency
 
