@@ -40,12 +40,17 @@ configs:
       exporters:
         prometheusremotewrite:
           endpoint: http://victoriametrics:8428/api/v1/write
+        debug:
+          verbosity: detailed
       service:
         extensions: [health_check]
         pipelines:
           metrics:
             receivers: [otlp, prometheus]
             exporters: [prometheusremotewrite]
+          traces:
+            receivers: [otlp]
+            exporters: [debug]
 
   grafana_vm_datasource:
     content: |
