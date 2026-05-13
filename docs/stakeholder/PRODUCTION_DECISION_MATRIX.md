@@ -1,94 +1,31 @@
 # Production decision matrix
 
-A **structured research scaffold** for evaluating candidate solutions
-against consistent dimensions, used in conjunction with
-[`PRODUCTION_DISCUSSIONS.md`](./PRODUCTION_DISCUSSIONS.md).
+Visual shape for the kind of decision-framework needed once production context is known. Operational tool for Rule 7 of [`ENGINEERING_RULES.md`](./ENGINEERING_RULES.md) — **defer over-determined choices**.
 
-> **This document is intentionally blank.** Filling in the cells with
-> real comparative research is **beyond the scope of this take-home**.
-> The framework is the deliverable; a production engagement does the
-> research and fills in the cells.
+> **Intentionally blank.** Filling cells with real research is beyond this take-home's scope; the framework is the deliverable.
 
-This matrix is the operational tool for
-[`ENGINEERING_RULES.md`](./ENGINEERING_RULES.md) **Rule 7 — defer
-over-determined choices**. The decisions captured here are the ones that
-fit into the *"TBD until we know more about prod"* category — vendor
-and tooling choices that depend on organizational context (SCM in use,
-existing skill base, cloud relationships, customer commitments) that
-doesn't yet exist or hasn't yet been surfaced.
+3-star ratings, up to 7 dimensions per decision. Dimensions are 1-2 words. Candidate lists are illustrative.
 
-## How to read
+| Rating | Meaning |
+|---|---|
+| ★☆☆ | **No.** Doesn't address this dimension. |
+| ★★☆ | **Sorta.** Partial fit with caveats. |
+| ★★★ | **Yes.** Fits naturally. |
 
-Each decision evaluates candidate solutions across **up to 7 dimensions**
-using a **3-star rating scale**:
+## Example: Secrets backend
 
-| Rating | Meaning | What it implies (≤10 words) |
-|---|---|---|
-| ★☆☆ | **No** | Solution doesn't meaningfully address this dimension. |
-| ★★☆ | **Sorta** | Partial fit; works with explicit caveats or effort. |
-| ★★★ | **Yes** | Solution fits this dimension naturally, low friction. |
+Replaces the dev `secrets/` directory and `make mtls` keys. Pairs with the **Local mTLS (mutual TLS) setup** and **Secrets injection** rows in [`DESIGN_DECISIONS.md`](./DESIGN_DECISIONS.md). See [`PRODUCTION_DISCUSSIONS.md`](./PRODUCTION_DISCUSSIONS.md) §Security.
 
-**Conventions:**
+**Candidates** (a mix of self-hosted strategies and managed vendors): Vault, External Secrets Operator (ESO), Sealed Secrets, AWS Secrets Manager (AWS SM), Doppler.
 
-- **Dimensions are 1-2 words.** Sharp axes beat verbose ones.
-- **Candidate lists** are examples, not exhaustive — real research
-  surfaces the real candidates.
-- **Empty cells are correct at design time.** They get filled in by real
-  engineering investigation.
-- **Pick up to 7 dimensions per decision** — don't force every decision
-  into the same shape.
-
----
-
-## Example: choosing a CI/CD orchestrator
-
-CI/CD orchestrator choice is the canonical *"TBD until we know more"*
-decision: it depends on where source code lives (which SCM), the org's
-existing CI footprint, deployment shape (Kubernetes-native or not), and
-team skill base. Underlying conversation:
-[`PRODUCTION_DISCUSSIONS.md`](./PRODUCTION_DISCUSSIONS.md) §CI/CD &
-release management → *"What's the promotion path?"* and *"What triggers
-a deploy?"*
-
-**Candidate solutions** (non-exhaustive):
-GitHub Actions, GitLab CI, Tekton, Argo Workflows, Buildkite.
-
-| Dimension | GH Actions | GitLab CI | Tekton | Argo Workflows | Buildkite |
+| Dimension | Vault | ESO | Sealed Secrets | AWS SM | Doppler |
 |---|---|---|---|---|---|
 | Self-hosted | | | | | |
-| K8s-native | | | | | |
-| Cost | | | | | |
-| Maturity | | | | | |
-| Integrations | | | | | |
-| Speed | | | | | |
+| Kubernetes-native | | | | | |
+| Rotation | | | | | |
+| Audit trail | | | | | |
+| Cloud-agnostic | | | | | |
+| Operator burden | | | | | |
 | Skill fit | | | | | |
 
----
-
-## Using this template for other decisions
-
-Each major *defer-until-prod-context* decision from
-[`PRODUCTION_DISCUSSIONS.md`](./PRODUCTION_DISCUSSIONS.md) gets its own
-matrix. Likely starting points, in roughly the order they tend to come
-up in a production engagement:
-
-| Decision | Conversation | Example candidates (non-exhaustive) |
-|---|---|---|
-| **CI/CD orchestrator** | (example above) | GitHub Actions, GitLab CI, Tekton, Argo Workflows, Buildkite, Jenkins |
-| **External load balancer** | Networking → "ingress strategy" | NGINX, HAProxy, Envoy, Traefik, Istio Gateway, cloud ALB/GLB |
-| **Static content / CDN** | Networking → "how do static assets get to users" | CloudFront, Cloudflare, Fastly, Akamai, Bunny, KeyCDN |
-| **Image registry** | CI/CD → "supply-chain security" | Harbor, GHCR, ECR, GCR, Quay, Artifactory |
-| **DNS provider** | Networking (cert routing + ingress) | Cloudflare DNS, Route53, NS1, dnsimple |
-| **WAF / DDoS protection** | Networking + Security | Cloudflare, AWS WAF, Akamai, Imperva |
-| **SSO / IdP** | Security → "operator auth & audit" + "embedded-dashboard auth" | Okta, Azure AD, Auth0, Keycloak, Google Workspace |
-| **Secrets backend** | Security → "where do secrets live" | Vault, External Secrets Operator, Sealed Secrets, AWS Secrets Manager, Doppler |
-| **Service mesh** | Security → "service identity" | Istio, Linkerd, Cilium SM, Consul Connect |
-| **Logs aggregation** | Observability → "where do logs go" | Loki, ELK, ClickHouse, Datadog, Splunk |
-| **Tracing backend** | Observability → "where do traces go" | Tempo, Jaeger, Honeycomb, Datadog APM |
-| **Dashboard provisioning** | Observability → "dashboards as code vs. UI" | Grafana (UI), Grafana (provisioned), Perses, vendor-managed |
-| **Rollback tooling tier** | Reliability → "how do teams roll back" | Manual, GitOps (Argo CD / Flux), Progressive delivery (Argo Rollouts / Flagger), Vendor-managed |
-| **Email / notification gateway** | Cross-cutting | SES, SendGrid, Postmark, Mailgun, vendor SMTP |
-| **Bare-metal cluster stack** | Provider & cost → "cloud, on-prem, or hybrid" | TalosOS + MetalLB + Longhorn (bare-metal); EKS / GKE / AKS (cloud); Rancher (hybrid) |
-
-For each: pick up to 7 sharp dimensions, list real candidates, leave the
-cells empty for the research phase.
+Every other defer-until-prod decision (CI/CD orchestrator, load balancer, CDN (Content Delivery Network), image registry, DNS, service mesh, observability backends, rollback tooling, IdP (Identity Provider), bare-metal stack, …) gets the same treatment.
