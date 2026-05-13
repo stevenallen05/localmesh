@@ -1,0 +1,143 @@
+# Observability catalogue module — dev-local stub of the catalogue version.
+# Included from the team's top-level docker-compose.yml.
+#
+# External env interface (consumed by team services in later chunks):
+#   OTEL_EXPORTER_OTLP_ENDPOINT  http://otel-collector:4317
+#   TSDB_URL                     http://victoriametrics:8428  (https in mTLS chunk)
+#
+# Host port map:
+#   victoriametrics  8428  PromQL HTTP (reviewer-debug curl path)
+#   grafana          3001  UI (in-container 3000)
+#
+# Healthchecks: only services whose images ship shell utilities get them.
+# otel-collector, node-exporter, cadvisor ship distroless / FROM scratch
+# bases — they use service_started for ordering.
+
+configs:
+  otel_collector_config:
+    content: |
+      extensions:
+        health_check:
+          endpoint: 0.0.0.0:13133
+      receivers:
+        otlp:
+          protocols:
+            grpc:
+              endpoint: 0.0.0.0:4317
+            http:
+              endpoint: 0.0.0.0:4318
+        prometheus:
+          config:
+            scrape_configs:
+              - job_name: node-exporter
+                static_configs:
+                  - targets: ['node-exporter:9100']
+                scrape_interval: 30s
+              - job_name: cadvisor
+                static_configs:
+                  - targets: ['cadvisor:8080']
+                scrape_interval: 30s
+      exporters:
+        prometheusremotewrite:
+          endpoint: http://victoriametrics:8428/api/v1/write
+      service:
+        extensions: [health_check]
+        pipelines:
+          metrics:
+            receivers: [otlp, prometheus]
+            exporters: [prometheusremotewrite]
+
+  grafana_vm_datasource:
+    content: |
+      apiVersion: 1
+      datasources:
+        - name: VictoriaMetrics
+          type: prometheus
+          access: proxy
+          url: http://victoriametrics:8428
+          isDefault: true
+          editable: false
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.116.0
+    container_name: otel-collector
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    configs:
+      - source: otel_collector_config
+        target: /etc/otelcol-contrib/config.yaml
+    depends_on:
+      victoriametrics:
+        condition: service_healthy
+      node-exporter:
+        condition: service_started
+      cadvisor:
+        condition: service_started
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: node-exporter
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: cadvisor
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.106.0
+    container_name: victoriametrics
+    command:
+      - '--storageDataPath=/victoria-metrics-data'
+      - '--httpListenAddr=:8428'
+    ports:
+      - "8428:8428"
+    volumes:
+      - vm-data:/victoria-metrics-data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8428/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+    configs:
+      - source: grafana_vm_datasource
+        target: /etc/grafana/provisioning/datasources/vm.yaml
+    volumes:
+      - grafana-data:/var/lib/grafana
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      victoriametrics:
+        condition: service_healthy
+
+volumes:
+  vm-data: {}
+  grafana-data: {}
