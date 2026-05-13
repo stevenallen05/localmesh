@@ -5,6 +5,10 @@ production deployment of the same architecture would assume.** Read this
 before treating any source-doc caveat ("PoC shortcut," "dev-only,"
 "deferred") as a gap.
 
+Pairs with [`PRODUCTION_DISCUSSIONS.md`](./PRODUCTION_DISCUSSIONS.md),
+which carries the open conversations a prod engagement would start with.
+Scope is the *what*; Discussions is the *what to talk through*.
+
 ## In scope
 
 A developer-facing reference implementation of the **team microservice +

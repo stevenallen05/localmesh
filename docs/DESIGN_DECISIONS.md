@@ -8,19 +8,19 @@ in [`docs/superpowers/specs/`](./superpowers/specs/).
 > microservice-template + service-catalogue pattern** an organization would
 > adopt at the CI/CD layer. The Rust + Next.js parts are *one team's
 > microservice*; observability is a *catalogue module* the team `include:`s.
-> Design rules in [`ENGINEERING_RULES.md`](./ENGINEERING_RULES.md); dev/prod
-> scope boundary in [`PROJECT_SCOPE.md`](./PROJECT_SCOPE.md); full design
-> detail in
+> Design rules in [`ENGINEERING_RULES.md`](./ENGINEERING_RULES.md);
+> dev/prod scope boundary in [`PROJECT_SCOPE.md`](./PROJECT_SCOPE.md);
+> pre-prod discussion agenda in [`PRODUCTION_DISCUSSIONS.md`](./PRODUCTION_DISCUSSIONS.md);
+> full design detail in
 > [`docs/superpowers/specs/2026-05-13-microservice-template-design.md`](./superpowers/specs/2026-05-13-microservice-template-design.md).
 
 ## Settled
 
 > The **prod-considerations** column lists *row-specific* signposts only.
-> Cross-cutting infrastructure assumptions (service mesh, secrets backend,
-> OCI registry, container hardening, CI/CD pipeline, ingress with cert-manager,
-> named storage classes, scaling topology, gRPC LB, observability hardening,
-> per-service charts, linter rules, provider choices) all live in
-> [`PROJECT_SCOPE.md`](./PROJECT_SCOPE.md).
+> The full assumption set (what we assume is in place in prod) lives in
+> [`PROJECT_SCOPE.md`](./PROJECT_SCOPE.md); the discussions that would
+> precede an actual prod deployment live in
+> [`PRODUCTION_DISCUSSIONS.md`](./PRODUCTION_DISCUSSIONS.md).
 
 | Area | Dev choice | Rationale | Prod-considerations (row-specific) |
 |---|---|---|---|
@@ -51,12 +51,13 @@ in [`docs/superpowers/specs/`](./superpowers/specs/).
 
 ## Open
 
+v0-scope design questions still in flux. Production-scope conversations
+(governance, scale, multi-region, supply-chain, etc.) live in
+[`PRODUCTION_DISCUSSIONS.md`](./PRODUCTION_DISCUSSIONS.md).
+
 - **Rust gRPC API surface beyond `Echo`** — `TsdbHealth()`, `GetMetric(name, range)`, `WatchMetric(name) → stream`, auth model, error mapping. v0 ships `Echo`; the rest is its own follow-up.
 - **mTLS demonstration depth** — minimum: Rust startup health-check to VM, logs success. Reviewer-visible: `Greeter.TsdbHealth()` gRPC method + UI button. Both are cheap.
 - **OTel Collector → VM mTLS in dev** — plain HTTP for simplicity; uniform mTLS on the dev path is possible at small cost.
-- **Module dev↔prod swap mechanic** — URL include vs. CI substitution vs. Helm chart dependency. Not blocking v0.
-- **Linter rules for catalogue compliance** — see [`PROJECT_SCOPE.md`](./PROJECT_SCOPE.md). Out of scope for the take-home.
-- **Logs catalogue module** — obvious next step after metrics observability lands.
 
 ## Deviations from `requirements.md`
 
