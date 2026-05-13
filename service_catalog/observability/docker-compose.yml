@@ -42,6 +42,10 @@ configs:
           endpoint: http://victoriametrics:8428/api/v1/write
         debug:
           verbosity: detailed
+        otlp/tempo:
+          endpoint: tempo:4317
+          tls:
+            insecure: true
       service:
         extensions: [health_check]
         pipelines:
@@ -50,7 +54,7 @@ configs:
             exporters: [prometheusremotewrite]
           traces:
             receivers: [otlp]
-            exporters: [debug]
+            exporters: [otlp/tempo, debug]
 
   grafana_vm_datasource:
     content: |
@@ -63,6 +67,35 @@ configs:
           url: http://victoriametrics:8428
           isDefault: true
           editable: false
+
+  grafana_tempo_datasource:
+    content: |
+      apiVersion: 1
+      datasources:
+        - name: Tempo
+          uid: tempo
+          type: tempo
+          access: proxy
+          url: http://tempo:3200
+          editable: false
+
+  tempo_config:
+    content: |
+      server:
+        http_listen_port: 3200
+      distributor:
+        receivers:
+          otlp:
+            protocols:
+              grpc:
+                endpoint: 0.0.0.0:4317
+      storage:
+        trace:
+          backend: local
+          local:
+            path: /var/tempo/blocks
+          wal:
+            path: /var/tempo/wal
 
   grafana_dashboards_provider:
     content: |
@@ -151,6 +184,18 @@ services:
     # No healthcheck: VM image is FROM scratch — no wget/curl/shell.
     # Reviewer-debug: `curl http://localhost:8428/health` from host.
 
+  tempo:
+    image: dhi.io/tempo:2.10
+    container_name: tempo
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    configs:
+      - source: tempo_config
+        target: /etc/tempo/tempo.yaml
+    volumes:
+      - tempo-data:/var/tempo
+    # Internal-only; Grafana proxies it. No healthcheck — Tempo's image
+    # is minimal; rely on service_started for ordering.
+
   grafana:
     image: grafana/grafana:11.4.0
     container_name: grafana
@@ -165,6 +210,8 @@ services:
     configs:
       - source: grafana_vm_datasource
         target: /etc/grafana/provisioning/datasources/vm.yaml
+      - source: grafana_tempo_datasource
+        target: /etc/grafana/provisioning/datasources/tempo.yaml
       - source: grafana_dashboards_provider
         target: /etc/grafana/provisioning/dashboards/default.yaml
       - source: grafana_say_hello_dashboard
@@ -183,3 +230,4 @@ services:
 volumes:
   vm-data: {}
   grafana-data: {}
+  tempo-data: {}
