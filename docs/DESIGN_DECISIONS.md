@@ -1,8 +1,8 @@
 # Design Decisions
 
-Current state of every important design choice, one line each. History in git.
-Technical detail (compose layout, OTel config, mTLS layout, proto, code
-sketches) lives in [`docs/superpowers/specs/`](./superpowers/specs/).
+Current state of every important design choice. History in git. Technical
+detail (compose layout, OTel config, mTLS layout, proto, code sketches) lives
+in [`docs/superpowers/specs/`](./superpowers/specs/).
 
 > **Framing:** this repo is a **reference implementation of the
 > microservice-template + service-catalogue pattern** an organization would
@@ -13,41 +13,44 @@ sketches) lives in [`docs/superpowers/specs/`](./superpowers/specs/).
 
 ## Settled
 
-| Area | Choice |
-|---|---|
-| Vision | Reference implementation of org-scale CI/CD pattern: **ops** owns service mesh + SPIFFE/SPIRE-issued mTLS + service catalogue + named storage classes + top-level CI/CD; **teams** own a docker-compose-shaped microservice repo that `include:`s required (observability, auth) + optional (DB, cache) modules. Linter-enforced compliance on PRs. Catalogue modules ship dev-local stubs that get substituted at deploy time. |
-| Orchestration | `docker compose` is the **single source of truth**; **katenary** auto-derives Helm charts via pre-commit hook (CI in prod). Compose → katenary → helm pipeline is **baked in** — no hand-edited charts. |
-| Module composition | **`docker-compose include:`** for catalogue modules. Top-level compose = team's microservice (`server` + `www`); `modules/observability/docker-compose.yml` is the dev-local catalogue stub. In prod the include swaps to ops-published (URL include, registry compose snippet, or CI substitution). |
-| Stack inside the observability module | **OTel Collector** (`otelcol-contrib`) receives OTLP from Rust + www, scrapes `node-exporter` + `cadvisor` via its prometheus receiver, `prometheusremotewrite`s to **VictoriaMetrics**. **Grafana** queries VM. vmagent dropped — collector covers both ingest paths. |
-| Server | Rust + tonic. **Instrumented with the OpenTelemetry Rust SDK** (`opentelemetry`, `opentelemetry-otlp`, `opentelemetry_sdk`, `tracing`, `tracing-opentelemetry`). Emits OTLP gRPC to the collector. v0 ships `Greeter.Echo` (renamed from `SayHello` template); observable behavior via OTel counters/spans on each call. |
-| Server → TSDB | Rust queries VM over **mTLS** as a worked example of the inter-service-mTLS pattern. `reqwest` + `rustls-tls`, client cert/key/CA paths injected via env (provided by the catalogue's secret-mount conventions). |
-| www | Next.js Pages Router, template UX preserved. Instrumented with **`@vercel/otel`** via `instrumentation.ts`. Pages Router caveat: Next.js OTel docs are App-Router-flavored; the package works for both — page renders, API routes, middleware all emit traces. Grafana panels embed via iframe. |
-| gRPC LB | **Deferred for take-home.** v0 wires the Next.js API route directly to Rust via `@grpc/grpc-js` (server-side; browser never speaks gRPC). Prod swaps in mesh-aware LB + SPIFFE mTLS. |
-| Proto | `proto/hello.proto` — `Greeter.Echo` for v0. Rust commits `tonic-build` output under `server/src/proto/`; TS uses `@grpc/proto-loader` at runtime. |
-| mTLS dev story | `make mtls` runs openssl with **force-override** to produce a dev root CA + per-service keypairs into `secrets/` (gitignored). VM configured to require client certs signed by the root CA. Rust loads paths from env. Compose: bind-mounts. Helm via katenary: secrets+configmap-files. **Prod**: External Secrets Operator / Sealed Secrets / Vault CSI / cloud KMS — none of which live in this repo; the catalogue swap covers it. |
-| Secrets injection | Via katenary standards: `katenary.v3/secrets` (env → K8s Secrets); `katenary.v3/configmap-files` (mount cert files). Team services consume the module's secrets via `katenary.v3/values-from`. |
-| Volume-class abstraction | Custom convention: PVC `storageClassName` comes from a values.yaml field (`<module>.volumeClass`) with sensible defaults (dev: empty/cluster-default). Prod overlays `longhorn-soc2-sensitive`, `fault_tolerant_cache`, `ephemeral_scratch`, etc. — **human-reviewable in PR labels**, not buried in YAML. Katenary doesn't carry a native abstraction; this is a documented pattern. |
-| Containers | Single-stage Dockerfiles for `server` and `www`; off-the-shelf images for everything in modules. `build.context: .` so shared `proto/` is reachable. Multi-stage / non-root / distroless deferred. |
-| Image tags | Hardcoded `0.1.0` for the local-only PoC (Rule 1 from [`docs/rules/katenary-top-seven.md`](./rules/katenary-top-seven.md)). Prod CI replaces with registry-pushed tags. |
-| Katenary labels | The seven labels from [`docs/rules/katenary-top-seven.md`](./rules/katenary-top-seven.md) + honorable mentions (`values-from`, `configmap-files`). `main-app` on `server`. `values-from` is the load-bearing label for catalogue consumption — the team's compose pulls env from the observability module's services without duplicating credentials/hostnames. |
-| README scope | `docker compose up` is the supported path; reproducible in GitHub Codespaces per requirements. The author's personal k8s cluster (with Longhorn) hosts the live demo; **no warranty for other k8s clusters** (the volume class names + cert authority + mesh configuration are author-specific). |
-| Live demo | CloudFlare Zero Trust tunnel + Access. |
-| Logging | Rust: `tracing` (structured) bridged to OTel via `tracing-opentelemetry`; spans/events flow with metrics through the same OTLP exporter. Off-the-shelf services: stdout/stderr to the compose log driver. Loki / Promtail as a future catalogue module. |
-| Tests | `cargo test` in `server/`, `npm test` in `www/`. High-value tests only. |
-| Commit hygiene | Test changes and code changes **never** share a commit. Code commits require a green test tree. |
-| Bonuses | All six in scope. The OTel-everywhere posture makes "good logging" and "good error handling" naturally stronger than custom alternatives. Mapping in spec §10. |
+| Area | Dev choice | Rationale | Possible prod considerations & choices |
+|---|---|---|---|
+| Vision | This repo = one team's microservice + a stub catalogue module. | Showcases an org-scale CI/CD pattern where ops owns the catalogue and teams write compose files instead of becoming Kubernetes experts. | Catalogue is a real ops-team product: versioned modules, linter-enforced compliance on PRs, central registry. |
+| Orchestration | `docker compose` is the single source of truth; pre-commit hook regenerates the Helm chart via katenary. | Compose is the practical ceiling of what most teams can wrangle on their own. The chart is generated, not hand-edited. | Regen + lint runs in CI rather than pre-commit; charts published to an OCI registry; per-environment values overlays. |
+| Module composition | Compose `include:` pulls `modules/observability/docker-compose.yml`. | One file the team controls; required and optional catalogue modules are added by reference, not copy-paste. | Include path swaps to an ops-published location (URL include, OCI-distributed compose snippet, or CI substitution). |
+| Observability module | OTel Collector (otelcol-contrib) + node-exporter + cadvisor + VictoriaMetrics + Grafana. | Off-the-shelf components handle ingest, infra scraping, time-series storage, and visualization. All battle-tested. | Same components, scaled (collector replicas, VM cluster mode, stateless Grafana); swap VM for Mimir/Influx if scale demands. |
+| Server | Rust + tonic + OpenTelemetry Rust SDK. v0 ships `Greeter.Echo`. | Echo preserves the template wire; OTel counters and spans per call drive observable behavior visible in Grafana. | Real product logic and gRPC methods; same OTel SDK; outbound auth via mesh-issued identities, not file-mounted certs. |
+| Server → TSDB | Rust queries VictoriaMetrics over mTLS using `reqwest` + `rustls-tls`; cert paths injected via env. | Worked example of the inter-service mutual-TLS pattern the catalogue is built around. | Mesh-enforced mTLS (SPIFFE/SPIRE workload SVIDs); file mounts replaced by mesh-injected, short-lived identities. |
+| www | Next.js Pages Router + `@vercel/otel` via `instrumentation.ts`. Template UX preserved; Grafana panels embed via iframe. | Page renders, API routes, and middleware all emit traces. Grafana owns dashboard chrome; www links to it. | CDN/edge in front; iframe embeds wrapped by forward-auth or OIDC; SSR/RSC pattern as the team prefers. |
+| gRPC LB | Next.js API route calls Rust directly via `@grpc/grpc-js`. | Server-side gRPC only; the browser never speaks the protocol. Proof-of-concept scope. | Envoy / grpc-web bridge / service mesh sidecar; mTLS-aware load balancing; browser stays on HTTPS to the edge. |
+| Proto | `proto/hello.proto` with `Greeter.Echo`. Rust commits `tonic-build` output; TS loads at runtime via `@grpc/proto-loader`. | Minimal wire. Both languages need the proto; only one needs codegen committed to make builds hermetic. | Real product proto; same codegen split; `buf` for lint and breaking-change checks; proto distribution via a schema registry. |
+| mTLS dev story | `make mtls` runs openssl to force-overwrite a dev root CA + per-service keypairs into gitignored `secrets/`. | Single command, zero friction; certs are bind-mounted into the relevant containers locally. | External Secrets Operator / Vault CSI / Sealed Secrets / cloud KMS. None of which live in this repo; the catalogue swap covers it. |
+| Secrets injection | `katenary.v3/secrets` and `configmap-files` for the Helm path; team consumes module outputs via `values-from`. | Compose env and bind-mounts translate to Kubernetes Secrets/ConfigMaps via labels — no extra YAML to write. | Labels resolve to live secrets via the mechanisms above; same compose interface stays for the team's pull-request workflow. |
+| Volume-class abstraction | Named volume; PVC has empty `storageClassName` (cluster default). A `values.yaml` field exposes the class. | Dev doesn't need named classes; each environment overlays the right one for its workload. | Named storage classes (`longhorn-soc2-sensitive`, `fault_tolerant_cache`, `ephemeral_scratch`); choices reviewable in PR labels. |
+| Containers | Single-stage Dockerfiles for `server` and `www`; off-the-shelf images for modules. `build.context: .` for proto reach. | Shortest build path; multi-stage hardening costs build time without demo value. | Multi-stage builds; distroless base; non-root USER; signed images; SBOMs; vulnerability scanning; healthchecks. |
+| Image tags | Hardcoded `0.1.0` placeholder; no registry prefix. | Katenary requires an `image:` tag to render Helm; the PoC has no registry to push to. | CI sets the tag from a git release; pushes to `ghcr.io` / ECR / etc. with provenance and SBOM. |
+| Katenary labels | The seven mandatory labels + `values-from` + `configmap-files`. See [`docs/rules/katenary-top-seven.md`](./rules/katenary-top-seven.md). | Each label flips a specific compose→Helm translation. `values-from` is how teams cleanly consume catalogue modules. | Same labels; possibly extended with org-specific custom labels (e.g., a native `volume-class:` once the convention solidifies). |
+| README scope | `docker compose up` is the supported entrypoint; reproducible in GitHub Codespaces per requirements. | Codespaces is the most predictable runtime for reviewers; per-team READMEs document only the team's product. | Deployment is via the org's standard CI/CD; per-team READMEs focus on the team's product, not infra. |
+| Live demo | CloudFlare Zero Trust tunnel + Access pointing at the author's personal k8s cluster (Longhorn-equipped). | Easy public URL with an auth gate. No warranty for other k8s clusters — storage class and cert authority are author-specific. | Real ingress + cert-manager + mesh forward-auth + org IdP; published service URL with TLS from a real CA. |
+| Logging | Rust `tracing` bridged to OTel via `tracing-opentelemetry`; off-the-shelf services log to stdout. | Spans and events flow through the same OTLP pipe as metrics — one observability surface, not two. | Add a Loki/Promtail catalogue module for aggregation, long-term retention, PII redaction, and audit trails. |
+| Bonuses | All six items from `requirements.md` in scope. | OTel-everywhere makes "good logging" and "good error handling" naturally stronger; the catalogue argument carries "good database design." | Each bonus row above lists its production form. The spec §10 has the per-bonus mapping. |
+
+### Process notes (not architecture)
+
+- **Tests:** `cargo test` in `server/`, `npm test` in `www/`. High-value tests only — PoC scope.
+- **Commit hygiene:** test changes and code changes **never** share a commit; code commits require a green tree.
 
 ## Open
 
 - **Rust gRPC API surface beyond `Echo`** — `TsdbHealth()`, `GetMetric(name, range)`, `WatchMetric(name) → stream`, auth model, error mapping. v0 ships `Echo`; the rest is its own follow-up.
 - **mTLS demonstration depth** — minimum: Rust startup health-check to VM, logs success. Reviewer-visible: `Greeter.TsdbHealth()` gRPC method + UI button. Both are cheap.
 - **OTel Collector → VM mTLS** — plain HTTP in dev for simplicity; prod = mesh-enforced. Could be made uniform on the dev path at small cost.
-- **Module dev↔prod swap mechanic** — URL include vs. CI substitution vs. helm chart dependency. Not blocking v0.
+- **Module dev↔prod swap mechanic** — URL include vs. CI substitution vs. Helm chart dependency. Not blocking v0.
 - **Linter rules for catalogue compliance** — custom PR linters enforcing module usage, mTLS wiring, volume-class registry. Out of scope for the take-home; logged for the bigger picture.
 - **Loki / Promtail as a future catalogue module** — obvious next step after metrics observability lands.
 
 ## Deviations from `requirements.md`
 
-- **Agent → Server (literal arrow):** layered. OTel Collector receives metrics; VM stores them; Rust is the application API. "The server," in the requirements' sense, is the layered tier (VM + Rust). Justification: separating off-the-shelf storage from the custom application API is the right factoring.
+- **Agent → Server (literal arrow):** layered. The OTel Collector receives metrics; VM stores them; Rust is the application API. "The server," in the requirements' sense, is the layered tier (VM + Rust). Justification: separating off-the-shelf storage from the custom application API is the right factoring.
 - **Server in Rust** — satisfies the literal requirement.
-- **Agent in Python (Tasks-section bullet)** — superseded by Core Requirements' "any language." Off-the-shelf OTel Collector (Go binary) instead, packaged as a *catalogue module* rather than a team-owned component.
+- **Agent in Python (Tasks-section bullet)** — superseded by Core Requirements' "any language." Off-the-shelf OTel Collector (a Go binary) instead, packaged as a *catalogue module* rather than a team-owned component.
