@@ -234,6 +234,11 @@ Use this to triage which conversations to invest in first.
 - **What's the ingress strategy?** Mesh-native gateway, cloud load
   balancer, or Kubernetes ingress controller. *— Matters more with
   public-facing surface area.*
+- **How do static assets get to users?** Front-end bundles, images,
+  and video — served from an edge CDN, regional CDN, self-hosted asset
+  caches, or origin-direct. Cache invalidation API, edge compute
+  support, and WAF integration shape the choice. *— Matters more with
+  geographic spread, traffic volume, and asset size.*
 - **Where does mTLS get enforced?** Mesh sidecar everywhere, ambient
   mesh, or selectively at certain hops. *— Matters more with zero-trust
   posture.*

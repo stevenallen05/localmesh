@@ -9,6 +9,14 @@ against consistent dimensions, used in conjunction with
 > The framework is the deliverable; a production engagement does the
 > research and fills in the cells.
 
+This matrix is the operational tool for
+[`ENGINEERING_RULES.md`](./ENGINEERING_RULES.md) **Rule 7 — defer
+over-determined choices**. The decisions captured here are the ones that
+fit into the *"TBD until we know more about prod"* category — vendor
+and tooling choices that depend on organizational context (SCM in use,
+existing skill base, cloud relationships, customer commitments) that
+doesn't yet exist or hasn't yet been surfaced.
+
 ## How to read
 
 Each decision evaluates candidate solutions across **up to 7 dimensions**
@@ -32,52 +40,55 @@ using a **3-star rating scale**:
 
 ---
 
-## Example: choosing a cluster OS (bare-metal)
+## Example: choosing a CI/CD orchestrator
 
-The shape of a bare-metal Kubernetes deployment is set by which OS
-underpins the cluster. Underlying conversation:
-[`PRODUCTION_DISCUSSIONS.md`](./PRODUCTION_DISCUSSIONS.md) §Reliability,
-scale & multi-region → *"How are hardware drivers versioned and
-updated?"* + §Provider & cost → *"Cloud, on-prem, or hybrid?"*
+CI/CD orchestrator choice is the canonical *"TBD until we know more"*
+decision: it depends on where source code lives (which SCM), the org's
+existing CI footprint, deployment shape (Kubernetes-native or not), and
+team skill base. Underlying conversation:
+[`PRODUCTION_DISCUSSIONS.md`](./PRODUCTION_DISCUSSIONS.md) §CI/CD &
+release management → *"What's the promotion path?"* and *"What triggers
+a deploy?"*
 
 **Candidate solutions** (non-exhaustive):
-TalosOS, RHEL CoreOS, Ubuntu Server LTS, Rocky Linux, openSUSE Leap Micro.
+GitHub Actions, GitLab CI, Tekton, Argo Workflows, Buildkite.
 
-| Dimension | TalosOS | RHEL CoreOS | Ubuntu LTS | Rocky | openSUSE |
+| Dimension | GH Actions | GitLab CI | Tekton | Argo Workflows | Buildkite |
 |---|---|---|---|---|---|
-| Immutable | | | | | |
-| API surface | | | | | |
-| Hardware breadth | | | | | |
-| Driver story | | | | | |
-| Air-gap | | | | | |
-| Maturity | | | | | |
+| Self-hosted | | | | | |
+| K8s-native | | | | | |
 | Cost | | | | | |
+| Maturity | | | | | |
+| Integrations | | | | | |
+| Speed | | | | | |
+| Skill fit | | | | | |
 
 ---
 
 ## Using this template for other decisions
 
-Each major decision from
+Each major *defer-until-prod-context* decision from
 [`PRODUCTION_DISCUSSIONS.md`](./PRODUCTION_DISCUSSIONS.md) gets its own
-matrix. Likely starting points, oriented toward a bare-metal /
-datacenter deployment:
+matrix. Likely starting points, in roughly the order they tend to come
+up in a production engagement:
 
 | Decision | Conversation | Example candidates (non-exhaustive) |
 |---|---|---|
-| **Cluster OS** | (example above) | TalosOS, RHEL CoreOS, Ubuntu LTS, Rocky, openSUSE Micro |
-| **CNI / pod networking** | Networking → "ingress strategy" | Cilium, Calico, Flannel, Weave |
-| **Bare-metal load balancer** | Networking → "ingress strategy" | MetalLB, Cilium LB, Kube-VIP |
-| **Distributed storage** | Storage → "named storage classes" | Longhorn, Rook/Ceph, OpenEBS, Portworx, MayaStor |
-| **Hardware lifecycle / provisioning** | Reliability → "driver versioning" | Tinkerbell, Metal3, Rancher Elemental, vendor BMC tooling |
-| **Service mesh** | Security → "service identity" | Istio, Linkerd, Cilium SM, Consul Connect |
-| **Operational isolation tier** | Security → "customer vs. company isolation" | Shared cluster, dedicated namespaces, dedicated node pools, dedicated clusters, physical separation |
-| **Secrets backend** | Security → "where do secrets live" | Vault, External Secrets Operator, Sealed Secrets, HSM-backed |
-| **Logs aggregation** | Observability → "where do logs go" | Loki, ELK, ClickHouse, vendor (Datadog, Splunk) |
-| **Tracing backend** | Observability → "where do traces go" | Tempo, Jaeger, Honeycomb |
-| **Rollback tooling tier** | Reliability → "how do teams roll back" | Manual, GitOps (Argo CD / Flux), Progressive delivery (Argo Rollouts / Flagger), Vendor-managed |
+| **CI/CD orchestrator** | (example above) | GitHub Actions, GitLab CI, Tekton, Argo Workflows, Buildkite, Jenkins |
+| **External load balancer** | Networking → "ingress strategy" | NGINX, HAProxy, Envoy, Traefik, Istio Gateway, cloud ALB/GLB |
+| **Static content / CDN** | Networking → "how do static assets get to users" | CloudFront, Cloudflare, Fastly, Akamai, Bunny, KeyCDN |
 | **Image registry** | CI/CD → "supply-chain security" | Harbor, GHCR, ECR, GCR, Quay, Artifactory |
-| **CI/CD orchestrator** | CI/CD → "promotion path" | GitHub Actions, GitLab CI, Tekton, Argo Workflows, Buildkite |
-| **Dashboard provisioning** | Observability → "dashboards as code" | Grafana (UI-edited), Grafana (provisioned), Perses, vendor-managed |
+| **DNS provider** | Networking (cert routing + ingress) | Cloudflare DNS, Route53, NS1, dnsimple |
+| **WAF / DDoS protection** | Networking + Security | Cloudflare, AWS WAF, Akamai, Imperva |
+| **SSO / IdP** | Security → "operator auth & audit" + "embedded-dashboard auth" | Okta, Azure AD, Auth0, Keycloak, Google Workspace |
+| **Secrets backend** | Security → "where do secrets live" | Vault, External Secrets Operator, Sealed Secrets, AWS Secrets Manager, Doppler |
+| **Service mesh** | Security → "service identity" | Istio, Linkerd, Cilium SM, Consul Connect |
+| **Logs aggregation** | Observability → "where do logs go" | Loki, ELK, ClickHouse, Datadog, Splunk |
+| **Tracing backend** | Observability → "where do traces go" | Tempo, Jaeger, Honeycomb, Datadog APM |
+| **Dashboard provisioning** | Observability → "dashboards as code vs. UI" | Grafana (UI), Grafana (provisioned), Perses, vendor-managed |
+| **Rollback tooling tier** | Reliability → "how do teams roll back" | Manual, GitOps (Argo CD / Flux), Progressive delivery (Argo Rollouts / Flagger), Vendor-managed |
+| **Email / notification gateway** | Cross-cutting | SES, SendGrid, Postmark, Mailgun, vendor SMTP |
+| **Bare-metal cluster stack** | Provider & cost → "cloud, on-prem, or hybrid" | TalosOS + MetalLB + Longhorn (bare-metal); EKS / GKE / AKS (cloud); Rancher (hybrid) |
 
 For each: pick up to 7 sharp dimensions, list real candidates, leave the
 cells empty for the research phase.
