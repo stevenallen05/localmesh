@@ -1,66 +1,63 @@
 # Engineering rules
 
-Design rules behind this architecture. Two goals: **velocity of product-team shipping** and **architectural coherence across teams.** Assumes scale — too many teams for one platform team to hand-hold each. The platform team is leverage, not gatekeeper.
+Design rules behind this architecture. Two goals: product teams shipping fast, and the architecture staying coherent across many teams.
 
-Rules are heuristics, not laws. Violating one means showing the trade-off.
+Assumes scale — too many teams for one platform team to hand-hold. The platform team builds infrastructure that makes other teams faster, not a gate they have to pass through.
 
-## 1. Bottom out at one file the team owns
+Heuristics, not laws. Breaking one means showing the trade-off.
 
-Designs end at a single declarative deployment file (typically a compose file) the team can maintain — not Kubernetes manifests, Helm charts, or mesh policy directly.
+## 1. Each team owns one deployment file
 
-*Why:* Reviewer load grows super-linearly when every team writes its own pipeline; product teams let infrastructure they don't understand rot.
+A team's deploy story ends at one declarative file they actually read and edit — typically a compose file. Not Kubernetes manifests, not hand-edited Helm charts, not mesh policy. The platform team's tooling stops there.
 
-## 2. Catalogue over copy-paste
+*Why:* Teams let infrastructure they don't understand go stale. That turns into outages, security gaps, and pages to the platform team.
 
-Cross-cutting concerns (auth, observability, cache, data tier) live in published, versioned, centrally-maintained modules consumed by reference.
+## 2. Cross-cutting concerns live in a shared catalogue
 
-*Why:* Otherwise *N* teams converge on *N* divergent forks, and the platform team can't ship a CVE (Common Vulnerabilities and Exposures) patch in one place.
+Things every service needs — auth, observability, cache, data tier — come from a centrally-maintained set of modules called the *catalogue*. Published, versioned, consumed by reference. Teams don't copy-paste their own.
 
-## 3. Prescription beats flexibility for composable things
+*Why:* Otherwise you get many slightly-different copies of the same thing. A security fix becomes N migrations instead of one update.
 
-A module's interface contract, configuration surface, and versioning policy are fixed by the catalogue, not renegotiated per team.
+## 3. The catalogue prescribes; teams don't renegotiate
 
-*Why:* Without prescription there's no shape to migrate *to*; mass updates fragment into *N* conversations.
+Each module has a fixed shape: defined interface, defined configuration, defined versioning policy. Teams take it on those terms or pick a different module.
 
-## 4. Defaults over knobs
+*Why:* If every team can change the module's contract, there's no clean target to migrate everyone *to*. Big updates — a new auth flow, a new metrics format — fragment into many conversations instead of one.
 
-One sensible default the majority of teams accept, not an exhaustive config surface no team configures correctly.
+## 4. Sensible defaults beat exhaustive configuration
 
-*Why:* Default-setters (platform team) have more org-wide context than default-consumers (product teams); overrides should be deliberate, not the starting point.
+Pick one configuration most teams accept. Allow overrides for special cases, but the override should be deliberate and visible — not the starting point.
 
-## 5. Labels over generated output for review surface
+*Why:* The platform team knows the org-wide right answer better than the team using the module. Without strong defaults, configs grow to hundreds of lines and nobody gets it right.
 
-Compliance-relevant decisions surface as labels alongside the service definition — where SREs (Site Reliability Engineers) and security reviewers already look, not buried in generated chart output or container internals.
+## 5. Important decisions go where reviewers already look
 
-*Why:* Reviewer attention is finite; what's behind a translation step doesn't get caught.
+If a choice matters for security, compliance, or audit, surface it as a label on the service definition — where SREs (Site Reliability Engineers) and security reviewers already read. Not buried in generated chart output or container internals.
 
-## 6. Off-the-shelf for undifferentiated; custom for differentiated
+*Why:* Reviewer attention is finite. What's behind a translation step doesn't get caught, even by good reviewers.
 
-Mature OSS (open-source software) or vendor for slots where the team adds no value by building.
+## 6. Use off-the-shelf for undifferentiated work
 
-*Why:* Every dependency you maintain is one you pay for in on-call, security patches, and feature-parity work. Engineering hours go where the org actually differentiates.
+If a layer isn't where the team adds product value — auth, metrics storage, dashboards, secret rotation — use a mature open-source or vendor option. Build custom only for the parts that differentiate the org.
 
-## 7. Defer over-determined choices
+*Why:* Every layer you build is one you pay for in on-call, security patches, and keeping up with whatever the open-source equivalent does next. Engineering hours go where the org wins.
 
-Battle-tested default until production context is known.
+## 7. Defer choices until production tells you the answer
 
-*Why:* Reversibility is cheaper than precision — "right calls" with insufficient information become very wrong calls six months later, and the migration costs more than the initial decision did.
+When a decision depends on facts you don't have yet (real traffic, availability targets, compliance requirements, customer mix), use the battle-tested default and revisit when production arrives.
+
+*Why:* "Right calls" with too little information become very wrong calls six months later, and the migration costs more than the original decision did. Reversibility is cheaper than precision.
 
 ---
 
-## Conway's Law as substrate
+## Conway's Law
 
-Conway's Law: systems mirror the communication structure of the organizations that build them. The rules above push **with** that, not against it:
+Conway's Law: any system mirrors the communication structure of the organization that built it. Teams that don't talk produce code that doesn't interface cleanly; responsibilities split among people show up split in the architecture, whether you intended that or not.
 
-- One deployment file per team (Rule 1) → team = deployment boundary.
-- Cross-cutting concerns in shared modules (Rules 2–3) → platform owns the *shape*, product owns the *product*.
-- Centrally-set defaults (Rule 4) → the seam runs where the headcount seam runs.
-- Compliance choices in the diff (Rule 5) → cross-team reviewers read along team lines.
-- Off-the-shelf for undifferentiated (Rule 6) → engineering hours go where the org differentiates.
-- Deferred over-determined choices (Rule 7) → architecture stays responsive to whichever team owns the new context.
+This architecture leans into that instead of fighting it. Technical boundaries sit where team boundaries already are. Each team gets one repo and one deployment file. Cross-cutting concerns no single team owns — auth, observability, the data tier — live in a shared catalogue the platform team maintains as its own product. Compliance choices show up in the diff alongside the service, where cross-team reviewers (SREs, security, audit) already read.
 
-The architecture *is* the team structure. New team → new repo. Team merge → repo merge. Org-chart changes are deployment changes.
+The architecture *is* the team structure. New team → new repo. Two teams merge → their repos merge. Org-chart changes are deployment changes — by design.
 
 ## When these rules don't apply
 
-If the platform team can hand-write everyone's chart, the trade-offs invert and bespoke is fine. These rules assume scale.
+These assume scale — too many teams for one platform team to hand-hold. If the platform team can hand-write every team's chart, the trade-offs invert and bespoke is fine.
