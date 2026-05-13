@@ -98,7 +98,7 @@ configs:
 
 services:
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.124.0
+    image: otel/opentelemetry-collector-contrib:0.152.0
     container_name: otel-collector
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     configs:
