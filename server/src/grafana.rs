@@ -1,5 +1,5 @@
-// `dead_code` allowed: response-shape fields are populated by serde and the
-// GrafanaClient methods are read by chunk 3's catalog.rs (incoming).
+// `dead_code` allowed: serde response-shape fields (e.g. GfSearchEntry.title)
+// are populated for completeness even when not currently read by callers.
 #![allow(dead_code)]
 
 use std::time::Duration;

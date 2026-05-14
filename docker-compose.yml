@@ -15,9 +15,15 @@ services:
       SERVER_ADDR: 0.0.0.0:50051
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_SERVICE_NAME: server
+      GRAFANA_API_URL: http://grafana:3000
+      GRAFANA_API_TOKEN_FILE: /run/grafana/token
+    volumes:
+      - grafana-token:/run/grafana:ro
     depends_on:
       otel-collector:
         condition: service_started
+      grafana-bootstrap:
+        condition: service_completed_successfully
     healthcheck:
       # bash built-in TCP test — no extra packages on bookworm.
       test: ["CMD", "bash", "-c", "</dev/tcp/localhost/50051"]
