@@ -1,16 +1,5 @@
 # `service_catalog/` is inlined in this repo for demo legibility. In a real
-# org this would arrive either from an ops-team git repo (vendored, or via
-# git submodule / sparse-checkout) or a katenary dependency provided by ops.
-# https://docs.katenary.io/latest/labels/#katenaryv3dependencies
-
-# Top-level katenary labels. Compliance flags live here rather than on each
-# service so one declaration covers every container in the stack — and so
-# cross-team reviewers (SREs, security, audit) see them at a glance instead
-# of grepping for them per-service. The team declares; the chart generator
-# (or a future linter) applies the centrally-managed rules: log retention,
-# encryption at rest, audit trail, backup policy.
-x-katenary:
-  stores_pci_data: true
+# org this would arrive from a git owned by ops
 
 include:
   - path: service_catalog/required.compose.yaml

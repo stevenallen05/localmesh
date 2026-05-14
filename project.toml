@@ -1,0 +1,24 @@
+# project.toml — example of a project-level metadata and compliance
+# declaration. Non-functional in this demo; included as the shape of
+# an artifact an org would adopt at the platform layer.
+#
+# In a real deployment, an ops tool (Terraform or similar) would read
+# this file and apply the implied infrastructure: audit-log shipping,
+# encrypted backups, NetworkPolicy, IAM bindings, and so on. CODEOWNERS
+# would route changes to ops review; git would record when each scope
+# changed and who approved.
+#
+# With sensible defaults applied everywhere else in the stack, this is
+# the only file a team's day-to-day work touches that requires SRE
+# attention.
+
+project_name    = "metrics-collector"
+tech_lead       = "sallen@amberstyle.ca"
+external_domain = "metrics.example.com"
+
+[compliance]
+pci_data = true
+
+# Other flags an org might declare here:
+#   pii_data, hipaa_phi, soc2_in_scope, export_controlled
+

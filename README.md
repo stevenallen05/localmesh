@@ -9,6 +9,21 @@ should support it: a top-level `docker-compose.yml` that `include:`s an
 observability module from a stub service catalogue. Helm charts are
 generated from compose, not hand-maintained.
 
+## Design intent
+
+A framework for compartmentalized microservices — a working look at the
+developer experience that emerges when off-the-shelf tooling is chained
+together. Teams' day-to-day input is compose, so they handle their own
+infra needs from a searchable catalogue. The output is Helm, so the
+chart drops into any helm-speaking infra. The prescriptive middle layer
+shifts SRE workload off per-team toil and onto larger infra and
+catalogue investments.
+
+[`project.toml`](./project.toml) is where team work, SRE oversight, and
+business requirements intersect — one human-scale file that captures
+all three, auditable and controllable at whatever level the context
+demands. (Expanded elsewhere — see [`docs/stakeholder/`](./docs/stakeholder/).)
+
 ## Read these first
 
 Stakeholder-facing context — read these regardless of role:

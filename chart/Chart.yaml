@@ -1,9 +1,9 @@
 # This is the main values.yaml file for the challenge chart.
 # More information can be found in the chart's README.md file.
 #
-# generated at: 2026-05-14T02:53:25Z
+# generated at: 2026-05-14T10:35:20Z
 # compose files: docker-compose.yml
-# compose hash (sha1): 9614b8d906d3bb452a7f021f748707c4574fa522
+# compose hash (sha1): 7254d38a3901f929396e016f1e161398870c9378
 
 # Name of the chart (required), basically the name of the project.
 name: challenge
