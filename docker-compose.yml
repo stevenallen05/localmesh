@@ -50,6 +50,7 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       OTEL_SERVICE_NAME: www
       HOSTNAME: ${HOSTNAME:-}
+      NEXT_PUBLIC_GRAFANA_URL: http://localhost:3001
     ports:
       - "3000:3000"
     depends_on:
