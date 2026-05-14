@@ -133,34 +133,42 @@ configs:
       TOKEN_FILE=/run/grafana/token
       GF="http://grafana:3000"
       AUTH="admin:admin"
+      # Token name is unique per run — Grafana 400s if you re-create a token
+      # with the same name for the same service account, so re-runnable setup
+      # needs a suffix. Orphaned tokens are harmless (revocable via UI).
+      TOKEN_NAME="rust-server-$$(date +%s)"
 
-      SEARCH_RESP=$$(curl -fSs -u "$$AUTH" "$$GF/api/serviceaccounts/search?query=rust-server")
+      # curl -sS (no -f): always capture body, even on HTTP error, so we can
+      # echo it for diagnostics. We detect failure by absence of the expected
+      # field in the response.
+      SEARCH_RESP=$$(curl -sS -u "$$AUTH" "$$GF/api/serviceaccounts/search?query=rust-server")
       SA_ID=$$(printf '%s' "$$SEARCH_RESP" | sed -n 's/.*"id":\([0-9]*\).*/\1/p' | head -n1)
+
       if [ -z "$$SA_ID" ]; then
-        CREATE_RESP=$$(curl -fSs -u "$$AUTH" -H "Content-Type: application/json" \
+        CREATE_RESP=$$(curl -sS -u "$$AUTH" -H "Content-Type: application/json" \
                 -X POST "$$GF/api/serviceaccounts" \
                 -d '{"name":"rust-server","role":"Editor"}')
-        SA_ID=$$(printf '%s' "$$CREATE_RESP" | sed -n 's/.*"id":\([0-9]*\).*/\1/p')
+        SA_ID=$$(printf '%s' "$$CREATE_RESP" | sed -n 's/.*"id":\([0-9]*\).*/\1/p' | head -n1)
         if [ -z "$$SA_ID" ]; then
-          echo "bootstrap: service-account create failed; grafana response:" >&2
-          echo "$$CREATE_RESP" >&2
+          echo "bootstrap: SA search returned: $$SEARCH_RESP" >&2
+          echo "bootstrap: SA create returned: $$CREATE_RESP" >&2
           exit 1
         fi
       fi
 
-      MINT_RESP=$$(curl -fSs -u "$$AUTH" -H "Content-Type: application/json" \
+      MINT_RESP=$$(curl -sS -u "$$AUTH" -H "Content-Type: application/json" \
               -X POST "$$GF/api/serviceaccounts/$$SA_ID/tokens" \
-              -d '{"name":"rust-server-bootstrap"}')
+              -d "{\"name\":\"$$TOKEN_NAME\"}")
       TOKEN=$$(printf '%s' "$$MINT_RESP" | sed -n 's/.*"key":"\([^"]*\)".*/\1/p')
 
       if [ -z "$$TOKEN" ]; then
-        echo "bootstrap: token mint failed; grafana response:" >&2
-        echo "$$MINT_RESP" >&2
+        echo "bootstrap: token mint failed for SA_ID=$$SA_ID, TOKEN_NAME=$$TOKEN_NAME" >&2
+        echo "bootstrap: grafana response: $$MINT_RESP" >&2
         exit 1
       fi
 
       printf '%s' "$$TOKEN" > "$$TOKEN_FILE"
-      echo "bootstrap: token written to $$TOKEN_FILE"
+      echo "bootstrap: token $$TOKEN_NAME written to $$TOKEN_FILE"
 
   grafana_say_hello_dashboard:
     content: |
