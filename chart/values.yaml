@@ -412,7 +412,7 @@ www:
     # key: www.ingress.annotations
     annotations: {}
     # key: www.ingress.host
-    host: agentbox-challenge
+    host: www.tld
     # key: www.ingress.path
     path: /
     # key: www.ingress.class

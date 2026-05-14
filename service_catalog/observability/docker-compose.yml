@@ -183,6 +183,17 @@ configs:
         ]
       }
 
+  # Bookmark-worthy production-ops dashboards. Each one is a JSON file
+  # under ./dashboards/ — externalised because inlining gets unwieldy
+  # past a couple of panels. The file provider configured above picks
+  # up everything that lands in /etc/grafana/dashboards/.
+  grafana_host_health_dashboard:
+    file: ./dashboards/host-health.json
+  grafana_container_health_dashboard:
+    file: ./dashboards/container-health.json
+  grafana_service_health_dashboard:
+    file: ./dashboards/service-health.json
+
 services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.152.0
@@ -281,6 +292,12 @@ services:
         target: /etc/grafana/provisioning/dashboards/default.yaml
       - source: grafana_say_hello_dashboard
         target: /etc/grafana/dashboards/say-hello.json
+      - source: grafana_host_health_dashboard
+        target: /etc/grafana/dashboards/host-health.json
+      - source: grafana_container_health_dashboard
+        target: /etc/grafana/dashboards/container-health.json
+      - source: grafana_service_health_dashboard
+        target: /etc/grafana/dashboards/service-health.json
     volumes:
       - grafana-data:/var/lib/grafana
     healthcheck:

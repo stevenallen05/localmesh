@@ -88,7 +88,7 @@ The following table lists the configurable parameters of the challenge chart and
 | `www.imagePullPolicy`                                     | `IfNotPresent`                         |
 | `www.ingress.class`                                       | `-`                                    |
 | `www.ingress.enabled`                                     | `false`                                |
-| `www.ingress.host`                                        | `agentbox-challenge`                   |
+| `www.ingress.host`                                        | `www.tld`                              |
 | `www.ingress.path`                                        | `/`                                    |
 | `www.ingress.tls.enabled`                                 | `true`                                 |
 | `www.ingress.tls.secretName`                              | ``                                     |

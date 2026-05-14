@@ -40,11 +40,11 @@ spec:
         - /bin/sh
         - -c
         - |-
-          until nc -z {{ include "challenge.fullname" . }}-victoriametrics 8428; do
+          until nc -z {{ include "challenge.fullname" . }}-cadvisor 8080; do
             sleep 1;
           done
         image: busybox:latest
-        name: wait-for-victoriametrics
+        name: wait-for-cadvisor
         {{- if .Values.otel_collector.resources }}
         resources:
           {{ .Values.otel_collector.resources | toYaml | nindent 10 }}
@@ -53,11 +53,11 @@ spec:
         - /bin/sh
         - -c
         - |-
-          until nc -z {{ include "challenge.fullname" . }}-cadvisor 8080; do
+          until nc -z {{ include "challenge.fullname" . }}-victoriametrics 8428; do
             sleep 1;
           done
         image: busybox:latest
-        name: wait-for-cadvisor
+        name: wait-for-victoriametrics
         {{- if .Values.otel_collector.resources }}
         resources:
           {{ .Values.otel_collector.resources | toYaml | nindent 10 }}
