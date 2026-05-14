@@ -12,6 +12,10 @@ pub struct GreeterSvc;
 #[tonic::async_trait]
 impl Greeter for GreeterSvc {
     async fn say_hello(&self, req: Request<HelloRequest>) -> Result<Response<HelloReply>, Status> {
+        // Extract the upstream W3C context off the incoming metadata, then
+        // start a server-kind span as a child of it. The named `_span`
+        // binding keeps the span alive until end-of-scope — binding to bare
+        // `_` would drop it immediately and record zero duration.
         let parent_cx =
             global::get_text_map_propagator(|p| p.extract(&MetadataMap(req.metadata())));
         let tracer = global::tracer("server");

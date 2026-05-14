@@ -10,7 +10,7 @@ pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 /// Build the OTel tracer provider, install W3C as the global propagator,
 /// register the provider globally, and return it so `main` can shut it
-/// down cleanly.
+/// down cleanly. Modelled on opentelemetry-rust/examples/tracing-grpc.
 pub fn init_tracer() -> Result<SdkTracerProvider, BoxError> {
     global::set_text_map_propagator(TraceContextPropagator::new());
 
@@ -33,7 +33,7 @@ pub fn init_tracer() -> Result<SdkTracerProvider, BoxError> {
 
 /// Adapter: lets the OTel propagator read gRPC headers off a tonic
 /// `MetadataMap`. Inlined from the upstream `tracing-grpc` example.
-pub struct MetadataMap<'a>(pub(crate) &'a TonicMetadataMap);
+pub(crate) struct MetadataMap<'a>(pub(crate) &'a TonicMetadataMap);
 
 impl Extractor for MetadataMap<'_> {
     fn get(&self, key: &str) -> Option<&str> {
