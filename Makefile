@@ -5,17 +5,20 @@
 # TODO: standardize how contributors install pipx; pending prod infra & provider choices.
 setup:
 	@command -v pipx >/dev/null || { echo "ERROR: pipx not found — install pipx (e.g. 'python3 -m pip install --user pipx') and re-run."; exit 1; }
-	pipx run pre-commit install \
+	@pipx run pre-commit install \
 		|| { echo "ERROR: pipx install pre-commit failed — fix and re-run."; exit 1; }
-	@echo "==> Ensuring grafana is up (idempotent)"
+	@echo "==> Wiping all compose state (sledgehammer reset)"
+	@echo "    TODO: a real dev tool would gate this behind --force and offer a"
+	@echo "    granular 'reset just grafana credentials' path. The drift cases"
+	@echo "    (persisted admin password, stale tokens) are real but out of"
+	@echo "    scope for this take-home — fresh state every setup is fine for"
+	@echo "    the demo."
+	docker compose down -v
+	@echo "==> Bringing up fresh grafana"
 	docker compose up -d --wait grafana
-	@echo "==> Forcing admin password to 'admin' (overrides any prior state)"
-	docker compose exec -T grafana grafana-cli admin reset-admin-password admin
-	@echo "==> Minting service-account token (overwrites any previous token)"
+	@echo "==> Minting service-account token"
 	docker compose run --rm grafana-bootstrap
-	@echo "==> Restarting server so it picks up the new token (if running)"
-	docker compose restart server 2>/dev/null || true
-	@echo "==> Setup complete. Run 'docker compose up -d' to start the stack."
+	@echo "==> Setup complete. Run 'docker compose up -d --build' to start the stack."
 
 # TODO: detect OS/arch — tools/ binaries hardcoded to linux-amd64; pending prod infra & provider choices.
 chart:
@@ -29,7 +32,7 @@ chart-lint:
 # Begin individual team responsibility
 
 test:
- echo "To be done per-project"
+	@echo "To be done per-project"
 
 # Others could include `lint`, `build`, etc. 
 
