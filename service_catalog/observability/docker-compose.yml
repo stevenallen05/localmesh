@@ -29,22 +29,60 @@ configs:
         prometheus:
           config:
             scrape_configs:
-              # `catalog_source` attributes each scrape job to the module
-              # whose compose file declares it. Other catalogue includes
-              # set their own value (metrics-collector-<module>) on
-              # scrape jobs they own — see redis/docker-compose.yml.
+              # `module_name` attributes each scrape job to the catalogue
+              # module whose compose file declares it; `owned_by` names the
+              # team accountable for the data. Other catalogue includes set
+              # their own values on scrape jobs they own — app code uses
+              # OTEL_RESOURCE_ATTRIBUTES on the container instead.
               - job_name: node-exporter
                 static_configs:
                   - targets: ['node-exporter:9100']
                     labels:
-                      catalog_source: metrics-collector-observability
+                      module_name: observability
+                      owned_by: ops_team@example.com
                 scrape_interval: 30s
               - job_name: cadvisor
                 static_configs:
                   - targets: ['cadvisor:8080']
                     labels:
-                      catalog_source: metrics-collector-observability
+                      module_name: observability
+                      owned_by: ops_team@example.com
                 scrape_interval: 30s
+        # Tails the docker JSON log driver output for every container on
+        # the host. The k8s overlay swaps this `include:` to
+        # /var/log/containers/*.log (kubelet's path) — same receiver,
+        # different glob. The bind mount declared on otel-collector's
+        # `volumes:` (below) is what makes this readable; katenary
+        # translates it to a hostPath volume.
+        filelog:
+          include: ['/var/lib/docker/containers/*/*-json.log']
+          start_at: end
+          include_file_path: true
+          operators:
+            # Docker writes one JSON object per line: {"log","stream","time"}.
+            - type: json_parser
+              timestamp:
+                parse_from: attributes.time
+                layout: '%Y-%m-%dT%H:%M:%S.%LZ'
+            # Extract the container id from the filename so dashboards can
+            # filter by container without a separate enrichment step.
+            - type: regex_parser
+              regex: '^/var/lib/docker/containers/(?P<container_id>[^/]+)/'
+              parse_from: attributes["log.file.path"]
+            # Promote container_id to resource scope — Loki's OTLP endpoint
+            # only indexes resource attributes as labels (see logging/
+            # docker-compose.yml distributor.otlp_config).
+            - type: move
+              from: attributes.container_id
+              to: resource["container_id"]
+            # The actual log line — move out of attributes.log into body
+            # so Loki's payload is the message itself.
+            - type: move
+              from: attributes.log
+              to: body
+            - type: move
+              from: attributes.stream
+              to: attributes["log.iostream"]
       processors:
         # Stamps `project_name=metrics-collector` on every span and log.
         # Hardcoded today — matches project.toml's identity block; once the
@@ -54,6 +92,18 @@ configs:
             - key: project_name
               value: metrics-collector
               action: upsert
+        # pg_tracing hard-codes service.name=PostgreSQL_Server and ignores
+        # OTEL_RESOURCE_ATTRIBUTES, so the database module's resource attrs
+        # land here at the collector instead of at the source. Rename to
+        # `postgres` for dashboard cleanliness; stamp `module_name`/`owned_by`
+        # to match the rest of the catalogue contract.
+        transform/database:
+          trace_statements:
+            - context: resource
+              statements:
+                - set(attributes["module_name"], "database") where attributes["service.name"] == "PostgreSQL_Server"
+                - set(attributes["owned_by"], "ops_team@example.com") where attributes["service.name"] == "PostgreSQL_Server"
+                - set(attributes["service.name"], "postgres") where attributes["service.name"] == "PostgreSQL_Server"
       exporters:
         prometheusremotewrite:
           endpoint: http://victoriametrics:8428/api/v1/write
@@ -68,19 +118,26 @@ configs:
           endpoint: tempo:4317
           tls:
             insecure: true
+        # Loki push API. Container id + iostream become indexed labels;
+        # the rest stays as structured metadata (cardinality control).
+        otlphttp/loki:
+          endpoint: http://loki:3100/otlp
+          tls:
+            insecure: true
       service:
         extensions: [health_check]
         pipelines:
-          # No `logs:` pipeline today — no source emits OTLP logs yet. When
-          # one lands, add it here with processors: [resource/project] so
-          # logs pick up the same project_name tag.
           metrics:
             receivers: [otlp, prometheus]
             exporters: [prometheusremotewrite]
           traces:
             receivers: [otlp]
-            processors: [resource/project]
+            processors: [transform/database, resource/project]
             exporters: [otlp/tempo, debug]
+          logs:
+            receivers: [filelog]
+            processors: [resource/project]
+            exporters: [otlphttp/loki]
 
   grafana_vm_datasource:
     content: |
@@ -107,6 +164,24 @@ configs:
           jsonData:
             serviceMap:
               datasourceUid: vm
+
+  grafana_loki_datasource:
+    content: |
+      apiVersion: 1
+      datasources:
+        - name: Loki
+          uid: loki
+          type: loki
+          access: proxy
+          url: http://loki:3100
+          editable: false
+          jsonData:
+            # Click through from a trace span to its container's logs.
+            derivedFields:
+              - name: TraceID
+                matcherRegex: '"trace_id":"(\w+)"'
+                url: '$${__value.raw}'
+                datasourceUid: tempo
 
   tempo_config:
     content: |
@@ -136,10 +211,18 @@ configs:
               send_exemplars: true
         processor:
           service_graphs: {}
+          # span_metrics emits traces_spanmetrics_{calls_total,latency_*} —
+          # the RED side of the per-service dashboards. Default dimensions are
+          # service / span_name / span_kind / status_code; `dimensions:` adds
+          # the catalogue's resource attrs so dashboards can slice by module.
+          span_metrics:
+            dimensions:
+              - module_name
+              - owned_by
       overrides:
         defaults:
           metrics_generator:
-            processors: [service-graphs]
+            processors: [service-graphs, span-metrics]
 
   grafana_dashboards_provider:
     content: |
@@ -188,52 +271,51 @@ configs:
       printf '%s' "$$TOKEN" > "$$TOKEN_FILE"
       echo "bootstrap: token written to $$TOKEN_FILE"
 
-  grafana_say_hello_dashboard:
-    content: |
-      {
-        "uid": "say-hello",
-        "title": "Demo placeholder",
-        "schemaVersion": 39,
-        "version": 1,
-        "panels": [
-          {
-            "id": 1,
-            "type": "text",
-            "title": "Metrics TBD",
-            "gridPos": { "h": 6, "w": 24, "x": 0, "y": 0 },
-            "options": {
-              "mode": "markdown",
-              "content": "Application metrics have been removed pending re-design.\n\nInfra metrics from node-exporter and cadvisor still flow to VictoriaMetrics — see Grafana → Explore → VictoriaMetrics.\n\nTraces continue to flow to Tempo — see Grafana → Explore → Tempo, or the Service Graph view."
-            }
-          }
-        ]
-      }
-
-  # Bookmark-worthy production-ops dashboards. Each one is a JSON file
-  # under ./dashboards/ — externalised because inlining gets unwieldy
-  # past a couple of panels. The file provider configured above picks
-  # up everything that lands in /etc/grafana/dashboards/.
-  grafana_host_health_dashboard:
-    file: ./dashboards/host-health.json
-  grafana_container_health_dashboard:
-    file: ./dashboards/container-health.json
-  grafana_service_health_dashboard:
-    file: ./dashboards/service-health.json
+  # Bookmark-worthy production-ops dashboards. Each is a JSON file under
+  # ./dashboards/ — externalised because inlining gets unwieldy past a
+  # couple of panels. The file provider configured above picks up
+  # everything that lands in /etc/grafana/dashboards/.
+  #
+  # Roster (the three are intentionally a small set, not a comprehensive
+  # library — ops ships the starter shapes, teams fork into their own):
+  #
+  #   infra-modules    Catalogue overview — what's deployed, who owns it.
+  #   cluster-health   Container roster + USE method (cpu/mem/net + throttle).
+  #   service-glance   `$service` template var — RED + USE + logs in one view.
+  grafana_infra_modules_dashboard:
+    file: ./dashboards/infra-modules.json
+  grafana_cluster_health_dashboard:
+    file: ./dashboards/cluster-health.json
+  grafana_service_glance_dashboard:
+    file: ./dashboards/service-glance.json
 
 services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.152.0
     container_name: otel-collector
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    # Docker's JSON log files are 640 root:root; the contrib image's default
+    # UID 10001 can't read them. Running root here is the trade-off every
+    # node-local log scraper makes (Promtail/Alloy/filebeat all do the
+    # same on k8s via DaemonSet privileges). Constrained to read-only mount.
+    user: "0:0"
     configs:
       - source: otel_collector_config
         target: /etc/otelcol-contrib/config.yaml
+    volumes:
+      # Docker's JSON log driver output for every container on the host.
+      # Read-only — the collector only tails, never writes. katenary
+      # translates this to a hostPath volume in helm; the k8s overlay
+      # also swaps the filelog `include:` path to /var/log/containers.
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
     depends_on:
       victoriametrics:
         condition: service_started
       node-exporter:
         condition: service_started
       cadvisor:
+        condition: service_started
+      loki:
         condition: service_started
 
   node-exporter:
@@ -314,16 +396,16 @@ services:
         target: /etc/grafana/provisioning/datasources/vm.yaml
       - source: grafana_tempo_datasource
         target: /etc/grafana/provisioning/datasources/tempo.yaml
+      - source: grafana_loki_datasource
+        target: /etc/grafana/provisioning/datasources/loki.yaml
       - source: grafana_dashboards_provider
         target: /etc/grafana/provisioning/dashboards/default.yaml
-      - source: grafana_say_hello_dashboard
-        target: /etc/grafana/dashboards/say-hello.json
-      - source: grafana_host_health_dashboard
-        target: /etc/grafana/dashboards/host-health.json
-      - source: grafana_container_health_dashboard
-        target: /etc/grafana/dashboards/container-health.json
-      - source: grafana_service_health_dashboard
-        target: /etc/grafana/dashboards/service-health.json
+      - source: grafana_infra_modules_dashboard
+        target: /etc/grafana/dashboards/infra-modules.json
+      - source: grafana_cluster_health_dashboard
+        target: /etc/grafana/dashboards/cluster-health.json
+      - source: grafana_service_glance_dashboard
+        target: /etc/grafana/dashboards/service-glance.json
     volumes:
       - grafana-data:/var/lib/grafana
     healthcheck:

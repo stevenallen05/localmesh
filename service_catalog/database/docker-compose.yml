@@ -1,0 +1,59 @@
+# Optional catalogue module — Postgres 16 with the pg_tracing extension.
+# Replaces the old redis stub as the worked example because pg_tracing
+# pushes OTLP spans for parse/plan/execute, which closes the distributed
+# trace `user → www → server → postgres` with zero polling glue.
+#
+# Telemetry shape:
+#   - pg_tracing pushes spans to http://otel-collector:4318/v1/traces
+#     (HTTP/JSON OTLP) on a background worker every otel_naptime ms.
+#   - Spans inherit the trace context from a `/*traceparent='...'*/` SQL
+#     comment, which the Rust server's Persist RPC injects.
+#   - Spans carry `service.name=postgres`, `module_name=database`,
+#     `owned_by=ops_team@example.com` via OTEL_RESOURCE_ATTRIBUTES.
+#
+# In prod this module would point at the managed offering (e.g., RDS
+# with pg_tracing enabled through a custom parameter group / extension
+# allowlist) rather than building a local image.
+
+services:
+  postgres:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: metrics-stack/postgres-pgtracing:0.1.0  # pinned tag, see root Rule 1
+    container_name: postgres
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: app
+      # Demo-only password. In prod this comes from compose secrets / vault.
+      POSTGRES_PASSWORD: app
+      # Resource attrs the otel-collector sees on every pg_tracing span via
+      # the OTLP HTTP/JSON payload (pg_tracing reads OTEL_RESOURCE_ATTRIBUTES
+      # like any OTel SDK).
+      OTEL_RESOURCE_ATTRIBUTES: "module_name=database,owned_by=ops_team@example.com"
+      OTEL_SERVICE_NAME: postgres
+    command:
+      - postgres
+      # Load the extension up-front; it has to be listed in
+      # shared_preload_libraries before CREATE EXTENSION will succeed.
+      - -c
+      - shared_preload_libraries=pg_tracing
+      # 1.0 = trace every statement. Fine for the demo; production tuning
+      # would drop this to ~0.01–0.05 to keep WAL/CPU overhead low.
+      - -c
+      - pg_tracing.sample_rate=1.0
+      - -c
+      - pg_tracing.otel_endpoint=http://otel-collector:4318/v1/traces
+      - -c
+      - pg_tracing.otel_naptime=2000
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres-data: {}

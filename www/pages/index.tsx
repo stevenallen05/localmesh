@@ -171,7 +171,7 @@ export default function Home() {
           Click the button above to bump the line.
         </p>
         <iframe
-          src={`${process.env.NEXT_PUBLIC_GRAFANA_URL}/d-solo/say-hello?panelId=1&refresh=5s&theme=light`}
+          src={`${process.env.NEXT_PUBLIC_GRAFANA_URL}/d-solo/cluster-health?panelId=3&refresh=5s&theme=light`}
           width="100%"
           height="300"
           frameBorder="0"

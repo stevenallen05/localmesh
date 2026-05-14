@@ -4,4 +4,4 @@
 # `required.compose.yaml`.
 
 include:
-  - path: redis/docker-compose.yml
+  - path: database/docker-compose.yml

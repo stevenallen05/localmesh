@@ -1,0 +1,82 @@
+# Logging catalogue module — required.
+#
+# Shape: Loki for storage, otel-collector for ingest (filelog receiver +
+# loki exporter, declared in the observability module so the collector
+# stays a single binary). This module owns Loki and the Grafana data
+# source; observability owns the receiver wiring.
+#
+# Compose → k8s portability:
+#   - Compose tails docker's JSON log driver files at
+#     /var/lib/docker/containers/*/*-json.log — bind-mounted into the
+#     otel-collector. katenary translates the bind mount to a hostPath
+#     volume, which works on k8s nodes, BUT the kubelet writes logs to
+#     /var/log/containers/*.log instead. A helm overlay overrides the
+#     filelog receiver's `include:` path post-conversion. See the
+#     comment alongside the filelog config in observability/.
+#   - Loki itself is environment-agnostic; same image, same port.
+
+configs:
+  loki_config:
+    content: |
+      # Single-instance, in-memory ring, filesystem storage. Fine for the
+      # dev catalogue; prod overlay swaps storage_config to S3/GCS and
+      # enables auth + multi-tenancy.
+      auth_enabled: false
+      server:
+        http_listen_port: 3100
+      common:
+        instance_addr: 127.0.0.1
+        path_prefix: /loki
+        storage:
+          filesystem:
+            chunks_directory: /loki/chunks
+            rules_directory: /loki/rules
+        replication_factor: 1
+        ring:
+          kvstore:
+            store: inmemory
+      schema_config:
+        configs:
+          - from: 2024-04-01
+            store: tsdb
+            object_store: filesystem
+            schema: v13
+            index:
+              prefix: index_
+              period: 24h
+      # Default limits suit single-tenant local dev. Bump if the demo
+      # generates more than ~4MB/s of logs.
+      limits_config:
+        allow_structured_metadata: true
+      # By default Loki only promotes service.name from OTLP attributes to
+      # an indexed label. Container scrapes don't have a service.name, so
+      # query selectivity collapses to {service_name="unknown_service"}
+      # without this. Container id has bounded cardinality (host-local).
+      distributor:
+        otlp_config:
+          default_resource_attributes_as_index_labels:
+            - container_id
+            - module_name
+            - owned_by
+
+services:
+  loki:
+    image: grafana/loki:3.3.2
+    container_name: loki
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    configs:
+      - source: loki_config
+        target: /etc/loki/loki.yaml
+    volumes:
+      - loki-data:/loki
+    labels:
+      # Internal-only port; katenary needs the explicit declaration to
+      # generate the depends_on init-container in the helm chart.
+      katenary.v3/ports: |-
+        - 3100
+    # Loki image is distroless — no wget/curl/shell. Use service_started
+    # ordering; the otel-collector's loki exporter will retry on its own
+    # if Loki isn't accepting writes yet.
+
+volumes:
+  loki-data: {}
