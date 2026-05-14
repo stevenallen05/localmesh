@@ -29,17 +29,39 @@ configs:
         prometheus:
           config:
             scrape_configs:
+              # `catalog_source` attributes each scrape job to the module
+              # whose compose file declares it. Other catalogue includes
+              # set their own value (metrics-collector-<module>) on
+              # scrape jobs they own — see redis/docker-compose.yml.
               - job_name: node-exporter
                 static_configs:
                   - targets: ['node-exporter:9100']
+                    labels:
+                      catalog_source: metrics-collector-observability
                 scrape_interval: 30s
               - job_name: cadvisor
                 static_configs:
                   - targets: ['cadvisor:8080']
+                    labels:
+                      catalog_source: metrics-collector-observability
                 scrape_interval: 30s
+      processors:
+        # Stamps `project_name=metrics-collector` on every span and log.
+        # Hardcoded today — matches project.toml's identity block; once the
+        # platform reads project.toml, this constant goes away.
+        resource/project:
+          attributes:
+            - key: project_name
+              value: metrics-collector
+              action: upsert
       exporters:
         prometheusremotewrite:
           endpoint: http://victoriametrics:8428/api/v1/write
+          # Same label, applied to every metric series at the remote-write
+          # boundary. Surgical (one label) vs. resource_to_telemetry_conversion
+          # which would dump every resource attr in as a Prom label.
+          external_labels:
+            project_name: metrics-collector
         debug:
           verbosity: detailed
         otlp/tempo:
@@ -49,11 +71,15 @@ configs:
       service:
         extensions: [health_check]
         pipelines:
+          # No `logs:` pipeline today — no source emits OTLP logs yet. When
+          # one lands, add it here with processors: [resource/project] so
+          # logs pick up the same project_name tag.
           metrics:
             receivers: [otlp, prometheus]
             exporters: [prometheusremotewrite]
           traces:
             receivers: [otlp]
+            processors: [resource/project]
             exporters: [otlp/tempo, debug]
 
   grafana_vm_datasource:

@@ -24,11 +24,17 @@ You can see this notes again by running:
 
 {{- $count := 0 -}}
 {{- $listOfURL := "" -}}
+{{- if and .Values.www.ingress .Values.www.ingress.enabled }}
+{{- $count = add1 $count -}}{{- $listOfURL = printf "%s\n- http://%s" $listOfURL (tpl .Values.www.ingress.host .) -}}
+{{- end }}
 {{- if and .Values.server.ingress .Values.server.ingress.enabled }}
 {{- $count = add1 $count -}}{{- $listOfURL = printf "%s\n- http://%s" $listOfURL (tpl .Values.server.ingress.host .) -}}
 {{- end }}
-{{- if and .Values.www.ingress .Values.www.ingress.enabled }}
-{{- $count = add1 $count -}}{{- $listOfURL = printf "%s\n- http://%s" $listOfURL (tpl .Values.www.ingress.host .) -}}
+{{- if and .Values.cadvisor.ingress .Values.cadvisor.ingress.enabled }}
+{{- $count = add1 $count -}}{{- $listOfURL = printf "%s\n- http://%s" $listOfURL (tpl .Values.cadvisor.ingress.host .) -}}
+{{- end }}
+{{- if and .Values.victoriametrics.ingress .Values.victoriametrics.ingress.enabled }}
+{{- $count = add1 $count -}}{{- $listOfURL = printf "%s\n- http://%s" $listOfURL (tpl .Values.victoriametrics.ingress.host .) -}}
 {{- end }}
 {{- if and .Values.tempo.ingress .Values.tempo.ingress.enabled }}
 {{- $count = add1 $count -}}{{- $listOfURL = printf "%s\n- http://%s" $listOfURL (tpl .Values.tempo.ingress.host .) -}}
@@ -41,12 +47,6 @@ You can see this notes again by running:
 {{- end }}
 {{- if and .Values.node_exporter.ingress .Values.node_exporter.ingress.enabled }}
 {{- $count = add1 $count -}}{{- $listOfURL = printf "%s\n- http://%s" $listOfURL (tpl .Values.node_exporter.ingress.host .) -}}
-{{- end }}
-{{- if and .Values.cadvisor.ingress .Values.cadvisor.ingress.enabled }}
-{{- $count = add1 $count -}}{{- $listOfURL = printf "%s\n- http://%s" $listOfURL (tpl .Values.cadvisor.ingress.host .) -}}
-{{- end }}
-{{- if and .Values.victoriametrics.ingress .Values.victoriametrics.ingress.enabled }}
-{{- $count = add1 $count -}}{{- $listOfURL = printf "%s\n- http://%s" $listOfURL (tpl .Values.victoriametrics.ingress.host .) -}}
 {{- end }}
 {{- if and .Values.redis.ingress .Values.redis.ingress.enabled }}
 {{- $count = add1 $count -}}{{- $listOfURL = printf "%s\n- http://%s" $listOfURL (tpl .Values.redis.ingress.host .) -}}

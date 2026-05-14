@@ -14,6 +14,10 @@
 #     provenance, capabilities. Mostly a chart-time concern; dev-time
 #     approximations land here.
 #
+# Telemetry: whichever services this module grows label their data with
+# `catalog_source: metrics-collector-security` (scrape-job label or
+# OTEL_RESOURCE_ATTRIBUTES). See observability/docker-compose.yml.
+#
 # Empty `services:` so compose treats this as a valid includable file.
 
 services: {}
