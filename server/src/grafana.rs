@@ -1,9 +1,19 @@
+// Visibility: response shapes are `pub(crate)` (consumed internally) while
+// the `GrafanaClient` methods stay `pub` to keep the client a self-contained
+// surface. Rust's `private_interfaces` lint flags the mismatch — allowed
+// here because the design choice is intentional.
+//
+// `dead_code` is allowed because the response-shape fields are populated by
+// serde and read by tests + the catalog module (incoming). The lib-only
+// compilation doesn't see test reads, so the lint over-fires.
+#![allow(dead_code, private_interfaces)]
+
 use std::time::Duration;
 
 use serde::Deserialize;
 
 #[derive(Debug)]
-pub enum GrafanaError {
+pub(crate) enum GrafanaError {
     NotFound,
     Unauthorized,
     Unavailable(String),
@@ -24,62 +34,62 @@ impl std::fmt::Display for GrafanaError {
 impl std::error::Error for GrafanaError {}
 
 #[derive(Debug, Deserialize)]
-pub struct GfDataSource {
-    pub uid:  String,
-    pub name: String,
+pub(crate) struct GfDataSource {
+    pub(crate) uid:  String,
+    pub(crate) name: String,
     #[serde(rename = "type")]
-    pub kind: String,   // serde rename because `type` is a Rust keyword.
-    pub url:  String,
+    pub(crate) kind: String,   // serde rename because `type` is a Rust keyword.
+    pub(crate) url:  String,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct GfSearchEntry {
-    pub uid:   String,
-    pub title: String,
+pub(crate) struct GfSearchEntry {
+    pub(crate) uid:   String,
+    pub(crate) title: String,
 }
 
 // Subset of the dashboard-get response we actually read. Grafana returns
 // a {dashboard, meta} envelope; we only need .dashboard.
 #[derive(Debug, Deserialize)]
-pub struct GfDashboardEnvelope {
-    pub dashboard: GfDashboard,
+pub(crate) struct GfDashboardEnvelope {
+    pub(crate) dashboard: GfDashboard,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct GfDashboard {
-    pub uid:    String,
-    pub title:  String,
-    pub panels: Vec<GfPanel>,
+pub(crate) struct GfDashboard {
+    pub(crate) uid:    String,
+    pub(crate) title:  String,
+    pub(crate) panels: Vec<GfPanel>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct GfPanel {
+pub(crate) struct GfPanel {
     #[serde(rename = "type")]
-    pub kind:       String,    // "timeseries", "stat", "table", ...
-    pub datasource: Option<GfDatasourceRef>,
-    pub targets:    Option<Vec<GfTarget>>,
+    pub(crate) kind:       String,    // "timeseries", "stat", "table", ...
+    pub(crate) datasource: Option<GfDatasourceRef>,
+    pub(crate) targets:    Option<Vec<GfTarget>>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct GfDatasourceRef {
-    pub uid: String,
+pub(crate) struct GfDatasourceRef {
+    pub(crate) uid: String,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct GfTarget {
-    pub expr: Option<String>,   // PromQL expression
+pub(crate) struct GfTarget {
+    pub(crate) expr: Option<String>,   // PromQL expression
 }
 
 #[derive(Debug, Deserialize)]
-pub struct GfMetricsResponse {
-    pub status: String,
-    pub data:   Vec<String>,
+pub(crate) struct GfMetricsResponse {
+    pub(crate) status: String,
+    pub(crate) data:   Vec<String>,
 }
 
 // Constants for the bootstrap-token wait loop.
-pub const TOKEN_WAIT_TIMEOUT_SECS: u64 = 30;
-pub const TOKEN_WAIT_INTERVAL_MS:  u64 = 500;
+pub(crate) const TOKEN_WAIT_TIMEOUT_SECS: u64 = 30;
+pub(crate) const TOKEN_WAIT_INTERVAL_MS:  u64 = 500;
 
 pub struct GrafanaClient {
     pub(crate) http:  reqwest::Client,
@@ -87,17 +97,17 @@ pub struct GrafanaClient {
     pub(crate) token: String,
 }
 
-pub fn parse_data_sources(body: &str) -> Result<Vec<GfDataSource>, GrafanaError> {
+pub(crate) fn parse_data_sources(body: &str) -> Result<Vec<GfDataSource>, GrafanaError> {
     serde_json::from_str(body).map_err(|e| GrafanaError::Decode(e.to_string()))
 }
 
-pub fn parse_dashboard(body: &str) -> Result<GfDashboard, GrafanaError> {
+pub(crate) fn parse_dashboard(body: &str) -> Result<GfDashboard, GrafanaError> {
     let env: GfDashboardEnvelope =
         serde_json::from_str(body).map_err(|e| GrafanaError::Decode(e.to_string()))?;
     Ok(env.dashboard)
 }
 
-pub fn parse_prom_metrics(body: &str) -> Result<Vec<String>, GrafanaError> {
+pub(crate) fn parse_prom_metrics(body: &str) -> Result<Vec<String>, GrafanaError> {
     let resp: GfMetricsResponse =
         serde_json::from_str(body).map_err(|e| GrafanaError::Decode(e.to_string()))?;
     if resp.status != "success" {
@@ -109,7 +119,7 @@ pub fn parse_prom_metrics(body: &str) -> Result<Vec<String>, GrafanaError> {
 use std::path::Path;
 use tokio::time::sleep;
 
-pub type ClientResult<T> = Result<T, GrafanaError>;
+pub(crate) type ClientResult<T> = Result<T, GrafanaError>;
 
 impl GrafanaClient {
     pub async fn from_env() -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
@@ -241,7 +251,6 @@ fn map_status(resp: &reqwest::Response) -> ClientResult<()> {
         s if s.is_success() => Ok(()),
         S::NOT_FOUND => Err(GrafanaError::NotFound),
         S::UNAUTHORIZED | S::FORBIDDEN => Err(GrafanaError::Unauthorized),
-        s if s.is_server_error() => Err(GrafanaError::Unavailable(format!("grafana {s}"))),
         s => Err(GrafanaError::Unavailable(format!("grafana {s}"))),
     }
 }
