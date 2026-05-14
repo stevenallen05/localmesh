@@ -1,0 +1,7 @@
+# Catalogue aggregator — optional modules each team opts into. Top-level
+# docker-compose.yml `include:`s this file (or specific entries from
+# below) if the team wants the module. Required modules live in
+# `required.compose.yaml`.
+
+include:
+  - path: redis/docker-compose.yml

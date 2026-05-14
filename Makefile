@@ -8,11 +8,10 @@ setup:
 	@pipx run pre-commit install \
 		|| { echo "ERROR: pipx install pre-commit failed — fix and re-run."; exit 1; }
 	@echo "==> Wiping all compose state (sledgehammer reset)"
-	@echo "    TODO: a real dev tool would gate this behind --force and offer a"
-	@echo "    granular 'reset just grafana credentials' path. The drift cases"
-	@echo "    (persisted admin password, stale tokens) are real but out of"
-	@echo "    scope for this take-home — fresh state every setup is fine for"
-	@echo "    the demo."
+	@echo "    TODO: normally this would split into more granular setup tasks,"
+	@echo "    each individually runnable with --force (e.g. per service-"
+	@echo "    catalogue item). That's beyond the scope of this take-home —"
+	@echo "    fresh state every setup is fine for the demo."
 	docker compose down -v
 	@echo "==> Bringing up fresh grafana"
 	docker compose up -d --wait grafana

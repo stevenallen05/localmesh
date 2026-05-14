@@ -32,7 +32,7 @@ Pick one configuration most teams accept. Allow overrides for special cases, but
 
 ## 5. Important decisions go where reviewers already look
 
-If a choice matters for security, compliance, or audit, surface it as a label on the service definition — where SREs (Site Reliability Engineers) and security reviewers already read. Not buried in generated chart output or container internals.
+If a choice matters for security, compliance, or audit, surface it as a **top-level** `x-katenary:` flag in the team's `docker-compose.yml` — where SREs (Site Reliability Engineers) and security reviewers already read, *and* where one declaration covers every service in the stack. The chart generator (or a future linter) derives the per-service rules from that flag: log retention, encryption at rest, audit trail, backup policy. Not buried in generated chart output, not scattered as per-service labels, not in container internals.
 
 *Why:* Reviewer attention is finite. What's behind a translation step doesn't get caught, even by good reviewers.
 
@@ -54,7 +54,7 @@ When a decision depends on facts you don't have yet (real traffic, availability 
 
 Conway's Law: any system mirrors the communication structure of the organization that built it. Teams that don't talk produce code that doesn't interface cleanly; responsibilities split among people show up split in the architecture, whether you intended that or not.
 
-This architecture leans into that instead of fighting it. Technical boundaries sit where team boundaries already are. Each team gets one repo and one deployment file. Cross-cutting concerns no single team owns — auth, observability, the data tier — live in a shared catalogue the platform team maintains as its own product. Compliance choices show up in the diff alongside the service, where cross-team reviewers (SREs, security, audit) already read.
+This architecture leans into that instead of fighting it. Technical boundaries sit where team boundaries already are. Each team gets one repo and one deployment file. Cross-cutting concerns no single team owns — auth, observability, the data tier — live in a shared catalogue the platform team maintains as its own product. Compliance choices show up at the top of the team's `docker-compose.yml` as `x-katenary:` flags — one declaration per stack, visible to cross-team reviewers (SREs, security, audit) without grepping each service.
 
 The architecture *is* the team structure. New team → new repo. Two teams merge → their repos merge. Org-chart changes are deployment changes — by design.
 
