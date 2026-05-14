@@ -1,20 +1,16 @@
-# Hooks are intentionally empty.
-#
-# The chart-generation hooks (katenary-convert + helm-lint) were removed
-# because katenary 3.0.0-rc6 — the latest release as of this writing — has
-# a bug with our compose shape: it normalizes hyphenated service names to
-# underscores internally, but its `depends_on` resolution still looks the
-# names up by the hyphenated form, so e.g. `server` failing to find
-# `otel-collector` blocks every chart generation. Combined with no support
-# for nested compose `include:` directives, the tool currently can't
-# produce a valid chart from our top-level docker-compose.yml.
-#
-# Path forward: chart generation stays a manual `make chart` step (it'll
-# still fail, but the failure is visible and explicit). Re-enable these
-# hooks when katenary upstream fixes the depends_on resolution OR we
-# migrate off katenary. Tracked in DESIGN_DECISIONS row "Compose-to-Helm
-# chart generation".
-#
-# `pipx run pre-commit install` still succeeds on this file — it just
-# installs zero hooks.
-repos: []
+repos:
+  - repo: local
+    hooks:
+      - id: katenary-convert
+        name: katenary convert -> chart/ (auto-stages chart/)
+        language: system
+        entry: sh -c './tools/katenary-3.0.0-rc6-linux-amd64 convert --force && git add chart/'
+        files: ^(docker-compose\.ya?ml|katenary\.ya?ml|service_catalog/.*\.ya?ml)$
+        pass_filenames: false
+
+      - id: helm-lint
+        name: helm lint chart/
+        language: system
+        entry: ./tools/helm-v4.1.4-linux-amd64 lint chart
+        files: ^(docker-compose\.ya?ml|katenary\.ya?ml|service_catalog/.*\.ya?ml|chart/.*)$
+        pass_filenames: false

@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    katenary.v3/compose-hash: 9614b8d906d3bb452a7f021f748707c4574fa522
+    katenary.v3/version: 3.0.0-rc6
+  labels:
+    {{- include "challenge.labels" . | nindent 4 }}
+    katenary.v3/component: node_exporter
+  name: '{{ include "challenge.fullname" . }}-node-exporter'
+spec:
+  replicas: {{ .Values.node_exporter.replicas }}
+  selector:
+    matchLabels:
+      {{- include "challenge.selectorLabels" . | nindent 6 }}
+      katenary.v3/component: node_exporter
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        {{- include "challenge.selectorLabels" . | nindent 8 }}
+        katenary.v3/component: node_exporter
+    spec:
+      containers:
+      - command:
+        - --path.procfs=/host/proc
+        - --path.rootfs=/rootfs
+        - --path.sysfs=/host/sys
+        - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($|/)
+        image: '{{ tpl .Values.node_exporter.repository.image $ }}:{{ tpl .Values.node_exporter.repository.tag $ | default "latest" }}'
+        imagePullPolicy: {{ .Values.node_exporter.imagePullPolicy }}
+        name: node-exporter
+        ports:
+        - containerPort: 9100
+          name: port-9100
+        {{- if .Values.node_exporter.resources }}
+        resources:
+          {{ .Values.node_exporter.resources | toYaml | nindent 10 }}
+        {{- end }}
+      {{- if .Values.pullSecrets }}
+      imagePullSecrets:
+      {{- .Values.pullSecrets | toYaml | nindent 6 }}
+      {{- end }}
+      {{- if .Values.node_exporter.nodeSelector }}
+      nodeSelector:
+        {{- .Values.node_exporter.nodeSelector | toYaml | nindent 8 }}
+      {{- end }}
+      {{- if ne .Values.node_exporter.serviceAccount "" }}
+      serviceAccountName: {{ .Values.node_exporter.serviceAccount | quote }}
+      {{- end }}

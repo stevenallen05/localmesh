@@ -1,0 +1,22 @@
+{{- if .Values.victoriametrics.persistence.vm_data.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    katenary.v3/compose-hash: 9614b8d906d3bb452a7f021f748707c4574fa522
+    katenary.v3/version: 3.0.0-rc6
+  labels:
+    {{- include "challenge.labels" . | nindent 4 }}
+    katenary.v3/component: victoriametrics
+  name: '{{ include "challenge.fullname" . }}-victoriametrics-vm-data'
+spec:
+  accessModes:
+  {{- .Values.victoriametrics.persistence.vm_data.accessMode | toYaml | nindent 2 }}
+  resources:
+    requests:
+      storage: {{ tpl .Values.victoriametrics.persistence.vm_data.size $ }}
+  {{- if ne .Values.victoriametrics.persistence.vm_data.storageClass "-" }}
+  storageClassName: '{{ .Values.victoriametrics.persistence.vm_data.storageClass }}'
+  {{- end }}
+
+{{- end }}

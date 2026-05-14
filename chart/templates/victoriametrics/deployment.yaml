@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    katenary.v3/compose-hash: 9614b8d906d3bb452a7f021f748707c4574fa522
+    katenary.v3/version: 3.0.0-rc6
+  labels:
+    {{- include "challenge.labels" . | nindent 4 }}
+    katenary.v3/component: victoriametrics
+  name: '{{ include "challenge.fullname" . }}-victoriametrics'
+spec:
+  replicas: {{ .Values.victoriametrics.replicas }}
+  selector:
+    matchLabels:
+      {{- include "challenge.selectorLabels" . | nindent 6 }}
+      katenary.v3/component: victoriametrics
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        {{- include "challenge.selectorLabels" . | nindent 8 }}
+        katenary.v3/component: victoriametrics
+    spec:
+      containers:
+      - command:
+        - --storageDataPath=/victoria-metrics-data
+        - --httpListenAddr=:8428
+        image: '{{ tpl .Values.victoriametrics.repository.image $ }}:{{ tpl .Values.victoriametrics.repository.tag $ | default "latest" }}'
+        imagePullPolicy: {{ .Values.victoriametrics.imagePullPolicy }}
+        name: victoriametrics
+        ports:
+        - containerPort: 8428
+          name: port-8428
+        {{- if .Values.victoriametrics.resources }}
+        resources:
+          {{ .Values.victoriametrics.resources | toYaml | nindent 10 }}
+        {{- end }}
+        volumeMounts:
+        {{- if .Values.victoriametrics.persistence.vm_data.enabled }}
+        - mountPath: /victoria-metrics-data
+          name: vm-data
+        {{- end }}
+      {{- if .Values.pullSecrets }}
+      imagePullSecrets:
+      {{- .Values.pullSecrets | toYaml | nindent 6 }}
+      {{- end }}
+      {{- if .Values.victoriametrics.nodeSelector }}
+      nodeSelector:
+        {{- .Values.victoriametrics.nodeSelector | toYaml | nindent 8 }}
+      {{- end }}
+      {{- if ne .Values.victoriametrics.serviceAccount "" }}
+      serviceAccountName: {{ .Values.victoriametrics.serviceAccount | quote }}
+      {{- end }}
+      volumes:
+      {{- if .Values.victoriametrics.persistence.vm_data.enabled }}
+      - name: vm-data
+        persistentVolumeClaim:
+          claimName: '{{ include "challenge.fullname" . }}-victoriametrics-vm-data'
+      {{- end }}

@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    katenary.v3/compose-hash: 9614b8d906d3bb452a7f021f748707c4574fa522
+    katenary.v3/version: 3.0.0-rc6
+  labels:
+    {{- include "challenge.labels" . | nindent 4 }}
+    katenary.v3/component: redis
+  name: '{{ include "challenge.fullname" . }}-redis'
+spec:
+  replicas: {{ .Values.redis.replicas }}
+  selector:
+    matchLabels:
+      {{- include "challenge.selectorLabels" . | nindent 6 }}
+      katenary.v3/component: redis
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        {{- include "challenge.selectorLabels" . | nindent 8 }}
+        katenary.v3/component: redis
+    spec:
+      containers:
+      - command:
+        - redis-server
+        - --save
+        - "60"
+        - "1"
+        image: '{{ tpl .Values.redis.repository.image $ }}:{{ tpl .Values.redis.repository.tag $ | default "latest" }}'
+        imagePullPolicy: {{ .Values.redis.imagePullPolicy }}
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          periodSeconds: 10
+        name: redis
+        {{- if .Values.redis.resources }}
+        resources:
+          {{ .Values.redis.resources | toYaml | nindent 10 }}
+        {{- end }}
+        volumeMounts:
+        {{- if .Values.redis.persistence.redis_data.enabled }}
+        - mountPath: /data
+          name: redis-data
+        {{- end }}
+      {{- if .Values.pullSecrets }}
+      imagePullSecrets:
+      {{- .Values.pullSecrets | toYaml | nindent 6 }}
+      {{- end }}
+      {{- if .Values.redis.nodeSelector }}
+      nodeSelector:
+        {{- .Values.redis.nodeSelector | toYaml | nindent 8 }}
+      {{- end }}
+      {{- if ne .Values.redis.serviceAccount "" }}
+      serviceAccountName: {{ .Values.redis.serviceAccount | quote }}
+      {{- end }}
+      volumes:
+      {{- if .Values.redis.persistence.redis_data.enabled }}
+      - name: redis-data
+        persistentVolumeClaim:
+          claimName: '{{ include "challenge.fullname" . }}-redis-redis-data'
+      {{- end }}

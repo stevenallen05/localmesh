@@ -1,0 +1,18 @@
+# This is the main values.yaml file for the challenge chart.
+# More information can be found in the chart's README.md file.
+#
+# generated at: 2026-05-14T02:53:25Z
+# compose files: docker-compose.yml
+# compose hash (sha1): 9614b8d906d3bb452a7f021f748707c4574fa522
+
+# Name of the chart (required), basically the name of the project.
+name: challenge
+apiVersion: v2
+
+# Version of the chart (required)
+version: 0.1.0
+
+# Version of the application (required).
+# This should be the main application version.
+appVersion: 0.1.0
+description: A Helm chart for challenge

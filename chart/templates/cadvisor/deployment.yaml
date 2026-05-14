@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    katenary.v3/compose-hash: 9614b8d906d3bb452a7f021f748707c4574fa522
+    katenary.v3/version: 3.0.0-rc6
+  labels:
+    {{- include "challenge.labels" . | nindent 4 }}
+    katenary.v3/component: cadvisor
+  name: '{{ include "challenge.fullname" . }}-cadvisor'
+spec:
+  replicas: {{ .Values.cadvisor.replicas }}
+  selector:
+    matchLabels:
+      {{- include "challenge.selectorLabels" . | nindent 6 }}
+      katenary.v3/component: cadvisor
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        {{- include "challenge.selectorLabels" . | nindent 8 }}
+        katenary.v3/component: cadvisor
+    spec:
+      containers:
+      - image: '{{ tpl .Values.cadvisor.repository.image $ }}:{{ tpl .Values.cadvisor.repository.tag $ | default "latest" }}'
+        imagePullPolicy: {{ .Values.cadvisor.imagePullPolicy }}
+        name: cadvisor
+        ports:
+        - containerPort: 8080
+          name: http-alt
+        {{- if .Values.cadvisor.resources }}
+        resources:
+          {{ .Values.cadvisor.resources | toYaml | nindent 10 }}
+        {{- end }}
+      {{- if .Values.pullSecrets }}
+      imagePullSecrets:
+      {{- .Values.pullSecrets | toYaml | nindent 6 }}
+      {{- end }}
+      {{- if .Values.cadvisor.nodeSelector }}
+      nodeSelector:
+        {{- .Values.cadvisor.nodeSelector | toYaml | nindent 8 }}
+      {{- end }}
+      {{- if ne .Values.cadvisor.serviceAccount "" }}
+      serviceAccountName: {{ .Values.cadvisor.serviceAccount | quote }}
+      {{- end }}

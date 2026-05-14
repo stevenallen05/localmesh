@@ -1,0 +1,14 @@
+apiVersion: v1
+data:
+  GF_AUTH_ANONYMOUS_ENABLED: "true"
+  GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+  GF_SECURITY_ALLOW_EMBEDDING: "true"
+kind: ConfigMap
+metadata:
+  annotations:
+    katenary.v3/compose-hash: 9614b8d906d3bb452a7f021f748707c4574fa522
+    katenary.v3/version: 3.0.0-rc6
+  labels:
+    {{- include "challenge.labels" . | nindent 4 }}
+    katenary.v3/component: grafana
+  name: '{{ include "challenge.fullname" . }}-grafana'

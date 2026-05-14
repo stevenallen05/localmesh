@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    katenary.v3/compose-hash: 9614b8d906d3bb452a7f021f748707c4574fa522
+    katenary.v3/version: 3.0.0-rc6
+  labels:
+    {{- include "challenge.labels" . | nindent 4 }}
+    katenary.v3/component: otel_collector
+  name: '{{ include "challenge.fullname" . }}-otel-collector'
+spec:
+  replicas: {{ .Values.otel_collector.replicas }}
+  selector:
+    matchLabels:
+      {{- include "challenge.selectorLabels" . | nindent 6 }}
+      katenary.v3/component: otel_collector
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        {{- include "challenge.selectorLabels" . | nindent 8 }}
+        katenary.v3/component: otel_collector
+    spec:
+      containers:
+      - command:
+        - --config=/etc/otelcol-contrib/config.yaml
+        image: '{{ tpl .Values.otel_collector.repository.image $ }}:{{ tpl .Values.otel_collector.repository.tag $ | default "latest" }}'
+        imagePullPolicy: {{ .Values.otel_collector.imagePullPolicy }}
+        name: otel-collector
+        {{- if .Values.otel_collector.resources }}
+        resources:
+          {{ .Values.otel_collector.resources | toYaml | nindent 10 }}
+        {{- end }}
+      {{- if .Values.pullSecrets }}
+      imagePullSecrets:
+      {{- .Values.pullSecrets | toYaml | nindent 6 }}
+      {{- end }}
+      initContainers:
+      - command:
+        - /bin/sh
+        - -c
+        - |-
+          until nc -z {{ include "challenge.fullname" . }}-victoriametrics 8428; do
+            sleep 1;
+          done
+        image: busybox:latest
+        name: wait-for-victoriametrics
+        {{- if .Values.otel_collector.resources }}
+        resources:
+          {{ .Values.otel_collector.resources | toYaml | nindent 10 }}
+        {{- end }}
+      - command:
+        - /bin/sh
+        - -c
+        - |-
+          until nc -z {{ include "challenge.fullname" . }}-cadvisor 8080; do
+            sleep 1;
+          done
+        image: busybox:latest
+        name: wait-for-cadvisor
+        {{- if .Values.otel_collector.resources }}
+        resources:
+          {{ .Values.otel_collector.resources | toYaml | nindent 10 }}
+        {{- end }}
+      {{- if .Values.otel_collector.nodeSelector }}
+      nodeSelector:
+        {{- .Values.otel_collector.nodeSelector | toYaml | nindent 8 }}
+      {{- end }}
+      {{- if ne .Values.otel_collector.serviceAccount "" }}
+      serviceAccountName: {{ .Values.otel_collector.serviceAccount | quote }}
+      {{- end }}

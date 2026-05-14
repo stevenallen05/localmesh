@@ -211,6 +211,13 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /:/rootfs:ro
+    labels:
+      # No `ports:` block (internal-only — otel-collector scrapes 9100 over
+      # the docker network). Katenary needs a port to generate the
+      # depends_on readiness init-container; declare it here. See
+      # https://repo.katenary.io/katenary/katenary/issues/182.
+      katenary.v3/ports: |-
+        - 9100
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.52.1
@@ -222,6 +229,10 @@ services:
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
+    labels:
+      # See node-exporter above — cadvisor serves the prometheus scrape on 8080.
+      katenary.v3/ports: |-
+        - 8080
     devices:
       - /dev/kmsg
 

@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    katenary.v3/compose-hash: 9614b8d906d3bb452a7f021f748707c4574fa522
+    katenary.v3/version: 3.0.0-rc6
+  labels:
+    {{- include "challenge.labels" . | nindent 4 }}
+    katenary.v3/component: tempo
+  name: '{{ include "challenge.fullname" . }}-tempo'
+spec:
+  replicas: {{ .Values.tempo.replicas }}
+  selector:
+    matchLabels:
+      {{- include "challenge.selectorLabels" . | nindent 6 }}
+      katenary.v3/component: tempo
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        {{- include "challenge.selectorLabels" . | nindent 8 }}
+        katenary.v3/component: tempo
+    spec:
+      containers:
+      - command:
+        - -config.file=/etc/tempo/tempo.yaml
+        image: '{{ tpl .Values.tempo.repository.image $ }}:{{ tpl .Values.tempo.repository.tag $ | default "latest" }}'
+        imagePullPolicy: {{ .Values.tempo.imagePullPolicy }}
+        name: tempo
+        {{- if .Values.tempo.resources }}
+        resources:
+          {{ .Values.tempo.resources | toYaml | nindent 10 }}
+        {{- end }}
+        volumeMounts:
+        {{- if .Values.tempo.persistence.tempo_data.enabled }}
+        - mountPath: /var/tempo
+          name: tempo-data
+        {{- end }}
+      {{- if .Values.pullSecrets }}
+      imagePullSecrets:
+      {{- .Values.pullSecrets | toYaml | nindent 6 }}
+      {{- end }}
+      {{- if .Values.tempo.nodeSelector }}
+      nodeSelector:
+        {{- .Values.tempo.nodeSelector | toYaml | nindent 8 }}
+      {{- end }}
+      {{- if ne .Values.tempo.serviceAccount "" }}
+      serviceAccountName: {{ .Values.tempo.serviceAccount | quote }}
+      {{- end }}
+      volumes:
+      {{- if .Values.tempo.persistence.tempo_data.enabled }}
+      - name: tempo-data
+        persistentVolumeClaim:
+          claimName: '{{ include "challenge.fullname" . }}-tempo-tempo-data'
+      {{- end }}

@@ -1,0 +1,39 @@
+{{- if .Values.www.ingress.enabled -}}
+{{- $fullname := include "challenge.fullname" . -}}
+{{- $tlsname := printf "%s-%s-tls" $fullname "www" -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    katenary.v3/compose-hash: 9614b8d906d3bb452a7f021f748707c4574fa522
+    katenary.v3/version: 3.0.0-rc6
+    {{- if .Values.www.ingress.annotations -}}
+        {{- toYaml .Values.www.ingress.annotations | nindent 4 }}
+    {{- end }}
+  labels:
+    {{- include "challenge.labels" . | nindent 4 }}
+    katenary.v3/component: www
+  name: '{{ $fullname }}-www'
+spec:
+  {{- if ne .Values.www.ingress.class "-" }}
+  ingressClassName: '{{ tpl .Values.www.ingress.class $ }}'
+  {{- end }}
+  rules:
+  - host: '{{ tpl .Values.www.ingress.host $ }}'
+    http:
+      paths:
+      - backend:
+          service:
+            name: '{{ $fullname }}-www'
+            port:
+              number: 3000
+        path: '{{ tpl .Values.www.ingress.path $ }}'
+        pathType: ImplementationSpecific
+  {{- if .Values.www.ingress.tls.enabled }}
+  tls:
+  - hosts:
+    - '{{ tpl .Values.www.ingress.host . }}'
+    secretName: '{{ .Values.www.ingress.tls.secretName | default $tlsname }}'
+  {{ end -}}
+
+{{- end -}}
