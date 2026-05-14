@@ -1,12 +1,6 @@
-// Visibility: response shapes are `pub(crate)` (consumed internally) while
-// the `GrafanaClient` methods stay `pub` to keep the client a self-contained
-// surface. Rust's `private_interfaces` lint flags the mismatch — allowed
-// here because the design choice is intentional.
-//
-// `dead_code` is allowed because the response-shape fields are populated by
-// serde and read by tests + the catalog module (incoming). The lib-only
-// compilation doesn't see test reads, so the lint over-fires.
-#![allow(dead_code, private_interfaces)]
+// `dead_code` allowed: response-shape fields are populated by serde and the
+// GrafanaClient methods are read by chunk 3's catalog.rs (incoming).
+#![allow(dead_code)]
 
 use std::time::Duration;
 
@@ -200,27 +194,27 @@ impl GrafanaClient {
         resp.text().await.map_err(|e| GrafanaError::Decode(e.to_string()))
     }
 
-    pub async fn list_data_sources(&self) -> ClientResult<Vec<GfDataSource>> {
+    pub(crate) async fn list_data_sources(&self) -> ClientResult<Vec<GfDataSource>> {
         let body = self.get_text("/api/datasources").await?;
         parse_data_sources(&body)
     }
 
-    pub async fn get_data_source(&self, uid: &str) -> ClientResult<GfDataSource> {
+    pub(crate) async fn get_data_source(&self, uid: &str) -> ClientResult<GfDataSource> {
         let body = self.get_text(&format!("/api/datasources/uid/{uid}")).await?;
         serde_json::from_str(&body).map_err(|e| GrafanaError::Decode(e.to_string()))
     }
 
-    pub async fn list_dashboard_entries(&self) -> ClientResult<Vec<GfSearchEntry>> {
+    pub(crate) async fn list_dashboard_entries(&self) -> ClientResult<Vec<GfSearchEntry>> {
         let body = self.get_text("/api/search?type=dash-db").await?;
         serde_json::from_str(&body).map_err(|e| GrafanaError::Decode(e.to_string()))
     }
 
-    pub async fn get_dashboard(&self, uid: &str) -> ClientResult<GfDashboard> {
+    pub(crate) async fn get_dashboard(&self, uid: &str) -> ClientResult<GfDashboard> {
         let body = self.get_text(&format!("/api/dashboards/uid/{uid}")).await?;
         parse_dashboard(&body)
     }
 
-    pub async fn upsert_dashboard(&self, payload: &serde_json::Value) -> ClientResult<GfDashboard> {
+    pub(crate) async fn upsert_dashboard(&self, payload: &serde_json::Value) -> ClientResult<GfDashboard> {
         // Grafana echoes {uid, slug, version, status, ...}. Re-fetch by uid for the
         // full panel body so callers see the same shape as List/Get.
         let resp_body = self.post_json("/api/dashboards/db", payload).await?;
@@ -231,11 +225,11 @@ impl GrafanaClient {
         self.get_dashboard(&posted.uid).await
     }
 
-    pub async fn delete_dashboard(&self, uid: &str) -> ClientResult<()> {
+    pub(crate) async fn delete_dashboard(&self, uid: &str) -> ClientResult<()> {
         self.delete(&format!("/api/dashboards/uid/{uid}")).await
     }
 
-    pub async fn list_prometheus_metrics(&self, datasource_uid: &str) -> ClientResult<Vec<String>> {
+    pub(crate) async fn list_prometheus_metrics(&self, datasource_uid: &str) -> ClientResult<Vec<String>> {
         let body = self
             .get_text(&format!(
                 "/api/datasources/uid/{datasource_uid}/resources/api/v1/label/__name__/values"
