@@ -1,6 +1,7 @@
 # `service_catalog/` is inlined in this repo for demo legibility. In a real
 # org this would arrive either from an ops-team git repo (vendored, or via
-# git submodule / sparse-checkout) or a katenary plugin provided by ops.
+# git submodule / sparse-checkout) or a katenary dependency provided by ops.
+# https://docs.katenary.io/latest/labels/#katenaryv3dependencies
 include:
   - path: service_catalog/required.compose.yaml
 
