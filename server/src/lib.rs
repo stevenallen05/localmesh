@@ -1,5 +1,6 @@
 // Library entry — keeps logic testable. `main.rs` is the thin binary.
 
+pub mod grafana;
 pub mod greeter;
 pub mod telemetry;
 pub mod proto {
