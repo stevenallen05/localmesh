@@ -1,24 +1,43 @@
-# project.toml — example of a project-level metadata and compliance
-# declaration. Non-functional in this demo; included as the shape of
-# an artifact an org would adopt at the platform layer.
+# project.toml — top of the project.
 #
-# In a real deployment, an ops tool (Terraform or similar) would read
-# this file and apply the implied infrastructure: audit-log shipping,
-# encrypted backups, NetworkPolicy, IAM bindings, and so on. CODEOWNERS
-# would route changes to ops review; git would record when each scope
-# changed and who approved.
+# The identity block at the top is real: it feeds the helm chart and
+# names the point person. The section headings below are a sketch —
+# what this file could grow into once the platform reads them.
 #
-# With sensible defaults applied everywhere else in the stack, this is
-# the only file a team's day-to-day work touches that requires SRE
-# attention.
+# Rule of thumb for any flag that could change here: a legal assistant
+# or accountant pinged on the diff should understand it in three
+# seconds, cold. Anything that needs explanation belongs elsewhere —
+# in the catalogue or a deploy file.
 
 project_name    = "metrics-collector"
-tech_lead       = "sallen@amberstyle.ca"
+tech_lead       = "sallen@amberstyle.ca"   # point person for questions
 external_domain = "metrics.example.com"
 
+# Could page compliance, gate the PR, or trigger a control review.
 [compliance]
-pci_data = true
+# Other flags: handles_pii, handles_hipaa_phi, is_soc2_in_scope, is_export_controlled.
+handles_pci_data = true
 
-# Other flags an org might declare here:
-#   pii_data, hipaa_phi, soc2_in_scope, export_controlled
+# Could page legal, trigger a DPIA, or require sign-off.
+[legal]
+data_processed_in                    = ["US-CA", "EU"]
+handles_data_about                   = ["consumer"]   # consumer, business, employee, minor
+requires_international_data_transfer = true           # implies SCC / DPF review
 
+# Could update the chargeback system, alert finance, or require approval.
+[billing]
+cost_center  = "platform-eng"
+billing_code = "CC-1042"
+
+# Could gate the deploy or trigger a platform-team review.
+[compute]
+requires_accelerator_class = "ml_training"   # one of: none, ml_inference, ml_training, custom
+
+# Could trigger security review, secrets provisioning, or a DPA check.
+[vendors]
+uses_payments_processor       = true    # implies compliance.handles_pci_data
+uses_secrets_manager          = true    # security review on every change
+uses_identity_provider        = true    # SOC2 in-scope
+uses_hardware_security_module = false   # HSM-backed key custody
+uses_generative_ai_api        = false   # data-residency, DLP review
+sends_telemetry_to_vendor     = true    # off-prem sink — requires a DPA
