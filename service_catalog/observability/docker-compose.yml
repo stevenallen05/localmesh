@@ -288,6 +288,10 @@ services:
     # `make setup` via `docker compose run --rm grafana-bootstrap`, which
     # still honors depends_on so grafana is healthy before we hit the API.
     profiles: ["bootstrap"]
+    # curlimages/curl runs as UID 100 by default; the grafana-token named
+    # volume is created with root ownership and the curl_user can't write
+    # to it. Short-lived container — root is fine here.
+    user: root
     depends_on:
       grafana:
         condition: service_healthy
