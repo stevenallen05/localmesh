@@ -39,3 +39,17 @@ Engineering-side material (code-facing implementation rules):
 - [`docs/stakeholder/`](./docs/stakeholder/) — stakeholder-facing documents (rules, scope, discussions, decisions).
 - [`docs/engineering/`](./docs/engineering/) — engineer-facing implementation rules.
 - [`docs/superpowers/`](./docs/superpowers/) — exploration artifacts, design specs, plans, and other agentic/research material. Detailed technical specs live under `docs/superpowers/specs/`.
+
+## Run locally
+
+First time only (or after wiping `grafana-data`):
+
+```bash
+make setup
+```
+
+This forces Grafana's admin password to `admin` and mints a service-account token the Rust server reads on startup. Then:
+
+```bash
+docker compose up -d --build
+```

@@ -23,8 +23,6 @@ services:
     depends_on:
       otel-collector:
         condition: service_started
-      grafana-bootstrap:
-        condition: service_completed_successfully
     healthcheck:
       # bash built-in TCP test — no extra packages on bookworm.
       test: ["CMD", "bash", "-c", "</dev/tcp/localhost/50051"]

@@ -131,29 +131,31 @@ configs:
       #!/bin/sh
       set -eu
       TOKEN_FILE=/run/grafana/token
-      if [ -s "$$TOKEN_FILE" ]; then
-        echo "bootstrap: token file already present — exiting"
-        exit 0
-      fi
       GF="http://grafana:3000"
       AUTH="admin:admin"
 
-      SA_ID=$$(curl -s -u "$$AUTH" "$$GF/api/serviceaccounts/search?query=rust-server" \
-              | sed -n 's/.*"id":\([0-9]*\).*/\1/p' | head -n1)
+      SEARCH_RESP=$$(curl -fSs -u "$$AUTH" "$$GF/api/serviceaccounts/search?query=rust-server")
+      SA_ID=$$(printf '%s' "$$SEARCH_RESP" | sed -n 's/.*"id":\([0-9]*\).*/\1/p' | head -n1)
       if [ -z "$$SA_ID" ]; then
-        SA_ID=$$(curl -s -u "$$AUTH" -H "Content-Type: application/json" \
+        CREATE_RESP=$$(curl -fSs -u "$$AUTH" -H "Content-Type: application/json" \
                 -X POST "$$GF/api/serviceaccounts" \
-                -d '{"name":"rust-server","role":"Editor"}' \
-                | sed -n 's/.*"id":\([0-9]*\).*/\1/p')
+                -d '{"name":"rust-server","role":"Editor"}')
+        SA_ID=$$(printf '%s' "$$CREATE_RESP" | sed -n 's/.*"id":\([0-9]*\).*/\1/p')
+        if [ -z "$$SA_ID" ]; then
+          echo "bootstrap: service-account create failed; grafana response:" >&2
+          echo "$$CREATE_RESP" >&2
+          exit 1
+        fi
       fi
 
-      TOKEN=$$(curl -s -u "$$AUTH" -H "Content-Type: application/json" \
+      MINT_RESP=$$(curl -fSs -u "$$AUTH" -H "Content-Type: application/json" \
               -X POST "$$GF/api/serviceaccounts/$$SA_ID/tokens" \
-              -d '{"name":"rust-server-bootstrap"}' \
-              | sed -n 's/.*"key":"\([^"]*\)".*/\1/p')
+              -d '{"name":"rust-server-bootstrap"}')
+      TOKEN=$$(printf '%s' "$$MINT_RESP" | sed -n 's/.*"key":"\([^"]*\)".*/\1/p')
 
       if [ -z "$$TOKEN" ]; then
-        echo "bootstrap: token mint failed" >&2
+        echo "bootstrap: token mint failed; grafana response:" >&2
+        echo "$$MINT_RESP" >&2
         exit 1
       fi
 
@@ -282,9 +284,10 @@ services:
   grafana-bootstrap:
     image: curlimages/curl:8.10.1
     container_name: grafana-bootstrap
-    # Capped retries: persistent failure (auth wrong, JSON drift) must
-    # surface, not hang `service_completed_successfully` forever.
-    restart: "on-failure:3"
+    # Profile-gated: `docker compose up` skips it. Invoked explicitly by
+    # `make setup` via `docker compose run --rm grafana-bootstrap`, which
+    # still honors depends_on so grafana is healthy before we hit the API.
+    profiles: ["bootstrap"]
     depends_on:
       grafana:
         condition: service_healthy
