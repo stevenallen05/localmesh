@@ -23,14 +23,14 @@
         "name": "min_level",
         "type": "custom",
         "label": "Min level",
-        "description": "Body-regex approximation. Future: switch to a label filter once every conforming source emits a real level.",
+        "description": "LogQL label filter on the Loki `level` indexed label. Non-conforming sources land with level='' and the INFO+ default hides them — flip to ALL to see them.",
         "options": [
-          { "text": "ALL",    "value": "",                                          "selected": false },
-          { "text": "INFO+",  "value": "\"level\":\"(info|warn|error|fatal)\"",     "selected": true  },
-          { "text": "WARN+",  "value": "\"level\":\"(warn|error|fatal)\"",          "selected": false },
-          { "text": "ERROR+", "value": "\"level\":\"(error|fatal)\"",               "selected": false }
+          { "text": "ALL",    "value": ".*",                          "selected": false },
+          { "text": "INFO+",  "value": "info|warn|error|fatal",       "selected": true  },
+          { "text": "WARN+",  "value": "warn|error|fatal",            "selected": false },
+          { "text": "ERROR+", "value": "error|fatal",                 "selected": false }
         ],
-        "current": { "selected": true, "text": "INFO+", "value": "\"level\":\"(info|warn|error|fatal)\"" }
+        "current": { "selected": true, "text": "INFO+", "value": "info|warn|error|fatal" }
       },
       {
         "name": "log_filter",
@@ -229,7 +229,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{service=~\"$service\"} |~ \"$min_level\" |~ \"$log_filter\""
+          "expr": "{service=~\"$service\"} | level=~\"$min_level\" |~ \"$log_filter\""
         }
       ]
     }

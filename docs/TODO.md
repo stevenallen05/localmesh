@@ -39,10 +39,6 @@ observability DX between prod and 'my machine'
   each speak a different format. Either `docker_observer` enrichment by
   container id or per-source filelog operators. Until then,
   `service-glance`'s default `INFO+` filter hides these sources.
-- **Swap dashboard `min_level` line-filter for a real Loki label
-  filter.** Once every conforming source emits a real `level`, the
-  dashboard can switch from `|~ "$min_level"` to `| level=~"..."` —
-  exact, cheaper, no regex false positives.
 - **Validate `level` enum at the collector.** Drop / coerce malformed
   `level` values from non-conforming sources before they hit Loki, to
   bound the label's cardinality in prod.
