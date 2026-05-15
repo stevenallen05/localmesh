@@ -2,9 +2,12 @@
 /www/.next
 /server/target
 /agent/agent
-.env
-.env.*
-!.env.example
+
+# TODO find a good presentation for env files 
+# .env
+# .env.*
+# !.env.example
+
 scratch.*
 
 /www/*.tsbuildinfo

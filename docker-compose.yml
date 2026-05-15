@@ -1,6 +1,8 @@
 # `service_catalog/` is inlined in this repo for demo legibility. In a real
 # org this would arrive from a git owned by ops
 
+name: ${PROJECT_NAME}
+
 include:
   - path: service_catalog/required.compose.yaml
   - path: service_catalog/optional.compose.yaml
