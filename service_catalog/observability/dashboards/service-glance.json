@@ -2,7 +2,7 @@
   "uid": "service-glance",
   "title": "Service at a glance",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
   "time": { "from": "now-30m", "to": "now" },
   "timepicker": {},
@@ -11,12 +11,13 @@
       {
         "name": "service",
         "type": "query",
-        "label": "Service",
+        "label": "Services",
         "datasource": { "uid": "vm", "type": "prometheus" },
-        "query": { "query": "label_values(traces_spanmetrics_calls_total, service)" },
+        "query": { "query": "label_values(container_cpu_usage_seconds_total, service)" },
         "refresh": 1,
-        "includeAll": false,
-        "multi": false
+        "includeAll": true,
+        "multi": true,
+        "current": { "selected": true, "text": "All", "value": "$__all" }
       }
     ]
   },
@@ -28,104 +29,187 @@
       "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
       "options": {
         "mode": "markdown",
-        "content": "Generic 'this service at a glance' suggested by ops as the minimum for a containerized microservice. RED on top (Rate/Errors/Duration from Tempo spanmetrics), USE below (container CPU/memory from cadvisor), logs at the bottom. Fork it per team and add what's domain-specific."
+        "content": "Generic 'this service at a glance' suggested by ops as the minimum for a containerized microservice. RED on top (Rate/Errors/Duration from Tempo spanmetrics), USE below (container CPU/memory from cadvisor) with host total + free as dashed reference lines, logs at the bottom. Fork it per team and add what's domain-specific."
       }
     },
     {
       "id": 2,
-      "type": "stat",
+      "type": "timeseries",
       "title": "Request rate (RED: rate)",
-      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 3 },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 3 },
       "datasource": { "uid": "vm", "type": "prometheus" },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(traces_spanmetrics_calls_total{service=\"$service\"}[1m]))"
-        }
-      ],
-      "fieldConfig": { "defaults": { "unit": "reqps" } }
-    },
-    {
-      "id": 3,
-      "type": "stat",
-      "title": "Error rate (RED: errors)",
-      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 3 },
-      "datasource": { "uid": "vm", "type": "prometheus" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum(rate(traces_spanmetrics_calls_total{service=\"$service\", status_code=\"STATUS_CODE_ERROR\"}[1m]))"
+          "expr": "sum by (service) (rate(traces_spanmetrics_calls_total{service=~\"$service\"}[1m]))",
+          "legendFormat": "{{service}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 0.01 }
-            ]
-          }
+          "custom": { "stacking": { "mode": "normal" }, "fillOpacity": 30, "lineWidth": 1 }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Error rate (RED: errors)",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 3 },
+      "datasource": { "uid": "vm", "type": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service) (rate(traces_spanmetrics_calls_total{service=~\"$service\", status_code=\"STATUS_CODE_ERROR\"}[1m]))",
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "stacking": { "mode": "normal" }, "fillOpacity": 30, "lineWidth": 1 }
         }
       }
     },
     {
       "id": 4,
-      "type": "stat",
+      "type": "timeseries",
       "title": "p95 latency (RED: duration)",
-      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 3 },
+      "description": "Percentile latency per service. Intentionally NOT stacked — summing percentiles is mathematically wrong.",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 3 },
       "datasource": { "uid": "vm", "type": "prometheus" },
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(traces_spanmetrics_latency_bucket{service=\"$service\"}[5m])))"
+          "expr": "histogram_quantile(0.95, sum by (service, le) (rate(traces_spanmetrics_latency_bucket{service=~\"$service\"}[5m])))",
+          "legendFormat": "{{service}}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "ms" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": { "lineWidth": 2 }
+        }
+      }
     },
     {
       "id": 5,
       "type": "timeseries",
-      "title": "Container CPU (USE: utilization)",
-      "description": "Filtered on container `name` containing the service — works when compose names align with service.name (server, www). Adjust the regex when they don't.",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "title": "CPU (USE: utilization)",
+      "description": "Per-service CPU stacked at the bottom. Two dashed overlay lines show host CPU usage and host idle (capacity headroom) from node-exporter.",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 10 },
       "datasource": { "uid": "vm", "type": "prometheus" },
       "targets": [
         {
-          "refId": "A",
-          "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{name=~\".*$service.*\"}[1m]))",
-          "legendFormat": "{{name}}"
+          "refId": "services",
+          "expr": "sum by (service) (rate(container_cpu_usage_seconds_total{service=~\"$service\"}[1m]))",
+          "legendFormat": "{{service}}"
+        },
+        {
+          "refId": "host_used",
+          "expr": "sum(rate(node_cpu_seconds_total{mode!=\"idle\"}[1m])) / count(count by (cpu) (node_cpu_seconds_total))",
+          "legendFormat": "host (all cores avg)"
+        },
+        {
+          "refId": "host_free",
+          "expr": "sum(rate(node_cpu_seconds_total{mode=\"idle\"}[1m])) / count(count by (cpu) (node_cpu_seconds_total))",
+          "legendFormat": "host idle"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "percentunit" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": { "stacking": { "mode": "normal" }, "fillOpacity": 30, "lineWidth": 1 }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byFrameRefID", "options": "host_used" },
+            "properties": [
+              { "id": "custom.stacking", "value": { "mode": "none" } },
+              { "id": "custom.fillOpacity", "value": 0 },
+              { "id": "custom.lineWidth", "value": 2 },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "host_free" },
+            "properties": [
+              { "id": "custom.stacking", "value": { "mode": "none" } },
+              { "id": "custom.fillOpacity", "value": 0 },
+              { "id": "custom.lineWidth", "value": 2 },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }
+            ]
+          }
+        ]
+      }
     },
     {
       "id": 6,
       "type": "timeseries",
-      "title": "Container memory (USE: utilization)",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+      "title": "Memory (USE: utilization)",
+      "description": "Per-service memory stacked. Host used + free overlay shows headroom.",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 10 },
       "datasource": { "uid": "vm", "type": "prometheus" },
       "targets": [
         {
-          "refId": "A",
-          "expr": "sum by (name) (container_memory_working_set_bytes{name=~\".*$service.*\"})",
-          "legendFormat": "{{name}}"
+          "refId": "services",
+          "expr": "sum by (service) (container_memory_working_set_bytes{service=~\"$service\"})",
+          "legendFormat": "{{service}}"
+        },
+        {
+          "refId": "host_used",
+          "expr": "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes",
+          "legendFormat": "host used"
+        },
+        {
+          "refId": "host_free",
+          "expr": "node_memory_MemAvailable_bytes",
+          "legendFormat": "host free"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "bytes" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "stacking": { "mode": "normal" }, "fillOpacity": 30, "lineWidth": 1 }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byFrameRefID", "options": "host_used" },
+            "properties": [
+              { "id": "custom.stacking", "value": { "mode": "none" } },
+              { "id": "custom.fillOpacity", "value": 0 },
+              { "id": "custom.lineWidth", "value": 2 },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "host_free" },
+            "properties": [
+              { "id": "custom.stacking", "value": { "mode": "none" } },
+              { "id": "custom.fillOpacity", "value": 0 },
+              { "id": "custom.lineWidth", "value": 2 },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }
+            ]
+          }
+        ]
+      }
     },
     {
       "id": 7,
       "type": "logs",
       "title": "Recent logs",
-      "description": "Logs filtered by container_id whose name matches the service. Until app-side OTLP logs land, filelog can't tag logs with service.name — see catalogue/logging notes.",
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 17 },
+      "description": "Logs filtered by container_id whose name matches the service. Brittle body-regex match until app emitters land (chunk 4) — see DESIGN_DECISIONS.",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 19 },
       "datasource": { "uid": "loki", "type": "loki" },
       "targets": [
         {
           "refId": "A",
-          "expr": "{container_id=~\".+\"} |~ \"(?i)$service\""
+          "expr": "{container_id=~\".+\"} |~ \"(?i)${service:regex}\""
         }
       ]
     }
