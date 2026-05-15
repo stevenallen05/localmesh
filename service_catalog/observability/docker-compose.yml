@@ -59,6 +59,19 @@ configs:
                   - source_labels: [container_label_com_docker_compose_project]
                     regex: '${PROJECT_NAME}'
                     action: keep
+                  # Stamp `service` from the docker label set by every
+                  # compose service. Two-step fallback to container name —
+                  # if the docker label is set, step 1 copies it and step
+                  # 2's leading-semicolon-anchored regex no-ops; if the
+                  # label is absent, step 1 produces empty and step 2's
+                  # regex captures the container name.
+                  - source_labels: [container_label_metrics_service_name]
+                    target_label: service
+                  - source_labels: [service, name]
+                    separator: ';'
+                    regex: ';(.+)'
+                    target_label: service
+                    replacement: '$1'
         # Tails the docker JSON log driver output for every container on
         # the host. The k8s overlay swaps this `include:` to
         # /var/log/containers/*.log (kubelet's path) — same receiver,
