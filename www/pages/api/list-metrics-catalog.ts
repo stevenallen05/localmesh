@@ -3,6 +3,7 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import { promisify } from 'util';
 import path from 'path';
+import { logger } from '../../lib/logger';
 
 const PROTO_PATH = path.resolve(process.cwd(), 'proto/metrics.proto');
 
@@ -36,7 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ...ds,
       metrics: (await listMetrics({ datasource_uid: ds.uid })).names ?? [],
     })));
-    console.log('metrics catalog:', JSON.stringify(result, null, 2));
+    logger.info({ catalog: result }, 'metrics catalog');
     res.status(200).json({ dataSources: result });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'unknown';

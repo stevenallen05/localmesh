@@ -3,6 +3,7 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import { promisify } from 'util';
 import path from 'path';
+import { logger } from '../../lib/logger';
 
 // WORKDIR /app in the container; proto/ lands at /app/proto/.
 const PROTO_PATH = path.resolve(process.cwd(), 'proto/hello.proto');
@@ -46,7 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const stats = await printStats({});
-    console.log('postgres stats:', stats);
+    logger.info({ stats }, 'postgres stats');
     res.status(200).json(stats);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'unknown';

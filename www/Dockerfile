@@ -14,6 +14,7 @@ COPY www/package.json www/package-lock.json ./
 RUN npm ci
 COPY www/tsconfig.json www/next-env.d.ts www/next.config.ts ./
 COPY www/pages ./pages
+COPY www/lib ./lib
 COPY www/instrumentation.ts ./
 COPY proto /app/proto
 RUN npm run build

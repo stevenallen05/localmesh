@@ -13,7 +13,8 @@
     "@grpc/proto-loader": "^0.8.0",
     "@opentelemetry/instrumentation-grpc": "^0.218.0",
     "@vercel/otel": "^2.1.2",
-    "next": "^16.0.8"
+    "next": "^16.0.8",
+    "pino": "^9.5.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.7",
