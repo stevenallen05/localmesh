@@ -18,6 +18,26 @@
         "includeAll": true,
         "multi": true,
         "current": { "selected": true, "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "min_level",
+        "type": "custom",
+        "label": "Min level",
+        "description": "Body-regex approximation. Future: switch to a label filter once every conforming source emits a real level.",
+        "options": [
+          { "text": "ALL",    "value": "",                                          "selected": false },
+          { "text": "INFO+",  "value": "\"level\":\"(info|warn|error|fatal)\"",     "selected": true  },
+          { "text": "WARN+",  "value": "\"level\":\"(warn|error|fatal)\"",          "selected": false },
+          { "text": "ERROR+", "value": "\"level\":\"(error|fatal)\"",               "selected": false }
+        ],
+        "current": { "selected": true, "text": "INFO+", "value": "\"level\":\"(info|warn|error|fatal)\"" }
+      },
+      {
+        "name": "log_filter",
+        "type": "textbox",
+        "label": "Log filter (regex)",
+        "description": "Free-text LogQL line-filter regex. Empty matches everything.",
+        "current": { "value": "" }
       }
     ]
   },
@@ -203,13 +223,13 @@
       "id": 7,
       "type": "logs",
       "title": "Recent logs",
-      "description": "Logs filtered by container_id whose name matches the service. Brittle body-regex match until app emitters land (chunk 4) — see DESIGN_DECISIONS.",
+      "description": "Logs filtered by the contract's `service` label and the body-regex `min_level` / `log_filter` template vars. INFO+ default hides non-conforming sources (postgres, otel-collector, grafana, etc.) — flip Min level to ALL to see them.",
       "gridPos": { "h": 10, "w": 24, "x": 0, "y": 19 },
       "datasource": { "uid": "loki", "type": "loki" },
       "targets": [
         {
           "refId": "A",
-          "expr": "{container_id=~\".+\"} |~ \"(?i)${service:regex}\""
+          "expr": "{service=~\"$service\"} |~ \"$min_level\" |~ \"$log_filter\""
         }
       ]
     }
