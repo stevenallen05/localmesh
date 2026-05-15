@@ -10,6 +10,28 @@ export default function Home() {
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [catalogOk, setCatalogOk] = useState(false);
 
+  const [pgLoading, setPgLoading] = useState(false);
+  const [pgError, setPgError] = useState<string | null>(null);
+  const [pgOk, setPgOk] = useState(false);
+
+  const handlePrintPostgresStats = async () => {
+    setPgLoading(true);
+    setPgError(null);
+    setPgOk(false);
+    try {
+      const res = await fetch('/api/print-postgres-stats', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      console.log('postgres stats:', data);
+      setPgOk(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setPgError(message);
+    } finally {
+      setPgLoading(false);
+    }
+  };
+
   const handleListCatalog = async () => {
     setCatalogLoading(true);
     setCatalogError(null);
@@ -160,6 +182,38 @@ export default function Home() {
           <div style={{ marginTop: '15px', padding: '10px',
                         backgroundColor: '#fee', borderRadius: '4px', color: '#c00' }}>
             <strong>Error:</strong> {catalogError}
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginTop: '30px' }}>
+        <button
+          type="button"
+          onClick={handlePrintPostgresStats}
+          disabled={pgLoading}
+          style={{
+            padding: '10px 20px',
+            fontSize: '16px',
+            backgroundColor: pgLoading ? '#ccc' : '#0070f3',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: pgLoading ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {pgLoading ? 'Loading...' : 'Print Postgres stats to console'}
+        </button>
+
+        {pgOk && (
+          <div style={{ marginTop: '15px', padding: '10px',
+                        backgroundColor: '#efe', borderRadius: '4px' }}>
+            Logged to browser console.
+          </div>
+        )}
+        {pgError && (
+          <div style={{ marginTop: '15px', padding: '10px',
+                        backgroundColor: '#fee', borderRadius: '4px', color: '#c00' }}>
+            <strong>Error:</strong> {pgError}
           </div>
         )}
       </div>
