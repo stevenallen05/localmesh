@@ -18,10 +18,10 @@ services:
       SERVER_ADDR: 0.0.0.0:50051
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_SERVICE_NAME: server
-      # Hardcoded — `owned_by` is project.toml's tech_lead. In production
-      # terraform/CI templates this from the same source instead of
-      # duplicating the value in compose.
-      OTEL_RESOURCE_ATTRIBUTES: "module_name=app,owned_by=sallen@amberstyle.ca"
+      # `owned_by` interpolates from .env's TECH_LEAD_EMAIL, which
+      # mirrors project.toml's tech_lead. Eventually the platform reads
+      # project.toml directly and this duplication goes away.
+      OTEL_RESOURCE_ATTRIBUTES: "module_name=app,owned_by=${TECH_LEAD_EMAIL}"
       # Connection-string wiring is in place ahead of an actual postgres
       # client; what the server uses postgres for is still TBD. Server today
       # ignores this — when an RPC lands that needs it, the env is ready.
@@ -60,10 +60,10 @@ services:
       SERVER_ADDR: server:50051
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       OTEL_SERVICE_NAME: www
-      # See note on server above — same hardcoding caveat.
-      OTEL_RESOURCE_ATTRIBUTES: "module_name=app,owned_by=sallen@amberstyle.ca"
+      # See note on server above — same TECH_LEAD_EMAIL interpolation.
+      OTEL_RESOURCE_ATTRIBUTES: "module_name=app,owned_by=${TECH_LEAD_EMAIL}"
       HOSTNAME: ${HOSTNAME:-}
-      NEXT_PUBLIC_GRAFANA_URL: http://localhost:3001
+      NEXT_PUBLIC_GRAFANA_URL: ${INTERNAL_GRAFANA_URL}
     ports:
       - "3000:3000"
     depends_on:
@@ -80,7 +80,8 @@ services:
     labels:
       katenary.v3/map-env: |-
         SERVER_ADDR: '{{ .Release.Name }}-server:50051'
-      # Rule 6: placeholder domain — prod overlay injects the real hostname.
+      # Rule 6: domain comes from .env's EXTERNAL_DOMAIN, mirroring
+      # project.toml's external_domain. Prod overlay can still override.
       katenary.v3/ingress: |-
-        hostname: ${HOSTNAME:-}
+        hostname: ${EXTERNAL_DOMAIN}
         port: 3000
