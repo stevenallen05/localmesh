@@ -22,27 +22,34 @@ dev-only; the same data is available on prod, but those collectors are owned
 by ops. The dev env version is just to provide fidelity and give the same 
 observability DX between prod and 'my machine'
 
-## Logging
+## Cross-cutting conventions
 
-- **`service_name=unknown_service` on every container log.** filelog tails
-  raw docker JSON files and doesn't know the container's service identity.
-  Two paths: have apps (server, www) export OTLP logs directly with
-  `OTEL_RESOURCE_ATTRIBUTES` (clean, but doesn't help non-app containers),
-  or enrich at the collector with `docker_observer` + an attributes
-  processor that maps `container_id` → service name.
-- **`module_name`/`owned_by` missing on container logs.** Same root cause,
-  same fix paths.
-- **`service-glance` dashboard's logs panel uses a regex body match**
-  (`|~ "(?i)$service"`) instead of a proper label filter — works for the
-  demo, brittle in practice. Resolves once the above gap is filled.
+- **`metrics.*` compose-label namespace.** `metrics.service_name` is the
+  first inhabitant. Future infra-facing labels (trace sampling
+  overrides, log-routing hints, etc.) should follow the same
+  `<subsystem>.<purpose>` shape; document the rule alongside the
+  katenary label conventions in
+  [`katenary-top-seven.md`](../engineering/rules/katenary-top-seven.md)
+  so additions don't drift.
 
-## Dashboards
+## Logging follow-ups
 
-- **`service-glance` RED ↔ USE join is by container `name` regex.**
-  `traces_spanmetrics_*` carries `service`, `container_*` metrics carry
-  `name` — different labels. Today the dashboard hopes the compose name
-  matches the service. A recording rule (or relabel) that adds
-  `service` to container metrics would make the join exact.
+- **Per-source log-level extractors for non-app containers.** Postgres,
+  otel-collector, grafana, tempo, loki, vm, cadvisor, node-exporter
+  each speak a different format. Either `docker_observer` enrichment by
+  container id or per-source filelog operators. Until then,
+  `service-glance`'s default `INFO+` filter hides these sources.
+- **Swap dashboard `min_level` line-filter for a real Loki label
+  filter.** Once every conforming source emits a real `level`, the
+  dashboard can switch from `|~ "$min_level"` to `| level=~"..."` —
+  exact, cheaper, no regex false positives.
+- **Validate `level` enum at the collector.** Drop / coerce malformed
+  `level` values from non-conforming sources before they hit Loki, to
+  bound the label's cardinality in prod.
+- **Migrate Grafana Loki's `trace_id` derived field from body-regex to
+  structured-metadata reference.** The matcher works today via
+  `matcherRegex` on the body; field-based is cleaner and doesn't break
+  if body format changes.
 
 ## OTel collector
 
