@@ -4,6 +4,14 @@ Scoped to **this take-home project**. Anything that's a real production
 hardening concern lives in `DESIGN_DECISIONS.md` (or doesn't exist yet) —
 not here.
 
+## My thoughts
+
+First, the collectors need to be limited to the sensible default boundary. 
+Collectors should be restricted to just devices on the same compose network.
+The only prod note that's needed is that the hardware metrics collector is
+dev-only; the same data is available on prod, but those collectors are owned
+by ops. The dev env version is just to provide fidelity
+
 ## Logging
 
 - **`service_name=unknown_service` on every container log.** filelog tails
