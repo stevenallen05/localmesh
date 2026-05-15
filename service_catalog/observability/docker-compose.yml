@@ -35,25 +35,40 @@ configs:
               # their own values on scrape jobs they own — app code uses
               # OTEL_RESOURCE_ATTRIBUTES on the container instead.
               - job_name: node-exporter
+                # Host kernel metrics — dev-fidelity only. In prod, ops
+                # owns the equivalent collectors and this scrape job is
+                # removed by the prod overlay.
                 static_configs:
                   - targets: ['node-exporter:9100']
                     labels:
                       module_name: observability
-                      owned_by: ops_team@example.com
+                      owned_by: sre@example.com
                 scrape_interval: 30s
               - job_name: cadvisor
                 static_configs:
                   - targets: ['cadvisor:8080']
                     labels:
                       module_name: observability
-                      owned_by: ops_team@example.com
+                      owned_by: sre@example.com
                 scrape_interval: 30s
+                metric_relabel_configs:
+                  # Drop samples from containers outside this compose
+                  # project (e.g. the dev-environment agentbox-*
+                  # containers on the host daemon). Closes the TODO
+                  # entry on cluster-health host noise.
+                  - source_labels: [container_label_com_docker_compose_project]
+                    regex: '${PROJECT_NAME}'
+                    action: keep
         # Tails the docker JSON log driver output for every container on
         # the host. The k8s overlay swaps this `include:` to
         # /var/log/containers/*.log (kubelet's path) — same receiver,
         # different glob. The bind mount declared on otel-collector's
         # `volumes:` (below) is what makes this readable; katenary
         # translates it to a hostPath volume.
+        #
+        # Filtering to this compose project would need docker_observer
+        # enrichment (not a one-liner); dashboards filter by
+        # `module_name` / `service.name` instead.
         filelog:
           include: ['/var/lib/docker/containers/*/*-json.log']
           start_at: end
@@ -84,13 +99,14 @@ configs:
               from: attributes.stream
               to: attributes["log.iostream"]
       processors:
-        # Stamps `project_name=metrics-collector` on every span and log.
-        # Hardcoded today — matches project.toml's identity block; once the
-        # platform reads project.toml, this constant goes away.
+        # Stamps `project_name=${PROJECT_NAME}` on every span and log.
+        # The value comes from .env's PROJECT_NAME, which mirrors
+        # project.toml's identity block; once the platform reads
+        # project.toml directly, this becomes a pure passthrough.
         resource/project:
           attributes:
             - key: project_name
-              value: metrics-collector
+              value: ${PROJECT_NAME}
               action: upsert
         # pg_tracing hard-codes service.name=PostgreSQL_Server and ignores
         # OTEL_RESOURCE_ATTRIBUTES, so the database module's resource attrs
@@ -102,7 +118,7 @@ configs:
             - context: resource
               statements:
                 - set(attributes["module_name"], "database") where attributes["service.name"] == "PostgreSQL_Server"
-                - set(attributes["owned_by"], "ops_team@example.com") where attributes["service.name"] == "PostgreSQL_Server"
+                - set(attributes["owned_by"], "sre@example.com") where attributes["service.name"] == "PostgreSQL_Server"
                 - set(attributes["service.name"], "postgres") where attributes["service.name"] == "PostgreSQL_Server"
       exporters:
         prometheusremotewrite:
@@ -111,7 +127,7 @@ configs:
           # boundary. Surgical (one label) vs. resource_to_telemetry_conversion
           # which would dump every resource attr in as a Prom label.
           external_labels:
-            project_name: metrics-collector
+            project_name: ${PROJECT_NAME}
         debug:
           verbosity: detailed
         otlp/tempo:
