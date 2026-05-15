@@ -34,4 +34,12 @@ impl Greeter for GreeterSvc {
             message: format!("hello, {name}"),
         }))
     }
+
+    async fn print_postgres_stats(
+        &self,
+        _req: Request<()>,
+    ) -> Result<Response<crate::proto::hello::PostgresStatsReply>, Status> {
+        // Stub — wired to postgres in the next commit.
+        Err(Status::unimplemented("print_postgres_stats not yet wired"))
+    }
 }
