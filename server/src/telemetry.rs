@@ -2,9 +2,15 @@ use std::collections::HashMap;
 
 use opentelemetry::global;
 use opentelemetry::propagation::Extractor;
+use opentelemetry::trace::TracerProvider as _;
 use opentelemetry_otlp::{SpanExporter, WithExportConfig};
 use opentelemetry_sdk::propagation::TraceContextPropagator;
 use opentelemetry_sdk::trace::SdkTracerProvider;
+// In opentelemetry_sdk 0.31 this is a back-compat alias for SdkTracer
+// (`pub use tracer::SdkTracer as Tracer;` in the SDK's mod.rs). The alias
+// is kept specifically so tracing-opentelemetry builds. If cargo check
+// stops resolving this on a future SDK bump, switch to `SdkTracer`.
+use opentelemetry_sdk::trace::Tracer;
 use opentelemetry_sdk::Resource;
 use tonic::metadata::{KeyRef, MetadataMap as TonicMetadataMap};
 
@@ -29,9 +35,10 @@ pub(crate) fn parse_otel_resource_attrs(raw: &str) -> HashMap<String, String> {
 }
 
 /// Build the OTel tracer provider, install W3C as the global propagator,
-/// register the provider globally, and return it so `main` can shut it
-/// down cleanly. Modelled on opentelemetry-rust/examples/tracing-grpc.
-pub fn init_tracer() -> Result<SdkTracerProvider, BoxError> {
+/// register the provider globally, and return it (plus a tracer handle
+/// for `tracing-opentelemetry`) so `main` can wire logging and shut the
+/// provider down cleanly. Modelled on opentelemetry-rust/examples/tracing-grpc.
+pub fn init_tracer() -> Result<(SdkTracerProvider, Tracer), BoxError> {
     global::set_text_map_propagator(TraceContextPropagator::new());
 
     let endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
@@ -48,7 +55,54 @@ pub fn init_tracer() -> Result<SdkTracerProvider, BoxError> {
         .build();
 
     global::set_tracer_provider(provider.clone());
-    Ok(provider)
+    let tracer = provider.tracer("server");
+    Ok((provider, tracer))
+}
+
+/// Holds the entered root span for the lifetime of the program.
+pub struct RootSpanGuard(#[allow(dead_code)] tracing::span::EnteredSpan);
+
+/// Install the global `tracing` subscriber and open the process-wide
+/// root span carrying the contract's required constants. Returns a
+/// guard that must outlive every event emission.
+///
+/// Call **after** `init_tracer` so the `tracing-opentelemetry` layer
+/// can attach to the global tracer provider.
+pub fn init_logging(tracer: Tracer) -> RootSpanGuard {
+    use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+
+    let service = std::env::var("OTEL_SERVICE_NAME").unwrap_or_else(|_| "server".into());
+    let resource = parse_otel_resource_attrs(
+        std::env::var("OTEL_RESOURCE_ATTRIBUTES")
+            .unwrap_or_default()
+            .as_str(),
+    );
+    let module_name = resource.get("module_name").cloned().unwrap_or_default();
+    let owned_by = resource.get("owned_by").cloned().unwrap_or_default();
+
+    tracing_subscriber::registry()
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
+        .with(
+            fmt::layer()
+                .json()
+                .with_current_span(true)
+                .with_span_list(false)
+                .flatten_event(true),
+        )
+        .with(tracing_opentelemetry::layer().with_tracer(tracer))
+        .init();
+
+    // Process-wide root span; with_current_span(true) on the fmt layer
+    // serialises its fields under "span":{...} on every event. The
+    // collector's filelog operators flatten span.* back to top-level
+    // attributes before promoting to Loki labels.
+    let span = tracing::info_span!(
+        "app",
+        service = %service,
+        module_name = %module_name,
+        owned_by = %owned_by,
+    );
+    RootSpanGuard(span.entered())
 }
 
 /// Adapter: lets the OTel propagator read gRPC headers off a tonic

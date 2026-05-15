@@ -13,7 +13,7 @@ use server::telemetry::{init_tracer, BoxError};
 
 #[tokio::main]
 async fn main() -> Result<(), BoxError> {
-    let provider = init_tracer()?;
+    let (provider, _tracer) = init_tracer()?;
 
     let addr: SocketAddr = std::env::var("SERVER_ADDR")
         .unwrap_or_else(|_| "0.0.0.0:50051".to_string())
