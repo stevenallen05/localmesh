@@ -9,7 +9,7 @@
 #   - Spans inherit the trace context from a `/*traceparent='...'*/` SQL
 #     comment, which the Rust server's Persist RPC injects.
 #   - Spans carry `service.name=postgres`, `module_name=database`,
-#     `owned_by=ops_team@example.com` via OTEL_RESOURCE_ATTRIBUTES.
+#     `owned_by=sre@example.com` via OTEL_RESOURCE_ATTRIBUTES.
 #
 # In prod this module would point at the managed offering (e.g., RDS
 # with pg_tracing enabled through a custom parameter group / extension
@@ -30,7 +30,7 @@ services:
       # Resource attrs the otel-collector sees on every pg_tracing span via
       # the OTLP HTTP/JSON payload (pg_tracing reads OTEL_RESOURCE_ATTRIBUTES
       # like any OTel SDK).
-      OTEL_RESOURCE_ATTRIBUTES: "module_name=database,owned_by=ops_team@example.com"
+      OTEL_RESOURCE_ATTRIBUTES: "module_name=database,owned_by=sre@example.com"
       OTEL_SERVICE_NAME: postgres
     command:
       - postgres

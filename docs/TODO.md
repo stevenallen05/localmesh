@@ -6,11 +6,21 @@ not here.
 
 ## My thoughts
 
-First, the collectors need to be limited to the sensible default boundary. 
+First, make a .env to mock the project.toml (will eventually be .env.sample,
+just leave a todo note at the top of .env). Include int/ext domains, project name, etc -just what's
+needed to provide a bare minimum functional portable demo.
+
+Second, the URIs, namespaces, tags, etc used across the compose & catalog need to 
+be double-checked. Assume the env vars are long-term sufficient, and populating them
+in "better" ways is an exercise to be done later. Then interpolate with compose 
+best-practices
+
+Third, the collectors need to be limited to the sensible default boundary. 
 Collectors should be restricted to just devices on the same compose network.
-The only prod note that's needed is that the hardware metrics collector is
+The only prod note that's needed is that the metrics collectors are
 dev-only; the same data is available on prod, but those collectors are owned
-by ops. The dev env version is just to provide fidelity
+by ops. The dev env version is just to provide fidelity and give the same 
+observability DX between prod and 'my machine'
 
 ## Logging
 
@@ -28,11 +38,6 @@ by ops. The dev env version is just to provide fidelity
 
 ## Dashboards
 
-- **`cluster-health` includes the host's `agentbox-*` containers.**
-  cadvisor scrapes everything on the docker daemon, including the
-  dev-environment container. A `name!~"agentbox.*"` filter on each panel
-  would clean it up; doing it centrally needs a recording rule or
-  collector-side relabel.
 - **`infra-modules` service-graph table has no `module_name` column.**
   Tempo's `service_graphs` processor emits edges at the service level;
   there's no built-in way to project resource attrs onto them. Either
