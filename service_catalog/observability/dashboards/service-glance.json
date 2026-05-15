@@ -23,7 +23,7 @@
         "name": "min_level",
         "type": "custom",
         "label": "Min level",
-        "description": "LogQL label filter on the Loki `level` indexed label. Non-conforming sources land with level='' and the INFO+ default hides them — flip to ALL to see them.",
+        "description": "LogQL label filter on the Loki `level` indexed label. ALL = `.*` (matches any level value). Non-conforming sources are filtered upstream by the `service=~` stream selector and are not visible at any setting.",
         "options": [
           { "text": "ALL",    "value": ".*",                          "selected": false },
           { "text": "INFO+",  "value": "info|warn|error|fatal",       "selected": true  },
@@ -223,7 +223,7 @@
       "id": 7,
       "type": "logs",
       "title": "Recent logs",
-      "description": "Logs filtered by the contract's `service` label and the body-regex `min_level` / `log_filter` template vars. INFO+ default hides non-conforming sources (postgres, otel-collector, grafana, etc.) — flip Min level to ALL to see them.",
+      "description": "LogQL label filter on Loki's `service` and `level` indexed labels, plus a free-form `log_filter` line-filter regex. Non-conforming sources (postgres, otel-collector, grafana, etc.) emit no `service` field and are not visible in this panel at any Min level — the per-source extractors TODO covers that case.",
       "gridPos": { "h": 10, "w": 24, "x": 0, "y": 19 },
       "datasource": { "uid": "loki", "type": "loki" },
       "targets": [

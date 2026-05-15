@@ -40,6 +40,10 @@ async fn main() -> Result<(), BoxError> {
         .serve(addr)
         .await?;
 
+    // Drop the root span before shutting the OTel provider down so the
+    // close event reaches a still-live exporter. Shutdown is idempotent,
+    // so order is cosmetic — but intentional.
+    drop(_root);
     provider.shutdown()?;
     Ok(())
 }
