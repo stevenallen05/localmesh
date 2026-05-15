@@ -74,6 +74,7 @@ services:
       # generate the depends_on init-container in the helm chart.
       katenary.v3/ports: |-
         - 3100
+      metrics.service_name: logging
     # Loki image is distroless — no wget/curl/shell. Use service_started
     # ordering; the otel-collector's loki exporter will retry on its own
     # if Loki isn't accepting writes yet.

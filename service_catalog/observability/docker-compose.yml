@@ -310,6 +310,10 @@ services:
     image: otel/opentelemetry-collector-contrib:0.152.0
     container_name: otel-collector
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    labels:
+      # Whole catalog module collapses to one row in service-glance.
+      # See cadvisor metric_relabel_configs in this file.
+      metrics.service_name: observability
     # Docker's JSON log files are 640 root:root; the contrib image's default
     # UID 10001 can't read them. Running root here is the trade-off every
     # node-local log scraper makes (Promtail/Alloy/filebeat all do the
@@ -353,6 +357,7 @@ services:
       # https://repo.katenary.io/katenary/katenary/issues/182.
       katenary.v3/ports: |-
         - 9100
+      metrics.service_name: observability
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.52.1
@@ -368,6 +373,7 @@ services:
       # See node-exporter above — cadvisor serves the prometheus scrape on 8080.
       katenary.v3/ports: |-
         - 8080
+      metrics.service_name: observability
     devices:
       - /dev/kmsg
 
@@ -381,6 +387,8 @@ services:
       - "8428:8428"
     volumes:
       - vm-data:/victoria-metrics-data
+    labels:
+      metrics.service_name: observability
     # No healthcheck: VM image is FROM scratch — no wget/curl/shell.
     # Reviewer-debug: `curl http://localhost:8428/health` from host.
 
@@ -393,6 +401,8 @@ services:
         target: /etc/tempo/tempo.yaml
     volumes:
       - tempo-data:/var/tempo
+    labels:
+      metrics.service_name: observability
     # Internal-only; Grafana proxies it. No healthcheck — Tempo's image
     # is minimal; rely on service_started for ordering.
 
@@ -424,6 +434,8 @@ services:
         target: /etc/grafana/dashboards/service-glance.json
     volumes:
       - grafana-data:/var/lib/grafana
+    labels:
+      metrics.service_name: observability
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
       interval: 10s
@@ -454,6 +466,8 @@ services:
     volumes:
       - grafana-token:/run/grafana
     entrypoint: ["/bin/sh", "/bootstrap.sh"]
+    labels:
+      metrics.service_name: observability
 
 volumes:
   vm-data: {}
