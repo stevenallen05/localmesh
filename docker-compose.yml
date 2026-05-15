@@ -48,6 +48,11 @@ services:
       # Rule 3: depends_on target needs a port label or katenary rc6 emits no chart.
       katenary.v3/ports: |-
         - 50051
+      # Identity for the `service` label on cadvisor metrics + Loki logs.
+      # See service_catalog/observability/docker-compose.yml's cadvisor
+      # metric_relabel_configs for the propagation rule. Same value as
+      # OTEL_SERVICE_NAME above so metrics + traces + logs all agree.
+      metrics.service_name: server
 
   www:
     # Same reason as server: proto/ must be in the build context.
@@ -85,3 +90,4 @@ services:
       katenary.v3/ingress: |-
         hostname: ${EXTERNAL_DOMAIN}
         port: 3000
+      metrics.service_name: www
