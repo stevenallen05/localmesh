@@ -121,31 +121,32 @@ configs:
               parse_to: attributes
               on_error: send_quiet
             # tracing-subscriber (Rust) emits the root span's fields under
-            # a nested `"span":{...}` object. The json_parser flattens
-            # nested JSON to dotted attribute keys, so a Rust log like
-            # {"span":{"service":"server"}} lands as
-            # attributes["span.service"]. Pino (www) emits these at top
-            # level. Two-shape normalisation below.
+            # a nested `"span":{...}` object. json_parser preserves that as
+            # a real nested map (NOT dotted-key flatten). Address via
+            # `attributes.span.service` and lean on expr-lang's optional
+            # chaining (`attributes.span?.service`) to make the `if:` guard
+            # safe when there's no `span` key at all (non-JSON lines, or
+            # Pino which emits service at top level).
             - type: move
-              from: attributes["span.service"]
+              from: attributes.span.service
               to: attributes.service
-              if: 'attributes["span.service"] != nil'
+              if: 'attributes.span?.service != nil'
             - type: move
-              from: attributes["span.module_name"]
+              from: attributes.span.module_name
               to: attributes.module_name
-              if: 'attributes["span.module_name"] != nil'
+              if: 'attributes.span?.module_name != nil'
             - type: move
-              from: attributes["span.owned_by"]
+              from: attributes.span.owned_by
               to: attributes.owned_by
-              if: 'attributes["span.owned_by"] != nil'
+              if: 'attributes.span?.owned_by != nil'
             - type: move
-              from: attributes["span.trace_id"]
+              from: attributes.span.trace_id
               to: attributes.trace_id
-              if: 'attributes["span.trace_id"] != nil'
+              if: 'attributes.span?.trace_id != nil'
             - type: move
-              from: attributes["span.span_id"]
+              from: attributes.span.span_id
               to: attributes.span_id
-              if: 'attributes["span.span_id"] != nil'
+              if: 'attributes.span?.span_id != nil'
             # Promote contract fields to resource scope. Loki's distributor
             # config (logging/docker-compose.yml) turns resource attrs into
             # indexed labels via default_resource_attributes_as_index_labels.
