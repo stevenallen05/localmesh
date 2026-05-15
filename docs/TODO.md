@@ -38,11 +38,6 @@ observability DX between prod and 'my machine'
 
 ## Dashboards
 
-- **`infra-modules` service-graph table has no `module_name` column.**
-  Tempo's `service_graphs` processor emits edges at the service level;
-  there's no built-in way to project resource attrs onto them. Either
-  derive module-of-service from a separate query, or build the same edge
-  set off span pairs in a TraceQL query.
 - **`service-glance` RED ↔ USE join is by container `name` regex.**
   `traces_spanmetrics_*` carries `service`, `container_*` metrics carry
   `name` — different labels. Today the dashboard hopes the compose name

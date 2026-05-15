@@ -79,30 +79,27 @@
     },
     {
       "id": 4,
-      "type": "table",
-      "title": "Service graph edges (caller → callee)",
-      "description": "Built from Tempo's service_graphs processor. An edge appears when a CLIENT-kind span in `caller` has a SERVER-kind child in `callee`.",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
-      "datasource": { "uid": "vm", "type": "prometheus" },
+      "type": "nodeGraph",
+      "title": "Service graph (caller → callee)",
+      "description": "Tempo's serviceMap query — nodes are services, edges are CLIENT→SERVER call pairs observed in spans. Click an edge to inspect example traces.",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 12 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "pluginVersion": "11.4.0",
+      "options": {
+        "edges": {},
+        "nodes": {}
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (client, server) (rate(traces_service_graph_request_total[5m]))",
-          "instant": true,
-          "format": "table"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": { "Time": true },
-            "renameByName": {
-              "client": "Caller",
-              "server": "Callee",
-              "Value": "Req/s (5m avg)"
-            }
-          }
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "serviceMap",
+          "tableType": "traces",
+          "limit": 20
         }
       ]
     }
