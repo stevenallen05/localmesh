@@ -58,6 +58,10 @@ configs:
             - container_id
             - module_name
             - owned_by
+            - service
+            - level
+            # trace_id / span_id intentionally not indexed —
+            # structured-metadata only (see observability filelog operators).
 
 services:
   loki:

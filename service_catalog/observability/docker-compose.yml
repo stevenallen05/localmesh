@@ -111,6 +111,64 @@ configs:
             - type: move
               from: attributes.stream
               to: attributes["log.iostream"]
+            # Cross-language structured-log contract. Apps emit JSON to
+            # stdout with at minimum {timestamp, level, service, message,
+            # trace_id, span_id, module_name, owned_by}. The json_parser
+            # tries to parse the body; non-JSON lines (postgres, grafana,
+            # etc.) pass through unchanged thanks to send_quiet.
+            - type: json_parser
+              parse_from: body
+              parse_to: attributes
+              on_error: send_quiet
+            # tracing-subscriber (Rust) emits the root span's fields under
+            # a nested `"span":{...}` object. The json_parser flattens
+            # nested JSON to dotted attribute keys, so a Rust log like
+            # {"span":{"service":"server"}} lands as
+            # attributes["span.service"]. Pino (www) emits these at top
+            # level. Two-shape normalisation below.
+            - type: move
+              from: attributes["span.service"]
+              to: attributes.service
+              if: 'attributes["span.service"] != nil'
+            - type: move
+              from: attributes["span.module_name"]
+              to: attributes.module_name
+              if: 'attributes["span.module_name"] != nil'
+            - type: move
+              from: attributes["span.owned_by"]
+              to: attributes.owned_by
+              if: 'attributes["span.owned_by"] != nil'
+            - type: move
+              from: attributes["span.trace_id"]
+              to: attributes.trace_id
+              if: 'attributes["span.trace_id"] != nil'
+            - type: move
+              from: attributes["span.span_id"]
+              to: attributes.span_id
+              if: 'attributes["span.span_id"] != nil'
+            # Promote contract fields to resource scope. Loki's distributor
+            # config (logging/docker-compose.yml) turns resource attrs into
+            # indexed labels via default_resource_attributes_as_index_labels.
+            # trace_id and span_id intentionally stay in attributes —
+            # Loki accepts them as structured metadata (not indexed),
+            # addressable in queries like {service="server"} | trace_id="abc"
+            # without cardinality cost.
+            - type: move
+              from: attributes.service
+              to: resource["service"]
+              if: 'attributes.service != nil'
+            - type: move
+              from: attributes.level
+              to: resource["level"]
+              if: 'attributes.level != nil'
+            - type: move
+              from: attributes.module_name
+              to: resource["module_name"]
+              if: 'attributes.module_name != nil'
+            - type: move
+              from: attributes.owned_by
+              to: resource["owned_by"]
+              if: 'attributes.owned_by != nil'
       processors:
         # Stamps `project_name=${PROJECT_NAME}` on every span and log.
         # The value comes from .env's PROJECT_NAME, which mirrors
@@ -133,6 +191,15 @@ configs:
                 - set(attributes["module_name"], "database") where attributes["service.name"] == "PostgreSQL_Server"
                 - set(attributes["owned_by"], "sre@example.com") where attributes["service.name"] == "PostgreSQL_Server"
                 - set(attributes["service.name"], "postgres") where attributes["service.name"] == "PostgreSQL_Server"
+        # Normalise log-level case. Rust's tracing-subscriber emits levels
+        # uppercase ("INFO"); Pino + the contract use lowercase. Lowercasing
+        # at the collector means the Loki label is consistent and dashboard
+        # filters work without case-insensitive flags.
+        transform/logs:
+          log_statements:
+            - context: resource
+              statements:
+                - set(attributes["level"], ConvertCase(attributes["level"], "lower")) where attributes["level"] != nil
       exporters:
         prometheusremotewrite:
           endpoint: http://victoriametrics:8428/api/v1/write
@@ -165,7 +232,7 @@ configs:
             exporters: [otlp/tempo, debug]
           logs:
             receivers: [filelog]
-            processors: [resource/project]
+            processors: [resource/project, transform/logs]
             exporters: [otlphttp/loki]
 
   grafana_vm_datasource:
