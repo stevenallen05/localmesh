@@ -44,18 +44,6 @@ observability DX between prod and 'my machine'
   matches the service. A recording rule (or relabel) that adds
   `service` to container metrics would make the join exact.
 
-## Postgres / Rust integration
-
-- **What the server uses postgres for is undecided.** The compose wiring
-  (`DATABASE_URL`, `depends_on: postgres healthy`) is in place; no Rust
-  client yet. Options sketched in conversation: service registry /
-  module-owner source-of-truth, audit log on Grafana mutations, plain
-  events log. Pending decision.
-- **Migration tooling not chosen.** When the server gains a postgres
-  client, pick a migration runner (`sqlx::migrate!`, `refinery`, or
-  external `dbmate` / `goose` container) — this is one of the things the
-  dev-env should demonstrate alongside pg_tracing.
-
 ## OTel collector
 
 - **OTTL `transform/database` logs an auto-correct warning at startup.**
