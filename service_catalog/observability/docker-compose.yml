@@ -209,13 +209,15 @@ configs:
               statements:
                 - set(attributes["level"], ConvertCase(attributes["level"], "lower")) where attributes["level"] != nil
       exporters:
-        prometheusremotewrite:
-          endpoint: http://victoriametrics:8428/api/v1/write
-          # Same label, applied to every metric series at the remote-write
-          # boundary. Surgical (one label) vs. resource_to_telemetry_conversion
-          # which would dump every resource attr in as a Prom label.
-          external_labels:
-            project_name: ${PROJECT_NAME}
+        # OTLP HTTP to VM. VM accepts protobuf at /opentelemetry/v1/metrics
+        # by default in 1.93+; resource attrs are promoted to series labels
+        # automatically. The `project_name` resource attr is stamped by the
+        # resource/project processor (added to the metrics pipeline below)
+        # — that supersedes the old prometheusremotewrite external_labels.
+        otlphttp/vm:
+          endpoint: http://victoriametrics:8428/opentelemetry
+          tls:
+            insecure: true
         debug:
           verbosity: detailed
         otlp/tempo:
@@ -233,7 +235,8 @@ configs:
         pipelines:
           metrics:
             receivers: [otlp, prometheus]
-            exporters: [prometheusremotewrite]
+            processors: [resource/project]
+            exporters: [otlphttp/vm]
           traces:
             receivers: [otlp]
             processors: [transform/database, resource/project]
