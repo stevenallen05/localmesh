@@ -387,18 +387,13 @@ configs:
   # Roster (intentionally a small set, not a comprehensive library — ops
   # ships the starter shapes, teams fork into their own):
   #
-  #   infra-modules    Catalogue overview — what's deployed, who owns it.
-  #   cluster-health   Container roster + USE method (cpu/mem/net + throttle).
-  #   service-glance   `$service` multi-select — RED + USE + service graph.
-  #   service-logs     `$service` + level/regex controls scoped to logs.
-  grafana_infra_modules_dashboard:
-    file: ./dashboards/infra-modules.json
+  #   apm              Imported Lightweight APM for OpenTelemetry (dashboard 22784).
+  #                    Application-services lens: RED + inbound/outbound + logs + traces.
+  #   cluster-health   Module roster + container roster + USE (cpu/mem/net + throttle).
+  grafana_apm_dashboard:
+    file: ./dashboards/apm.json
   grafana_cluster_health_dashboard:
     file: ./dashboards/cluster-health.json
-  grafana_service_glance_dashboard:
-    file: ./dashboards/service-glance.json
-  grafana_service_logs_dashboard:
-    file: ./dashboards/service-logs.json
 
 services:
   otel-collector:
@@ -525,14 +520,10 @@ services:
         target: /etc/grafana/provisioning/datasources/loki.yaml
       - source: grafana_dashboards_provider
         target: /etc/grafana/provisioning/dashboards/default.yaml
-      - source: grafana_infra_modules_dashboard
-        target: /etc/grafana/dashboards/infra-modules.json
+      - source: grafana_apm_dashboard
+        target: /etc/grafana/dashboards/apm.json
       - source: grafana_cluster_health_dashboard
         target: /etc/grafana/dashboards/cluster-health.json
-      - source: grafana_service_glance_dashboard
-        target: /etc/grafana/dashboards/service-glance.json
-      - source: grafana_service_logs_dashboard
-        target: /etc/grafana/dashboards/service-logs.json
     volumes:
       - grafana-data:/var/lib/grafana
     labels:
