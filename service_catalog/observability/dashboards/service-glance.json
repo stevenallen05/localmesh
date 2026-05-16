@@ -18,26 +18,6 @@
         "includeAll": true,
         "multi": true,
         "current": { "selected": true, "text": "All", "value": "$__all" }
-      },
-      {
-        "name": "min_level",
-        "type": "custom",
-        "label": "Min level",
-        "description": "LogQL label filter on the Loki `level` indexed label. ALL = `.*` (matches any level value). Non-conforming sources are filtered upstream by the `service=~` stream selector and are not visible at any setting.",
-        "options": [
-          { "text": "ALL",    "value": ".*",                          "selected": false },
-          { "text": "INFO+",  "value": "info|warn|error|fatal",       "selected": true  },
-          { "text": "WARN+",  "value": "warn|error|fatal",            "selected": false },
-          { "text": "ERROR+", "value": "error|fatal",                 "selected": false }
-        ],
-        "current": { "selected": true, "text": "INFO+", "value": "info|warn|error|fatal" }
-      },
-      {
-        "name": "log_filter",
-        "type": "textbox",
-        "label": "Log filter (regex)",
-        "description": "Free-text LogQL line-filter regex. Empty matches everything.",
-        "current": { "value": "" }
       }
     ]
   },
@@ -221,15 +201,27 @@
     },
     {
       "id": 7,
-      "type": "logs",
-      "title": "Recent logs",
-      "description": "LogQL label filter on Loki's `service` and `level` indexed labels, plus a free-form `log_filter` line-filter regex. Non-conforming sources (postgres, otel-collector, grafana, etc.) emit no `service` field and are not visible in this panel at any Min level — the per-source extractors TODO covers that case.",
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 19 },
-      "datasource": { "uid": "loki", "type": "loki" },
+      "type": "nodeGraph",
+      "title": "Service graph (caller → callee)",
+      "description": "Tempo's serviceMap query — nodes are services, edges are CLIENT→SERVER call pairs observed in spans. Click an edge to inspect example traces. Companion dashboard: [Service logs](/d/service-logs).",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 19 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "pluginVersion": "11.4.0",
+      "options": {
+        "edges": {},
+        "nodes": {}
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "targets": [
         {
           "refId": "A",
-          "expr": "{service=~\"$service\"} | level=~\"$min_level\" |~ \"$log_filter\""
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "serviceMap",
+          "tableType": "traces",
+          "limit": 20
         }
       ]
     }
