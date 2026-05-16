@@ -25,6 +25,18 @@ business requirements intersect — one human-scale file that captures
 all three, auditable and controllable at whatever level the context
 demands. (Expanded elsewhere — see [`docs/stakeholder/`](./docs/stakeholder/).)
 
+**Production-quality on dev becomes production.** Each catalogue module
+ships the same shape ops would run in prod, just locally-hosted: dev
+gets the *real* observability stack (OpenTelemetry collector, Tempo,
+Loki, VictoriaMetrics, Grafana), the *real* logging contract, the
+*real* identity tuple — the prod overlay swaps the storage backends and
+the rest is the same wire. The reviewer's dashboard is the community
+[Lightweight APM for OpenTelemetry](https://grafana.com/grafana/dashboards/22784)
+(Grafana ID 22784, source [cyrille-leclerc/opentelemetry-service-dashboard](https://github.com/cyrille-leclerc/opentelemetry-service-dashboard))
+imported wholesale — it works against this stack because the apps emit
+OTel semantic conventions, and it'll work against any backend that
+honors them.
+
 ## Read these first
 
 Stakeholder-facing context — read these regardless of role:
@@ -74,4 +86,25 @@ docker compose up -d --build
 
 ## What to look at
 
-TODO: walk-through of the reviewer surface — Grafana dashboards at `localhost:3001`, the www trace-demo at `localhost:3000`, and the end-to-end trace path through the catalogue.
+**Grafana** at `localhost:3001` (admin / admin), two provisioned dashboards:
+
+- **Lightweight APM for OpenTelemetry** (`/d/apm`) — community dashboard
+  [22784](https://grafana.com/grafana/dashboards/22784) by Cyrille Le
+  Clerc ([source](https://github.com/cyrille-leclerc/opentelemetry-service-dashboard)),
+  imported with three small patches: datasource defaults, identity-tuple
+  defaults (`tw-demo`/`dev`), and template-var queries that source from
+  `label_values()` directly because VictoriaMetrics 1.106 doesn't expose
+  Prometheus 3.x's `keep_identifying_resource_attributes` knob. The fact
+  that an unmodified dashboard from the broader OTel community works
+  against this stack at all is the OTel-semconv contract paying off.
+- **Cluster: size & health** (`/d/cluster-health`) — host/container
+  resources (cadvisor + node-exporter) plus a module-roster panel listing
+  every catalogued module's identity.
+
+**www** at `localhost:3000` — three demo buttons (`PrintPostgresStats`,
+`ListGrafanaDatasources`, `TestRPC`) that exercise the trace path
+end-to-end (Next.js → tonic → Rust → postgres). Each click produces a
+trace visible in the APM dashboard's Tempo waterfall panel.
+
+**Tempo** + **Loki** are reachable via the APM dashboard's panels;
+direct queries via Grafana's Explore.
