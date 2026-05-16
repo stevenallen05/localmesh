@@ -4,6 +4,7 @@ pub mod catalog;
 pub mod db;
 pub mod grafana;
 pub mod greeter;
+pub mod rpc_metrics;
 pub mod telemetry;
 pub mod proto {
     pub mod hello {

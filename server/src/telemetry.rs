@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use opentelemetry::global;
 use opentelemetry::propagation::Extractor;
 use opentelemetry::trace::TracerProvider as _;
-use opentelemetry_otlp::{SpanExporter, WithExportConfig};
+use opentelemetry::KeyValue;
+use opentelemetry_otlp::{MetricExporter, SpanExporter, WithExportConfig};
+use opentelemetry_sdk::metrics::{PeriodicReader, SdkMeterProvider};
 use opentelemetry_sdk::propagation::TraceContextPropagator;
 use opentelemetry_sdk::trace::SdkTracerProvider;
 // In opentelemetry_sdk 0.31 this is a back-compat alias for SdkTracer
@@ -13,6 +15,7 @@ use opentelemetry_sdk::trace::SdkTracerProvider;
 use opentelemetry_sdk::trace::Tracer;
 use opentelemetry_sdk::Resource;
 use tonic::metadata::{KeyRef, MetadataMap as TonicMetadataMap};
+use uuid::Uuid;
 
 pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
@@ -34,29 +37,78 @@ pub(crate) fn parse_otel_resource_attrs(raw: &str) -> HashMap<String, String> {
         .collect()
 }
 
+/// Build the shared OTel `Resource` from `OTEL_SERVICE_NAME` +
+/// `OTEL_RESOURCE_ATTRIBUTES`, attaching a per-process `service.instance.id`.
+/// Used by both the tracer and meter providers so traces and metrics agree
+/// on identity.
+pub(crate) fn build_resource() -> Resource {
+    let service_name = std::env::var("OTEL_SERVICE_NAME").unwrap_or_else(|_| "server".to_string());
+    let attrs = parse_otel_resource_attrs(
+        std::env::var("OTEL_RESOURCE_ATTRIBUTES")
+            .unwrap_or_default()
+            .as_str(),
+    );
+    let mut builder = Resource::builder()
+        .with_service_name(service_name)
+        .with_attribute(KeyValue::new(
+            "service.instance.id",
+            Uuid::new_v4().to_string(),
+        ));
+    for (k, v) in attrs {
+        builder = builder.with_attribute(KeyValue::new(k, v));
+    }
+    builder.build()
+}
+
 /// Build the OTel tracer provider, install W3C as the global propagator,
 /// register the provider globally, and return it (plus a tracer handle
 /// for `tracing-opentelemetry`) so `main` can wire logging and shut the
 /// provider down cleanly. Modelled on opentelemetry-rust/examples/tracing-grpc.
+///
+/// The HTTP/protobuf exporter is used so traces and metrics share a
+/// single OTLP endpoint (:4318). `.with_endpoint()` for HTTP takes the
+/// full URL — `/v1/traces` must be appended explicitly.
 pub fn init_tracer() -> Result<(SdkTracerProvider, Tracer), BoxError> {
     global::set_text_map_propagator(TraceContextPropagator::new());
 
     let endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
-        .unwrap_or_else(|_| "http://otel-collector:4317".to_string());
+        .unwrap_or_else(|_| "http://otel-collector:4318".to_string());
 
     let exporter = SpanExporter::builder()
-        .with_tonic()
-        .with_endpoint(endpoint)
+        .with_http()
+        .with_endpoint(format!("{}/v1/traces", endpoint))
         .build()?;
 
     let provider = SdkTracerProvider::builder()
         .with_batch_exporter(exporter)
-        .with_resource(Resource::builder().with_service_name("server").build())
+        .with_resource(build_resource())
         .build();
 
     global::set_tracer_provider(provider.clone());
     let tracer = provider.tracer("server");
     Ok((provider, tracer))
+}
+
+/// Build the OTel meter provider with a periodic-pushing HTTP/protobuf
+/// exporter aimed at the same `:4318` collector endpoint as traces.
+/// Registers globally so `global::meter("...")` returns a real meter.
+pub fn init_meter() -> Result<SdkMeterProvider, BoxError> {
+    let endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
+        .unwrap_or_else(|_| "http://otel-collector:4318".to_string());
+
+    let exporter = MetricExporter::builder()
+        .with_http()
+        .with_endpoint(format!("{}/v1/metrics", endpoint))
+        .build()?;
+
+    let reader = PeriodicReader::builder(exporter).build();
+    let provider = SdkMeterProvider::builder()
+        .with_reader(reader)
+        .with_resource(build_resource())
+        .build();
+
+    global::set_meter_provider(provider.clone());
+    Ok(provider)
 }
 
 /// Holds the entered root span for the lifetime of the program.

@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use opentelemetry::global;
 use tonic::transport::Server;
 
 use server::catalog::CatalogSvc;
@@ -9,11 +10,13 @@ use server::grafana::GrafanaClient;
 use server::greeter::GreeterSvc;
 use server::proto::hello::greeter_server::GreeterServer;
 use server::proto::metrics_v1::catalog_server::CatalogServer;
-use server::telemetry::{init_logging, init_tracer, BoxError};
+use server::rpc_metrics::RpcMetricsLayer;
+use server::telemetry::{init_logging, init_meter, init_tracer, BoxError};
 
 #[tokio::main]
 async fn main() -> Result<(), BoxError> {
-    let (provider, tracer) = init_tracer()?;
+    let (tracer_provider, tracer) = init_tracer()?;
+    let meter_provider = init_meter()?;
     // _root keeps the process-wide span alive until main() returns.
     let _root = init_logging(tracer);
 
@@ -34,16 +37,24 @@ async fn main() -> Result<(), BoxError> {
 
     tracing::info!(address = %addr, "listening");
 
+    let metrics_layer = RpcMetricsLayer::new(&global::meter("server.rpc"));
+
     Server::builder()
+        .layer(metrics_layer)
         .add_service(GreeterServer::new(GreeterSvc::new(db)))
         .add_service(CatalogServer::new(CatalogSvc::new(grafana)))
         .serve(addr)
         .await?;
 
-    // Drop the root span before shutting the OTel provider down so the
-    // close event reaches a still-live exporter. Shutdown is idempotent,
-    // so order is cosmetic — but intentional.
+    // Drop the root span before shutting the OTel providers down so the
+    // close event reaches still-live exporters. Shutdown is idempotent,
+    // so order is cosmetic — but intentional. Meter shutdown returns
+    // `OTelSdkResult`, which doesn't impl `Into<BoxError>`; map it via
+    // `to_string()` since the error type is opaque to the caller.
     drop(_root);
-    provider.shutdown()?;
+    tracer_provider.shutdown()?;
+    meter_provider
+        .shutdown()
+        .map_err(|e| -> BoxError { e.to_string().into() })?;
     Ok(())
 }

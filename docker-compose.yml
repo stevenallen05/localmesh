@@ -16,7 +16,8 @@ services:
     image: metrics-stack/server:0.1.0  # Rule 1
     environment:
       SERVER_ADDR: 0.0.0.0:50051
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
       OTEL_SERVICE_NAME: server
       # `owned_by` interpolates from .env's TECH_LEAD_EMAIL, which
       # mirrors project.toml's tech_lead. Eventually the platform reads
