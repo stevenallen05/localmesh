@@ -269,7 +269,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "sum(count_over_time({service_name=\"$service_name\", deployment_environment_name=~\"$deployment_environment_name\", service_namespace=~\"$service_namespace\"} [5m]))",
+          "expr": "sum(count_over_time({service_name=\"$service_name\"} [5m]))",
           "queryType": "range",
           "refId": "A"
         }
@@ -2135,7 +2135,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "{deployment_environment_name=~\"$deployment_environment_name\", service_namespace=~\"$service_namespace\", service_name=\"$service_name\"} | line_format `\u001b[1m{{if .level }}{{alignRight 5 .level}}{{else if .severity_text}}{{alignRight 5 .severity_text}}{{end}}\u001b[0m \u001b[90m[{{alignRight 10 .service_instance_id}}{{if .thread_name}}/{{alignRight 20 .thread_name}}{{else if eq \"java\" .telemetry_sdk_language }}                    {{end}}]\u001b[0m \u001b[36m{{if .scope_name }}{{alignRight 40 .scope_name}}{{end}}{{if .exception_type}} \u001b[1;101m \u001b[0m{{end}} {{if .exception_type}}\u001b[1;91m{{.exception_type}}\u001b[0m{{end}}{{if .exception_message}} \u001b[1;91m{{.exception_message}}\u001b[0m {{end}} \u001b[0m {{__line__}} {{if .trace_id}} \u001b[37m\u001b[3m[trace_id={{.trace_id}}]{{end}}`",
+          "expr": "{ service_name=\"$service_name\"} | line_format `\u001b[1m{{if .level }}{{alignRight 5 .level}}{{else if .severity_text}}{{alignRight 5 .severity_text}}{{end}}\u001b[0m \u001b[90m[{{alignRight 10 .service_instance_id}}{{if .thread_name}}/{{alignRight 20 .thread_name}}{{else if eq \"java\" .telemetry_sdk_language }}                    {{end}}]\u001b[0m \u001b[36m{{if .scope_name }}{{alignRight 40 .scope_name}}{{end}}{{if .exception_type}} \u001b[1;101m \u001b[0m{{end}} {{if .exception_type}}\u001b[1;91m{{.exception_type}}\u001b[0m{{end}}{{if .exception_message}} \u001b[1;91m{{.exception_message}}\u001b[0m {{end}} \u001b[0m {{__line__}} {{if .trace_id}} \u001b[37m\u001b[3m[trace_id={{.trace_id}}]{{end}}`",
           "queryType": "range",
           "refId": "A"
         }
