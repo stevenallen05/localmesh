@@ -209,15 +209,16 @@ configs:
               statements:
                 - set(attributes["level"], ConvertCase(attributes["level"], "lower")) where attributes["level"] != nil
       exporters:
-        # OTLP HTTP to VM. VM accepts protobuf at /opentelemetry/v1/metrics
-        # by default in 1.93+; resource attrs are promoted to series labels
-        # automatically. The `project_name` resource attr is stamped by the
-        # resource/project processor (added to the metrics pipeline below)
-        # — that supersedes the old prometheusremotewrite external_labels.
-        otlphttp/vm:
-          endpoint: http://victoriametrics:8428/opentelemetry
-          tls:
-            insecure: true
+        # Apps push OTLP metrics to the collector; the collector translates
+        # to Prom remote-write on VM's behalf. The translation IS the
+        # OTel→Prom spec: target_info series per unique resource + resource
+        # attrs landed as data-point labels (via resource_to_telemetry_conversion).
+        # VM has an OTLP receiver, but as of 1.106 it skips target_info
+        # synthesis, which the imported APM dashboard's header stat panels need.
+        prometheusremotewrite:
+          endpoint: http://victoriametrics:8428/api/v1/write
+          resource_to_telemetry_conversion:
+            enabled: true
         debug:
           verbosity: detailed
         otlp/tempo:
@@ -236,7 +237,7 @@ configs:
           metrics:
             receivers: [otlp, prometheus]
             processors: [resource/project]
-            exporters: [otlphttp/vm]
+            exporters: [prometheusremotewrite]
           traces:
             receivers: [otlp]
             processors: [transform/database, resource/project]
