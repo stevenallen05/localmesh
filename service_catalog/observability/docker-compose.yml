@@ -158,6 +158,13 @@ configs:
               from: attributes.service
               to: resource["service"]
               if: 'attributes.service != nil'
+            # Alias service → service.name for the imported APM dashboard,
+            # which queries Loki by `service_name` (OTel-canonical). Same
+            # value, two indexed labels — cheap cardinality cost.
+            - type: copy
+              from: resource["service"]
+              to: resource["service.name"]
+              if: 'resource["service"] != nil'
             - type: move
               from: attributes.level
               to: resource["level"]
@@ -467,6 +474,10 @@ services:
     command:
       - '--storageDataPath=/victoria-metrics-data'
       - '--httpListenAddr=:8428'
+      # Translate OTLP-ingested metric names to Prom convention
+      # (dots → underscores, _bucket/_sum/_count suffixes for histograms).
+      # The imported APM dashboard queries by Prom-shaped names.
+      - '--opentelemetry.usePrometheusNaming'
     ports:
       - "8428:8428"
     volumes:

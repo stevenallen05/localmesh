@@ -58,7 +58,11 @@ configs:
             - container_id
             - module_name
             - owned_by
-            - service
+            - service                            # legacy JSON-stdout contract
+            - service.name                       # OTel-canonical; APM dashboard queries by service_name
+            - service.namespace
+            - service.instance.id
+            - deployment.environment.name
             - level
             # trace_id / span_id intentionally not indexed —
             # structured-metadata only (see observability filelog operators).
