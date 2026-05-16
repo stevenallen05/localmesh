@@ -190,7 +190,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+            "uid": "${prometheus_datasource}"
           },
           "editorMode": "code",
           "expr": "timestamp(sum by (deployment_environment_name, job) (target_info{deployment_environment_name=~\"$deployment_environment_name\", job=~\"$service_namespace/$service_name\"}) or absent{})\n",
@@ -265,7 +265,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "${DS_GRAFANACLOUD-CLECLERC-LOGS}"
+            "uid": "${loki_datasource}"
           },
           "direction": "backward",
           "editorMode": "code",
@@ -339,7 +339,7 @@
         {
           "datasource": {
             "type": "tempo",
-            "uid": "${DS_GRAFANACLOUD-CLECLERC-TRACES}"
+            "uid": "${tempo_datasource}"
           },
           "filters": [
             {
@@ -479,7 +479,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+            "uid": "${prometheus_datasource}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -512,7 +512,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+            "uid": "${prometheus_datasource}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -620,7 +620,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+            "uid": "${prometheus_datasource}"
           },
           "disableTextWrap": false,
           "editorMode": "code",
@@ -730,7 +730,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+            "uid": "${prometheus_datasource}"
           },
           "editorMode": "code",
           "expr": "(sum(rate(http_server_request_duration_seconds_count{deployment_environment_name=~\"$deployment_environment_name\", service_namespace=~\"$service_namespace\", service_name=\"$service_name\"}[$__rate_interval])) by (deployment_environment_name, service_namespace, service_name)) ",
@@ -845,7 +845,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+                "uid": "${prometheus_datasource}"
               },
               "disableTextWrap": false,
               "editorMode": "code",
@@ -878,7 +878,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+                "uid": "${prometheus_datasource}"
               },
               "disableTextWrap": false,
               "editorMode": "builder",
@@ -984,7 +984,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+                "uid": "${prometheus_datasource}"
               },
               "disableTextWrap": false,
               "editorMode": "code",
@@ -1094,7 +1094,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+                "uid": "${prometheus_datasource}"
               },
               "editorMode": "code",
               "expr": "(sum(rate(rpc_server_duration_milliseconds_count{deployment_environment_name=~\"$deployment_environment_name\", service_namespace=~\"$service_namespace\", service_name=\"$service_name\"}[$__rate_interval])) by (deployment_environment_name, service_namespace, service_name)) * $__interval_ms / 1000",
@@ -1232,7 +1232,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+            "uid": "${prometheus_datasource}"
           },
           "disableTextWrap": false,
           "editorMode": "code",
@@ -1262,7 +1262,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+            "uid": "${prometheus_datasource}"
           },
           "editorMode": "code",
           "expr": "\n        histogram_quantile(\n            0.99,\n            sum by (le, operation) (\n                label_join(\n                rate(http_server_request_duration_seconds_bucket{deployment_environment_name=~\"$deployment_environment_name\", service_namespace=~\"$service_namespace\", service_name=\"$service_name\"}[5m]),\n                \"operation\",\n                \" \",\n                \"http_request_method\",\n                \"http_route\"\n                )\n            )\n        )\n    ",
@@ -1422,7 +1422,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+            "uid": "${prometheus_datasource}"
           },
           "disableTextWrap": false,
           "editorMode": "code",
@@ -1453,7 +1453,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+            "uid": "${prometheus_datasource}"
           },
           "editorMode": "code",
           "expr": "\n        histogram_quantile(\n            0.99,\n            sum by (le, operation) (\n                label_join(\n                rate(rpc_server_duration_milliseconds_bucket{deployment_environment_name=~\"$deployment_environment_name\", service_namespace=~\"$service_namespace\", service_name=\"$service_name\"}[5m]),\n                \"operation\",\n                \"/\",\n                \"rpc_service\",\n                \"rpc_method\"\n                )\n            )\n        )\n    ",
@@ -1620,7 +1620,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+            "uid": "${prometheus_datasource}"
           },
           "disableTextWrap": false,
           "editorMode": "code",
@@ -1650,7 +1650,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+            "uid": "${prometheus_datasource}"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(\n  0.99,\n  sum by (le, outbound_service) (\n    label_join(\n      rate(\n        http_client_request_duration_seconds_bucket{\n          deployment_environment_name=~\"$deployment_environment_name\",\n          service_namespace=~\"$service_namespace\",\n          service_name=\"$service_name\"\n        }[5m]\n      ),\n      \"outbound_service\",\n      \" \",\n      \"server_address\",\n      \"http_request_method\",\n      \"url_template\"\n    )\n  )\n)",
@@ -1807,7 +1807,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+            "uid": "${prometheus_datasource}"
           },
           "disableTextWrap": false,
           "editorMode": "code",
@@ -1838,7 +1838,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+            "uid": "${prometheus_datasource}"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(\n  0.99,\n  sum by (le, database) (\n    label_join(\n      rate(\n        db_client_operation_duration_seconds_bucket{\n          deployment_environment_name=~\"$deployment_environment_name\",\n          service_namespace=~\"$service_namespace\",\n          service_name=\"$service_name\"\n        }[5m]\n      ),\n      \"database\",\n      \"/\",\n      \"server_address\",\n      \"db_namespace\"\n    )\n  )\n)",
@@ -1999,7 +1999,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+            "uid": "${prometheus_datasource}"
           },
           "disableTextWrap": false,
           "editorMode": "code",
@@ -2030,7 +2030,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+            "uid": "${prometheus_datasource}"
           },
           "editorMode": "code",
           "expr": "\nhistogram_quantile(\n    0.99,\n    sum by (le, outbound_service) (\n        label_join(\n        rate(rpc_client_duration_milliseconds_bucket{deployment_environment_name=~\"$deployment_environment_name\", service_namespace=~\"$service_namespace\", service_name=\"$service_name\"}[5m]),\n        \"outbound_service\",\n        \"/\",\n        \"server_address\",\n        \"rpc_service\",\n        \"rpc_method\"\n        )\n    )\n)",
@@ -2131,7 +2131,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "${DS_GRAFANACLOUD-CLECLERC-LOGS}"
+            "uid": "${loki_datasource}"
           },
           "direction": "backward",
           "editorMode": "code",
@@ -2277,7 +2277,7 @@
         {
           "datasource": {
             "type": "tempo",
-            "uid": "${DS_GRAFANACLOUD-CLECLERC-TRACES}"
+            "uid": "${tempo_datasource}"
           },
           "filters": [
             {
@@ -2419,7 +2419,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+            "uid": "${prometheus_datasource}"
           },
           "editorMode": "code",
           "expr": "sum by(service_instance_id) (jvm_cpu_recent_utilization_ratio{deployment_environment_name=~\"$deployment_environment_name\", service_namespace=~\"$service_namespace\", service_name=\"$service_name\"})",
@@ -2547,7 +2547,7 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+          "uid": "${prometheus_datasource}"
         },
         "definition": "label_values(deployment_environment_name)",
         "description": "Deployment environment (e.g. \"production\").\nResource attribute `deployment.environment.name` via `target_info`",
@@ -2595,7 +2595,7 @@
         "current": {},
         "datasource": {
           "type": "prometheus",
-          "uid": "${DS_GRAFANACLOUD-CLECLERC-PROM}"
+          "uid": "${prometheus_datasource}"
         },
         "definition": "label_values(service_name)",
         "description": "Service name.\nResource attribute `service.name` via `target_info`.",
