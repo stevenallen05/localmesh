@@ -30,10 +30,17 @@ pub struct RpcMetricsLayer {
 
 impl RpcMetricsLayer {
     pub fn new(meter: &Meter) -> Self {
+        // Recorded in milliseconds. Stable OTel semconv specifies seconds,
+        // but the opentelemetry-rust 0.31 SDK silently ignores
+        // `with_boundaries()` and `with_view()` — every histogram falls back
+        // to the default boundaries (0,5,10,…,10000) which are sized for ms.
+        // Recording in ms lets percentile estimates land in usable buckets
+        // without fighting the SDK. Revisit when the SDK honors custom
+        // boundaries.
         let histogram = meter
             .f64_histogram("rpc.server.duration")
             .with_description("Duration of gRPC server requests")
-            .with_unit("s")
+            .with_unit("ms")
             .build();
         Self { histogram }
     }
@@ -95,7 +102,7 @@ where
                 KeyValue::new("rpc.method", method.to_string()),
                 KeyValue::new("rpc.grpc.status_code", status_code),
             ];
-            histogram.record(start.elapsed().as_secs_f64(), &attrs);
+            histogram.record(start.elapsed().as_secs_f64() * 1000.0, &attrs);
             Ok(resp)
         })
     }

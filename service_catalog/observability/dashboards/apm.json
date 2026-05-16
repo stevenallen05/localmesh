@@ -1168,7 +1168,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "s"
+                "value": "ms"
               }
             ]
           },

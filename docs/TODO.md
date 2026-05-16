@@ -57,6 +57,57 @@ observability DX between prod and 'my machine'
   `otlp_http`, `file_log` instead of `otlp`, `otlphttp`, `filelog`.
   Rename now, before the aliases get removed.
 
+## Multi-user identity scaffolding
+
+End-to-end identity flow from the www edge through gRPC to the
+server. Kept minimal — no JWT minted or validated, no roles, no
+per-user data scoping. Production story (service mesh + SPIFFE/SPIRE
++ pass-through user JWT) is summarised in [`AUTH.md`](./AUTH.md); the
+implementation plan is in
+[`superpowers/specs/2026-05-15-identity-propagation-design.md`](./superpowers/specs/2026-05-15-identity-propagation-design.md).
+
+- **One hardcoded dev user.** `DEV_USER_ID` / `DEV_USER_EMAIL` /
+  `DEV_USER_NAME` in `.env`; a `getUser(req)` helper reads
+  `X-Forwarded-*` headers first and falls back to the env. A
+  forward-auth proxy would populate those headers in prod.
+- **Identity on the wire.** Three gRPC metadata keys (`x-user-id`,
+  `x-user-email`, `x-user-name`) attached at the www call site.
+- **Server-side reception.** Tonic interceptor extracts the keys
+  into a `User` struct and inserts it into request extensions;
+  each handler reads the extension and stamps `user.id` /
+  `user.email` on its OTel span. Identity is optional — missing
+  keys produce no extension and empty-string attrs, no error.
+- **Demo evidence.** All three existing demo buttons (PrintPostgresStats,
+  ListGrafanaDatasources, TestRPC) carry identity through; toggling
+  `DEV_USER_*` and restarting demonstrates the plumbing is
+  identity-agnostic.
+- **DESIGN_DECISIONS row** (*Identity propagation*) lands with the
+  implementation.
+
+## Dashboards
+
+- **Outbound RPC client metrics (`rpc.client.duration`).** The imported
+  APM dashboard's "RPC outbound" panels query `rpc_client_duration_*`,
+  which only the *caller* emits. We instrument the Rust gRPC server via
+  a Tower layer (`rpc.server.duration`); the www→server gRPC call from
+  Node has no client-side gRPC instrumentation wired up. Add
+  `@opentelemetry/instrumentation-grpc` to `www/instrumentation.ts`'s
+  `instrumentations: [...]` so those panels populate. Server-side panels
+  work — this is a one-direction gap.
+
+- **`rpc.server.duration` is recorded in milliseconds, not seconds.**
+  Stable OTel semconv says seconds, but in `opentelemetry-rust` 0.31 both
+  `HistogramBuilder::with_boundaries()` and `MeterProviderBuilder::with_view()`
+  are silently ignored — the exported histogram always uses the SDK's
+  default boundaries `[0, 5, 10, 25, …, 10000]`, which are sized for ms.
+  Recording in seconds makes every realistic latency fall into the
+  `[0, 5]` bucket and clamps `histogram_quantile` to 5. Recording in ms
+  fits the default buckets and gives usable percentiles. The dashboard's
+  RPC server panels are also milliseconds-shaped (the upstream community
+  dashboard was written for ms). Revisit when the SDK honors custom
+  boundaries — at that point switch to seconds + explicit buckets and
+  flip the dashboard's RPC queries back to `_seconds_`.
+
 ## Multi-environment portability
 
 - **k8s overlay for filelog `include:` path.** Compose tails
