@@ -4,7 +4,17 @@ Current state of every design choice — one row each. Implementation specifics 
 
 Companion: [`ENGINEERING_RULES.md`](./ENGINEERING_RULES.md), [`PROJECT_SCOPE.md`](./PROJECT_SCOPE.md), [`PRODUCTION_DISCUSSIONS.md`](./PRODUCTION_DISCUSSIONS.md).
 
-This repo is a reference implementation of the **microservice-template + service-catalogue pattern** an org would adopt at the CI/CD (Continuous Integration / Continuous Delivery) layer. The Rust + Next.js parts are one team's microservice; observability is a catalogue module the team includes.
+This repo is a reference implementation of the **microservice-template + service-catalogue pattern** — the design pattern that becomes [LocalMesh](../../README.md#localmesh) once an org's SRE-owned plugins are in place. The Rust + Next.js parts are one team's microservice; observability, security, logging, and the optional database are catalogue modules the team includes from a stub catalogue.
+
+## Starting assumptions
+
+Every decision below sits on top of these. They are not design choices — they are the premises the pattern only works under.
+
+- **Mandatory tools have to be easier to use than to work around.** If using the supported path is harder than disabling, bypassing, or stubbing it, the supported path loses. Applies universally — to SRE plugins, test frameworks, linters, security controls, anything anyone is told they have to use. Adoption depends on the easier path being the supported one.
+- **Compose is the limit of what a non-ops team handles on their own.** Helm is too much; bare k8s manifests are too much. Compose is the dev-facing interface every team already touches; the prescriptive middle layer (the chart generator) shifts that workload off per-team toil and onto larger infra and catalogue investments.
+- **Production-quality on dev becomes production.** Each catalogue module ships the same shape ops would run in prod, just locally-hosted. Dev gets the *real* observability stack, the *real* logging contract, the *real* identity tuple — the prod overlay swaps storage backends and the rest is the same wire. Drift between dev and prod is the single most expensive failure mode of any platform pattern; this is the structural fix.
+- **One human-scale file holds the cross-stakeholder truth.** [`project.toml`](../../project.toml) is where team work, SRE oversight, and business requirements intersect — identity, compliance flags, data residency, billing, ownership — auditable at whatever level the context demands. Compliance, legal, billing, and ops all read the same file; engineering decisions don't get translated into business language.
+- **The compose→helm boundary is strict on purpose.** Teams own everything inside their compose; SRE owns everything past the helm chart. The framework is opinionated on the translation in between and hands-off about what SRE puts on either side.
 
 ## Settled
 

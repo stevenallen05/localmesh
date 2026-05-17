@@ -1,5 +1,7 @@
 # Tensorwave take-home
 
+**LocalMesh turns your `docker-compose.yaml` into the helm chart your prod cluster runs.** Teams write compose; SRE maintains a catalogue of one-line `include:` plugins (postgres, queues, observability, secrets). Local dev = prod by construction — no drift, no platform tickets.
+
 > A reference implementation of the **microservice-template + service-catalogue**
 > deployment pattern, demonstrated through a small Rust + Next.js metrics service.
 
@@ -10,32 +12,57 @@ catalogue modules — `observability/`, `security/`, `logging/` (required)
 and `database/` (optional) — from a stub service catalogue. Helm charts
 are generated from compose, not hand-maintained.
 
-## Design intent
+## LocalMesh
 
-A framework for compartmentalized microservices — a working look at the
-developer experience that emerges when off-the-shelf tooling is chained
-together. Teams' day-to-day input is compose, so they handle their own
-infra needs from a searchable catalogue. The output is Helm, so the
-chart drops into any helm-speaking infra. The prescriptive middle layer
-shifts SRE workload off per-team toil and onto larger infra and
-catalogue investments.
+**LocalMesh is your local development environment, compiled into production.**
+A service mesh is the network layer between your services — encryption,
+identity, routing, observability — and if you're running k8s, you already
+have one, deliberately or not. LocalMesh is the framework that turns the
+`docker-compose.yaml` your team already writes into the helm chart your
+prod cluster already runs. The trick is omakase: SRE maintains a small,
+opinionated catalogue of infrastructure plugins, each with sensible
+defaults solving the hard parts (mTLS, identity propagation, log
+structure, metric naming, cert rotation) the way every team would
+otherwise reinvent. Devs get a two-tier interface: one mandatory
+`include:` line at the top of compose pulls the baseline SRE has decided
+every project gets (observability, the mesh, the company's required MQ,
+feature flags), and one more line per plugin the team picks out of the
+catalogue. The catalogue is whatever human-searchable form SRE finds
+easiest to keep up — a wiki page, an AWS Service Catalog instance, a
+folder of git links — and the install instructions for any plugin are
+the same: "copy this line into the top of your `docker-compose.yaml`."
 
-[`project.toml`](./project.toml) is where team work, SRE oversight, and
-business requirements intersect — one human-scale file that captures
-all three, auditable and controllable at whatever level the context
-demands. (Expanded elsewhere — see [`docs/stakeholder/`](./docs/stakeholder/).)
+A plugin is anything with a compose half (runs locally, exposes the
+configs/env vars/volumes the app needs) and a helm or terraform half
+(provisions the production version with matching presets). A "service"
+is anything that can be provisioned via helm and exposes some
+dev-facing handle (env var, config file, mounted volume, named secret).
+If it fits that shape, it fits the catalogue:
 
-**Production-quality on dev becomes production.** Each catalogue module
-ships the same shape ops would run in prod, just locally-hosted: dev
-gets the *real* observability stack (OpenTelemetry collector, Tempo,
-Loki, VictoriaMetrics, Grafana), the *real* logging contract, the
-*real* identity tuple — the prod overlay swaps the storage backends and
-the rest is the same wire. The reviewer's dashboard is the community
-[Lightweight APM for OpenTelemetry](https://grafana.com/grafana/dashboards/22784)
-(Grafana ID 22784, source [cyrille-leclerc/opentelemetry-service-dashboard](https://github.com/cyrille-leclerc/opentelemetry-service-dashboard))
-imported wholesale — it works against this stack because the apps emit
-OTel semantic conventions, and it'll work against any backend that
-honors them.
+- **Databases** — prod: Aurora, managed Postgres, Cloud SQL. Local: postgres container with the same extensions, exporter, and wire shape.
+- **Queues & messaging** — prod: SQS/SNS, Confluent Kafka, managed RabbitMQ. Local: RabbitMQ, NATS, or Redpanda in compose.
+- **Object storage** — prod: S3 with the right lifecycle rules and IAM. Local: MinIO.
+- **Secrets** — prod: Vault, AWS Secrets Manager, sealed-secrets. Local: dev CA and env-injected tokens.
+- **Observability** — prod: managed Loki/Tempo/Mimir or Grafana Cloud. Local: full stack in compose (OTel collector + Tempo + Loki + VictoriaMetrics + Grafana — this repo's `observability/` module).
+- **Provisioned resources** — prod: a real domain via Route53/Cloudflare, an API key minted from Stripe, a GPU node pool. Local: a stub domain, a sandbox API key, a CPU-only mock.
+
+What falls out once the mesh is in place: organization-wide security
+guarantees that don't depend on each team remembering them (encryption
+between services, identity on every call, default-deny network policy,
+an audit log of who-talked-to-what); one machine-readable file per
+project — [`project.toml`](./project.toml) — that captures identity,
+compliance flags, data residency, billing, and ownership in a form
+compliance/legal/billing/ops can all read directly; and a baseline of
+observability and structured logging every service gets for free.
+
+LocalMesh is hands-off about what's *in* the catalogue and what the
+rendered helm gets deployed to. SRE owns those choices — they're tied
+to your production environment, your support bandwidth, your cloud,
+your compliance posture. A homelab catalogue might be five plugins; a
+midsize company's might be fifty. Both are valid LocalMesh deployments.
+The framework's job is to keep the dev/SRE boundary clean: compose in,
+helm out, strict translation between, and the rest is yours. Long
+form: [`docs/WHAT_IS_MESH.md`](./docs/WHAT_IS_MESH.md).
 
 ## Read these first
 
