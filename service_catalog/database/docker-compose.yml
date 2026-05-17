@@ -65,5 +65,28 @@ services:
     labels:
       metrics.service_name: postgres
 
+  # Postgres infra + pg_stat_statements metrics. Scraped by the per-module
+  # sidecar collector (Task 3.3) which pushes OTLP to the main otel-collector.
+  # The community exporter's built-in queries cover pg_stat_*, including
+  # pg_stat_statements once the extension exists (initdb/02-pg_stat_statements.sql).
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://app:app@postgres:5432/app?sslmode=disable"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      # depends_on target → katenary needs a port for the init-container probe
+      katenary.v3/ports: |-
+        - 9187
+      # Project-wide convention: cadvisor metric_relabel_configs stamps this
+      # value as the `service` label on container resource metrics, so the
+      # exporter's cpu/mem/etc. roll up under the same `service=postgres` lens
+      # cluster-health uses. Not the same channel as module_name/owned_by on
+      # the scraped series (that's Task 3.3, the sidecar collector).
+      metrics.service_name: postgres
+
 volumes:
   postgres-data: {}
