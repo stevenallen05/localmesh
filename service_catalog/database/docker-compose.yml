@@ -37,7 +37,15 @@ services:
       # Load the extension up-front; it has to be listed in
       # shared_preload_libraries before CREATE EXTENSION will succeed.
       - -c
-      - shared_preload_libraries=pg_tracing
+      - shared_preload_libraries=pg_tracing,pg_stat_statements
+      # pg_stat_statements tunables — track every statement (incl. ones
+      # nested inside functions) and cap distinct-statement memory at 10k
+      # entries (default 5k). The exporter reads from this view; see
+      # spec §6.1 for why this is wired in alongside pg_tracing.
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - pg_stat_statements.max=10000
       # 1.0 = trace every statement. Fine for the demo; production tuning
       # would drop this to ~0.01–0.05 to keep WAL/CPU overhead low.
       - -c
