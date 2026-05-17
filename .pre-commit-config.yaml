@@ -4,7 +4,7 @@ repos:
       - id: katenary-convert
         name: katenary convert -> chart/ (auto-stages chart/)
         language: system
-        entry: sh -c './tools/katenary-3.0.0-rc6-linux-amd64 convert --force && git add chart/'
+        entry: sh -c './tools/katenary-3.0.0-rc6-linux-amd64 convert --force; git add chart/'
         files: ^(docker-compose\.ya?ml|katenary\.ya?ml|service_catalog/.*\.ya?ml)$
         pass_filenames: false
 

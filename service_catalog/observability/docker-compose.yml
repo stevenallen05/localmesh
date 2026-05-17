@@ -338,6 +338,13 @@ configs:
       providers:
         - name: default
           type: file
+          # Read-only stance deferred — spec §4.3. Flip to false once the
+          # module-shipped-dashboard pattern is stable.
+          allowUiUpdates: true
+          # Subdir under path: becomes the UI folder name. The catalogue
+          # mounts each module's dashboards under .../<module>/<slug>.json
+          # so each module gets its own folder.
+          foldersFromFilesStructure: true
           options:
             path: /etc/grafana/dashboards
 
