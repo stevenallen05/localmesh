@@ -93,6 +93,11 @@ services:
       # the scraped series (that's Task 3.3, the sidecar collector).
       metrics.service_name: postgres
 
+  grafana:
+    configs:
+      - source: database_dashboard_postgres
+        target: /etc/grafana/dashboards/database/postgres.json
+
   database-collector:
     image: otel/opentelemetry-collector-contrib:0.152.0
     container_name: database-collector
@@ -117,6 +122,9 @@ configs:
   # that the multi-config-merge alternative would have needed.
   database_pgexporter_queries:
     file: ./postgres-exporter-queries.yaml
+
+  database_dashboard_postgres:
+    file: ./postgres.json
 
   database_collector_config:
     content: |
