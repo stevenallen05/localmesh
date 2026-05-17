@@ -218,21 +218,6 @@ export default function Home() {
         )}
       </div>
 
-      <div style={{ marginTop: '40px' }}>
-        <h3>Live metrics</h3>
-        <p style={{ color: '#666', fontSize: '14px', margin: '0 0 10px' }}>
-          Auto-provisioned from the observability catalogue module.
-          Click the button above to bump the line.
-        </p>
-        <iframe
-          src={`${process.env.NEXT_PUBLIC_GRAFANA_URL}/d-solo/cluster-health?panelId=3&refresh=5s&theme=light`}
-          width="100%"
-          height="300"
-          frameBorder="0"
-          style={{ borderRadius: '4px', border: '1px solid #ddd' }}
-        />
-      </div>
-
       <div style={{ marginTop: '40px', padding: '15px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
         <h3>How it works:</h3>
         <ol>

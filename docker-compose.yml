@@ -76,7 +76,6 @@ services:
       # `http.server.request.duration` (seconds). Opt in.
       OTEL_SEMCONV_STABILITY_OPT_IN: http
       HOSTNAME: ${HOSTNAME:-}
-      NEXT_PUBLIC_GRAFANA_URL: ${INTERNAL_GRAFANA_URL}
     ports:
       - "3000:3000"
     depends_on:
