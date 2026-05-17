@@ -515,9 +515,6 @@ services:
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
-      # Required for the www page's iframe — Grafana otherwise sets
-      # X-Frame-Options: SAMEORIGIN and the embed renders blank.
-      GF_SECURITY_ALLOW_EMBEDDING: "true"
     configs:
       - source: grafana_vm_datasource
         target: /etc/grafana/provisioning/datasources/vm.yaml
