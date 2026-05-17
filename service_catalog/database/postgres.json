@@ -38,7 +38,7 @@
       }
     ]
   },
-  "description": "Imported community dashboard — Grafana ID 9628 by Lucas Estienne (https://grafana.com/grafana/dashboards/9628). Patched for the metrics-stack project: datasource UIDs rebound to vm (was ${DS_PROMETHEUS} template input); uid pinned to database-postgres; release label filters stripped from all exprs (Kubernetes-only label not emitted by our exporter); namespace and release template vars dropped; __inputs removed.",
+  "description": "Imported community dashboard — Grafana ID 9628 by Lucas Estienne (https://grafana.com/grafana/dashboards/9628). Patched for the metrics-stack project: datasource UIDs rebound to vm (was ${DS_PROMETHEUS} template input); uid pinned to database-postgres; release label filters stripped from all exprs (Kubernetes-only label not emitted by our exporter); namespace and release template vars dropped; __inputs removed. Custom addition: top-slow-queries table panel sourced from pg_stat_statements (no community dashboard surveyed had a matching slow-query panel for our exporter's metric names).",
   "editable": true,
   "gnetId": 9628,
   "graphTooltip": 0,
@@ -2928,6 +2928,65 @@
       "yaxis": {
         "align": false,
         "alignLevel": null
+      }
+    },
+    {
+      "id": 71,
+      "type": "table",
+      "title": "Top slow queries (pg_stat_statements)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "vm"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 51,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(20, sum by (queryid, query_text) (rate(pg_stat_statements_seconds_total[$__rate_interval])))",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "job": true,
+              "instance": true
+            },
+            "renameByName": {
+              "queryid": "Query ID",
+              "query": "Query (truncated)",
+              "Value": "Avg seconds/sec (interval)"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Avg seconds/sec (interval)",
+            "desc": true
+          }
+        ]
       }
     }
   ],
