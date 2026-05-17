@@ -86,7 +86,7 @@ docker compose up -d --build
 
 ## What to look at
 
-**Grafana** at `localhost:3001` (admin / admin), two provisioned dashboards:
+**Grafana** at `localhost:3001` (admin / admin), three provisioned dashboards:
 
 - **Lightweight APM for OpenTelemetry** (`/d/apm`) — community dashboard
   [22784](https://grafana.com/grafana/dashboards/22784) by Cyrille Le
@@ -100,6 +100,13 @@ docker compose up -d --build
 - **Cluster: size & health** (`/d/cluster-health`) — host/container
   resources (cadvisor + node-exporter) plus a module-roster panel listing
   every catalogued module's identity.
+- **PostgreSQL Database** (`/d/database-postgres`) — community dashboard
+  [9628](https://grafana.com/grafana/dashboards/9628) by Lucas Estienne,
+  imported with patches: datasource UIDs rebound to our `vm`; uid pinned
+  to `database-postgres`; Kubernetes-only `release=` / `namespace=` filters
+  stripped (we don't run on k8s in dev). Adds one custom **top-N slow queries**
+  table panel sourced from `pg_stat_statements` — no community dashboard
+  surveyed had a slow-query panel matching our exporter's metric names.
 
 **www** at `localhost:3000` — three demo buttons (`PrintPostgresStats`,
 `ListGrafanaDatasources`, `TestRPC`) that exercise the trace path
