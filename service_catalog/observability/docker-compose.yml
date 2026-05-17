@@ -341,12 +341,12 @@ configs:
           # Read-only stance deferred — spec §4.3. Flip to false once the
           # module-shipped-dashboard pattern is stable.
           allowUiUpdates: true
-          # Subdir under path: becomes the UI folder name. The catalogue
-          # mounts each module's dashboards under .../<module>/<slug>.json
-          # so each module gets its own folder.
-          foldersFromFilesStructure: true
           options:
             path: /etc/grafana/dashboards
+            # Subdir under path: becomes the UI folder name. The catalogue
+            # mounts each module's dashboards under .../<module>/<slug>.json
+            # so each module gets its own folder.
+            foldersFromFilesStructure: true
 
   grafana_bootstrap_script:
     # `$$` escapes the `$` from docker-compose interpolation — the rendered
@@ -387,9 +387,9 @@ configs:
       echo "bootstrap: token written to $$TOKEN_FILE"
 
   # Bookmark-worthy production-ops dashboards. Each is a JSON file under
-  # ./dashboards/ — externalised because inlining gets unwieldy past a
-  # couple of panels. The file provider configured above picks up
-  # everything that lands in /etc/grafana/dashboards/.
+  # ./ (alongside this compose file) — externalised because inlining gets
+  # unwieldy past a couple of panels. The file provider configured above
+  # picks up everything that lands in /etc/grafana/dashboards/.
   #
   # Roster (intentionally a small set, not a comprehensive library — ops
   # ships the starter shapes, teams fork into their own):
@@ -397,10 +397,10 @@ configs:
   #   apm              Imported Lightweight APM for OpenTelemetry (dashboard 22784).
   #                    Application-services lens: RED + inbound/outbound + logs + traces.
   #   cluster-health   Module roster + container roster + USE (cpu/mem/net + throttle).
-  grafana_apm_dashboard:
-    file: ./dashboards/apm.json
-  grafana_cluster_health_dashboard:
-    file: ./dashboards/cluster-health.json
+  observability_dashboard_apm:
+    file: ./apm.json
+  observability_dashboard_cluster_health:
+    file: ./cluster-health.json
 
 services:
   otel-collector:
@@ -527,10 +527,10 @@ services:
         target: /etc/grafana/provisioning/datasources/loki.yaml
       - source: grafana_dashboards_provider
         target: /etc/grafana/provisioning/dashboards/default.yaml
-      - source: grafana_apm_dashboard
-        target: /etc/grafana/dashboards/apm.json
-      - source: grafana_cluster_health_dashboard
-        target: /etc/grafana/dashboards/cluster-health.json
+      - source: observability_dashboard_apm
+        target: /etc/grafana/dashboards/observability/apm.json
+      - source: observability_dashboard_cluster_health
+        target: /etc/grafana/dashboards/observability/cluster-health.json
     volumes:
       - grafana-data:/var/lib/grafana
     labels:
