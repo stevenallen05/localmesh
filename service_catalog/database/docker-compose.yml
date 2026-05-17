@@ -88,5 +88,64 @@ services:
       # the scraped series (that's Task 3.3, the sidecar collector).
       metrics.service_name: postgres
 
+  database-collector:
+    image: otel/opentelemetry-collector-contrib:0.152.0
+    container_name: database-collector
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    configs:
+      - source: database_collector_config
+        target: /etc/otelcol-contrib/config.yaml
+    depends_on:
+      postgres-exporter:
+        condition: service_started
+    labels:
+      # Sidecar is functionally part of the observability plane; share the
+      # `service=observability` lens with the main collector so cluster-health
+      # rolls them up together.
+      metrics.service_name: observability
+
+configs:
+  # Self-contained metrics emission for the database module. The sidecar
+  # collector scrapes postgres-exporter and pushes OTLP to the main
+  # collector at otel-collector:4317. Spec §6.3 fallback — chosen because
+  # otel-collector-contrib:0.152.0 doesn't ship the `glob:` config provider
+  # that the multi-config-merge alternative would have needed.
+  database_collector_config:
+    content: |
+      receivers:
+        prometheus:
+          config:
+            scrape_configs:
+              - job_name: postgres-exporter
+                static_configs:
+                  - targets: ['postgres-exporter:9187']
+                scrape_interval: 30s
+      processors:
+        # Stamps the same identity tuple the rest of the catalogue uses.
+        # `service.name=postgres` overrides postgres-exporter's default
+        # (which would be the exporter's own name).
+        resource:
+          attributes:
+            - key: service.name
+              value: postgres
+              action: upsert
+            - key: module_name
+              value: database
+              action: upsert
+            - key: owned_by
+              value: sre@example.com
+              action: upsert
+      exporters:
+        otlp:
+          endpoint: otel-collector:4317
+          tls:
+            insecure: true
+      service:
+        pipelines:
+          metrics:
+            receivers: [prometheus]
+            processors: [resource]
+            exporters: [otlp]
+
 volumes:
   postgres-data: {}
