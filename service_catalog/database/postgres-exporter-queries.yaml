@@ -1,0 +1,58 @@
+# Custom queries for the postgres-exporter. Loaded via --extend.query-path
+# alongside the exporter's built-in defaults. Targets pg_stat_statements
+# coverage that the v0.15.0 built-ins don't include — the imported postgres
+# dashboard (database module, Task 4) needs slow-query data from this view.
+#
+# Queries here intentionally label by `queryid` (the pg_stat_statements
+# hash) and a truncated `query_text` rather than raw `query` to avoid the
+# unbounded-cardinality footgun of full statement text becoming a metric label.
+
+pg_stat_statements:
+  query: |
+    SELECT
+      pg_get_userbyid(s.userid) AS user,
+      d.datname,
+      s.queryid::text AS queryid,
+      LEFT(s.query, 120) AS query_text,
+      s.calls,
+      s.total_exec_time / 1000.0 AS seconds_total,
+      s.mean_exec_time / 1000.0 AS mean_seconds,
+      s.rows,
+      s.shared_blks_hit,
+      s.shared_blks_read
+    FROM pg_stat_statements s
+    JOIN pg_database d ON d.oid = s.dbid
+    WHERE s.query NOT LIKE '%pg_stat_statements%'
+    ORDER BY s.total_exec_time DESC
+    LIMIT 100
+  metrics:
+    - user:
+        usage: "LABEL"
+        description: "User that ran the statement"
+    - datname:
+        usage: "LABEL"
+        description: "Database the statement ran against"
+    - queryid:
+        usage: "LABEL"
+        description: "Stable pg_stat_statements hash of the statement"
+    - query_text:
+        usage: "LABEL"
+        description: "First 120 chars of the statement text"
+    - calls:
+        usage: "COUNTER"
+        description: "Number of times the statement was executed"
+    - seconds_total:
+        usage: "COUNTER"
+        description: "Total time spent executing the statement, seconds"
+    - mean_seconds:
+        usage: "GAUGE"
+        description: "Mean execution time, seconds"
+    - rows:
+        usage: "COUNTER"
+        description: "Total rows returned/affected"
+    - shared_blks_hit:
+        usage: "COUNTER"
+        description: "Shared block buffer hits"
+    - shared_blks_read:
+        usage: "COUNTER"
+        description: "Shared blocks read from disk"

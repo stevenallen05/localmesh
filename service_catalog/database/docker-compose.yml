@@ -72,8 +72,13 @@ services:
   postgres-exporter:
     image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
     container_name: postgres-exporter
+    command:
+      - --extend.query-path=/etc/postgres-exporter/queries.yaml
     environment:
       DATA_SOURCE_NAME: "postgresql://app:app@postgres:5432/app?sslmode=disable"
+    configs:
+      - source: database_pgexporter_queries
+        target: /etc/postgres-exporter/queries.yaml
     depends_on:
       postgres:
         condition: service_healthy
@@ -110,6 +115,9 @@ configs:
   # collector at otel-collector:4317. Spec §6.3 fallback — chosen because
   # otel-collector-contrib:0.152.0 doesn't ship the `glob:` config provider
   # that the multi-config-merge alternative would have needed.
+  database_pgexporter_queries:
+    file: ./postgres-exporter-queries.yaml
+
   database_collector_config:
     content: |
       receivers:
