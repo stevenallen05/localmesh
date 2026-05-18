@@ -1,0 +1,6 @@
+[identity]
+module_name = "database"
+owned_by    = "sre@example.com"
+
+[[certs]]
+id = "postgres"
