@@ -32,12 +32,14 @@ observability DX between prod and 'my machine'
   document the rule alongside the katenary label conventions in
   [`katenary-top-seven.md`](../engineering/rules/katenary-top-seven.md)
   so additions don't drift.
-- **Identity source consolidation.** Per-service identity is declared
-  twice — as docker labels (`metrics.*`) for Vector to enrich log events,
-  and as `OTEL_RESOURCE_ATTRIBUTES` env for the OTel SDK on traces and
-  metrics. Same values, two declarations. Either a compose-template
-  helper or `make`-driven `.env` expansion should derive both from one
-  source. Tracked in DESIGN_DECISIONS Open.
+- **Identity source consolidation.** `plugin.toml` is now the source of
+  truth for the per-plugin halves of the identity tuple (`module_name`,
+  `owned_by`); `scripts/secrets-gen.py` writes them into `.env`'s
+  managed section as UPCASE_SNAKECASE for compose interpolation. The
+  working bridge is the `.env` write; the proper replacement (compose
+  overlay generator at build time, or a real compose extension once
+  compose grows one) is `TODO: needs_prod_decisions plugin.toml →
+  compose interpolation`. Tracked in DESIGN_DECISIONS Open.
 
 ## Logging follow-ups
 
@@ -59,32 +61,63 @@ observability DX between prod and 'my machine'
   `otlp_http`, `file_log` instead of `otlp`, `otlphttp`, `filelog`.
   Rename now, before the aliases get removed.
 
-## Multi-user identity scaffolding
+## LocalMesh follow-ups
 
-End-to-end identity flow from the www edge through gRPC to the
-server. Kept minimal — no JWT minted or validated, no roles, no
-per-user data scoping. Production story (service mesh + SPIFFE/SPIRE
-+ pass-through user JWT) is summarised in [`AUTH.md`](./AUTH.md); the
-implementation plan is in
-[`superpowers/specs/2026-05-15-identity-propagation-design.md`](./superpowers/specs/2026-05-15-identity-propagation-design.md).
+Items deferred from the 2026-05-18 service-mesh delivery — all flagged
+inline as `TODO: needs_prod_decisions <≤10 words>` at the relevant call
+site so they're greppable. Listed here for visibility; resolution is
+context-dependent.
 
-- **One hardcoded dev user.** `DEV_USER_ID` / `DEV_USER_EMAIL` /
-  `DEV_USER_NAME` in `.env`; a `getUser(req)` helper reads
-  `X-Forwarded-*` headers first and falls back to the env. A
-  forward-auth proxy would populate those headers in prod.
-- **Identity on the wire.** Three gRPC metadata keys (`x-user-id`,
-  `x-user-email`, `x-user-name`) attached at the www call site.
-- **Server-side reception.** Tonic interceptor extracts the keys
-  into a `User` struct and inserts it into request extensions;
-  each handler reads the extension and stamps `user.id` /
-  `user.email` on its OTel span. Identity is optional — missing
-  keys produce no extension and empty-string attrs, no error.
-- **Demo evidence.** All three existing demo buttons (PrintPostgresStats,
-  ListGrafanaDatasources, TestRPC) carry identity through; toggling
-  `DEV_USER_*` and restarting demonstrates the plumbing is
-  identity-agnostic.
-- **DESIGN_DECISIONS row** (*Identity propagation*) lands with the
-  implementation.
+- **PII enforcement.** The PII-at-ingress rule (`enduser.*` stamps only at
+  www's API-route entry) is documented + code-reviewed today. Mechanical
+  enforcement (Vector / Tempo regex scrubbing, lint rule on `.setAttributes`
+  call sites, ESLint custom rule, semconv attribute allowlist on
+  downstream services) is deferred. Picking the right enforcement layer
+  depends on real-world PII contracts SRE settles on.
+- **Default-deny mesh policy.** No `AuthorizationPolicy` enforcement in
+  dev. The `mesh.exempt: "true"` compose label is the CEL predicate the
+  policy generator will read in prod to write carve-outs. Picking the
+  prod mesh runtime (Istio / Linkerd / Cilium) is the upstream
+  decision; default-deny lands when that lands.
+- **Cert lifespan + SVID rotation.** Dev certs have 10-year lifetimes;
+  prod uses short-lived SPIRE-issued SVIDs (~1h) with automatic
+  rotation. Whichever cert-delivery mechanism prod picks (cert-manager
+  vs SPIRE Workload API vs Vault PKI) sets the rotation cadence.
+- **CA key handling.** Dev's `.secrets/certs/ca.key` lives on the host
+  filesystem. Prod never has CA key in any workload pod; it's locked in
+  the chosen issuer (SPIRE / Vault / cert-manager backend).
+- **Strict EKU per role.** `plugin.toml`'s `[[certs]]` entries don't carry
+  `client`/`server` bools today — every cert is bidirectional. A
+  step-cli template enforcing per-role EKU is straightforward but
+  depends on whether prod's issuer respects the same axis.
+- **IP SAN list tightening.** Dev IP SAN list is over-permissive (RFC1918
+  / docker-bridge / loopback-IPv6 / `0.0.0.0`). Prod uses DNS-based
+  identity exclusively; cert-manager SVIDs carry no IP SANs.
+- **`/etc/hosts` seeding.** `make check-hosts` enforces required entries
+  but doesn't write them. Real DNS in prod; a privileged-init script /
+  mise hook / devcontainer feature for dev is the in-between.
+- **`tools/step` vendoring.** Single binary committed to the repo today.
+  Replace with bootstrap script (mise / nix / asdf) or a fetch-by-
+  checksum step in `make setup`.
+- **Caddy wildcard cert.** `*.${PROJECT_NAME}.${LOCAL_DOMAIN}` on the
+  ingress cert. Prod uses per-host certs via cert-manager IngressRoute.
+- **postgres-exporter strict perm wrapper.** Both postgres and
+  postgres-exporter wrap their image entrypoints to copy bind-mounted
+  certs into a postgres/nobody-owned location with `0600` .key.
+  Goes away when cert delivery is sidecar / SVID-based.
+- **`plugin.toml` schema growth.** Today's schema is `[identity]` +
+  `[[services]]`. Future sections (`[allows]` for default-deny, compliance
+  flags per `project.toml` shape, katenary chart selection) land as
+  the upstream features land.
+- **plugin.toml → compose interpolation.** `.env`'s managed section is
+  the dev bridge today. Replace with a build-step compose overlay
+  generator (or a real compose extension if compose grows one).
+- **multi-workload postgres roles.** `pg_hba.conf` binds each cert CN to
+  one role today. `pg_ident.conf` cert-map for multi-workload aliasing
+  is `TODO: needs_prod_decisions pg_hba cert-map for multi-workload roles`.
+- **gRPC client-side instrumentation in Node.** The www → server gRPC
+  call still lacks `@opentelemetry/instrumentation-grpc`. Pre-existing
+  gap; carries over from the logging delivery.
 
 ## Dashboards
 
