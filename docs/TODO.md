@@ -40,6 +40,12 @@ observability DX between prod and 'my machine'
   overlay generator at build time, or a real compose extension once
   compose grows one) is `TODO: needs_prod_decisions plugin.toml →
   compose interpolation`. Tracked in DESIGN_DECISIONS Open.
+- **Plugin-conventions linter.** Identity tuple binding + `README.md`
+  template compliance ship as documentation today. Land a v0+1 linter
+  that verifies every plugin's identity labels match its directory slug,
+  every app-tier service uses `module_name=app`, and every plugin with a
+  consumer surface ships an 8-heading `README.md`. Tracked in
+  DESIGN_DECISIONS Open.
 
 ## Logging follow-ups
 
