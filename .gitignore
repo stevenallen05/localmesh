@@ -16,5 +16,9 @@ scratch.*
 docs/superpowers
 .superpowers/
 
-
 .worktrees/
+.project-ai
+
+# LocalMesh dev artifacts (CA + per-plugin certs + per-plugin env + user list)
+.localmesh/
+.env.localmesh
