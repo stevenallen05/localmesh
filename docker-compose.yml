@@ -88,22 +88,25 @@ services:
       # `http.server.request.duration` (seconds). Opt in.
       OTEL_SEMCONV_STABILITY_OPT_IN: http
       HOSTNAME: ${HOSTNAME:-}
+      WWW_PORT: 3443
     volumes:
       # LocalMesh mesh cert dir — used by lib/grpc-credentials.ts to dial
-      # server:50051 over mTLS, and by www/server.ts for inbound HTTPS
-      # (lands in a later chunk). See docs/superpowers/specs/
+      # server:50051 over mTLS, and by server.mjs for inbound HTTPS from
+      # Caddy. See docs/superpowers/specs/
       # 2026-05-18-localmesh-service-mesh-design.md §8.
       - ./.secrets/certs/www:/run/www:ro
-    ports:
-      - "3000:3000"
+    # No host port mapping — Caddy is the only ingress. Container exposes
+    # 3443 to the docker network for caddy's https://www:3443 upstream.
     depends_on:
       server:
         condition: service_healthy
       otel-collector:
         condition: service_started
     healthcheck:
-      # BusyBox wget ships in Node alpine.
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
+      # BusyBox wget speaks HTTPS too; --no-check-certificate is fine for
+      # the in-container readiness check (we already trust the listener's
+      # cert by virtue of mounting our own CA into the same container).
+      test: ["CMD", "wget", "--no-check-certificate", "-qO-", "https://localhost:3443/"]
       interval: 10s
       timeout: 3s
       retries: 5
