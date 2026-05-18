@@ -1,6 +1,10 @@
 # Begin ops team responsibility
 
-.PHONY: setup chart chart-lint
+.PHONY: setup chart chart-lint certs certs-force trust untrust localmesh-clean check-hosts
+
+CERTS_DIR       := .secrets/certs
+HOSTS_FILE      ?= /etc/hosts
+REQUIRED_HOSTS  ?= www grafana
 
 # TODO: standardize how contributors install pipx; pending prod infra & provider choices.
 setup:
@@ -25,6 +29,53 @@ chart:
 
 chart-lint:
 	./tools/helm-v4.1.4-linux-amd64 lint chart
+
+# LocalMesh dev-machine bootstrap. See docs/superpowers/specs/
+# 2026-05-18-localmesh-service-mesh-design.md §7 and
+# scripts/secrets-gen.py for the actual work.
+#
+# `certs` mints the LocalMesh CA + per-service leaf certs into
+# .secrets/certs/<container>/, writes .env's managed section with
+# UPCASE_SNAKECASE TOML fields for compose interpolation, generates
+# service_catalog/caddy/Caddyfile.generated, and installs the CA into
+# the host trust store via `step certificate install`. Idempotent.
+certs:
+	@./scripts/secrets-gen.py
+	@./tools/step certificate install $(CERTS_DIR)/ca.crt
+
+# Destructive: untrust the CA, blow away every cert, regenerate.
+certs-force:
+	@./tools/step certificate uninstall $(CERTS_DIR)/ca.crt 2>/dev/null || true
+	@rm -rf $(CERTS_DIR)
+	@$(MAKE) certs
+
+trust:
+	@./tools/step certificate install $(CERTS_DIR)/ca.crt
+
+untrust:
+	@./tools/step certificate uninstall $(CERTS_DIR)/ca.crt 2>/dev/null || true
+
+# Removes the entire .secrets/ tree after untrusting the CA. Note: this
+# is distinct from `setup`'s docker compose down -v sledgehammer.
+localmesh-clean: untrust
+	@rm -rf .secrets
+
+check-hosts:
+	@. .env 2>/dev/null && \
+	missing=""; \
+	for sub in $(REQUIRED_HOSTS); do \
+	   fqdn="$$sub.$$PROJECT_NAME.$$LOCAL_DOMAIN"; \
+	   if ! grep -qE "127\.0\.0\.1[[:space:]]+$$fqdn" $(HOSTS_FILE); then \
+	     missing="$$missing $$fqdn"; \
+	   fi; \
+	done; \
+	if [ -n "$$missing" ]; then \
+	   echo "Missing /etc/hosts entries:"; \
+	   for h in $$missing; do echo "    127.0.0.1   $$h"; done; \
+	   echo "Add the above lines to $(HOSTS_FILE) (requires sudo), then re-run."; \
+	   exit 1; \
+	fi
+# TODO: needs_prod_decisions seed /etc/hosts from project.toml via privileged-init script
 
 # End ops team responsibility
 
