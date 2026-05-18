@@ -386,8 +386,16 @@ services:
     # is minimal; rely on service_started for ordering.
 
   grafana:
-    image: grafana/grafana:11.4.0
+    image: grafana/grafana:12.4.3
     container_name: grafana
+    # Grafana is `mesh.exempt: "true"` — no LocalMesh cert, plaintext on the
+    # compose network. Port 3001 is published unprotected to the host so dev
+    # tools (browser, `gcx`) can reach the API without the mTLS-trust dance
+    # the Caddy ingress requires. Browser users typically go through the
+    # ingress (`https://grafana.${PROJECT_NAME}.${LOCAL_DOMAIN}`); `gcx`
+    # talks straight to 127.0.0.1:3001 with admin/admin basic auth.
+    # TODO: needs_prod_decisions drop host port mapping in prod; admin API
+    #   access flows through the ingress + a real IdP, not basic auth.
     ports:
       - "3001:3000"
     environment:
