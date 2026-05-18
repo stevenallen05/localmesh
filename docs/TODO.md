@@ -24,28 +24,30 @@ observability DX between prod and 'my machine'
 
 ## Cross-cutting conventions
 
-- **`metrics.*` compose-label namespace.** `metrics.service_name` is the
-  first inhabitant. Future infra-facing labels (trace sampling
-  overrides, log-routing hints, etc.) should follow the same
-  `<subsystem>.<purpose>` shape; document the rule alongside the
-  katenary label conventions in
+- **`metrics.*` compose-label namespace.** Inhabitants are
+  `metrics.service_name` (cadvisor metric label + Vector log enrichment),
+  `metrics.module_name` and `metrics.owned_by` (Vector log enrichment).
+  Future infra-facing labels (trace sampling overrides, log-routing
+  hints, etc.) should follow the same `<subsystem>.<purpose>` shape;
+  document the rule alongside the katenary label conventions in
   [`katenary-top-seven.md`](../engineering/rules/katenary-top-seven.md)
   so additions don't drift.
+- **Identity source consolidation.** Per-service identity is declared
+  twice — as docker labels (`metrics.*`) for Vector to enrich log events,
+  and as `OTEL_RESOURCE_ATTRIBUTES` env for the OTel SDK on traces and
+  metrics. Same values, two declarations. Either a compose-template
+  helper or `make`-driven `.env` expansion should derive both from one
+  source. Tracked in DESIGN_DECISIONS Open.
 
 ## Logging follow-ups
 
-- **Per-source log-level extractors for non-app containers.** Postgres,
-  otel-collector, grafana, tempo, loki, vm, cadvisor, node-exporter
-  each speak a different format. Either `docker_observer` enrichment by
-  container id or per-source filelog operators. Until then,
-  `service-glance`'s default `INFO+` filter hides these sources.
-- **Validate `level` enum at the collector.** Drop / coerce malformed
-  `level` values from non-conforming sources before they hit Loki, to
-  bound the label's cardinality in prod.
 - **Migrate Grafana Loki's `trace_id` derived field from body-regex to
-  structured-metadata reference.** The matcher works today via
-  `matcherRegex` on the body; field-based is cleaner and doesn't break
-  if body format changes.
+  structured-metadata reference.** Body-regex still works post-Vector
+  (Vector ships `trace_id` in the JSON body for app events, and as
+  structured metadata via the loki sink). The cleaner field-based pivot
+  in Grafana 11 / Loki 3.x needs verification — `matcherType: label`
+  matches stream labels, not structured metadata; the path is probably
+  an `internalLink` with raw LogQL on the linked side.
 
 ## OTel collector
 
