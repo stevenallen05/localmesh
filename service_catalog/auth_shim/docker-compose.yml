@@ -1,0 +1,33 @@
+# Dev-only user picker. Serves GET /users from .secrets/users.yaml.
+# Plugin is mesh_exempt (plugin.toml): no certs minted, plaintext
+# access from www over the docker network.
+#
+# TODO: needs_prod_decisions oauth2-proxy + IdP (Dex / Keycloak) in
+# prod; this is the dev stand-in.
+
+services:
+  auth-shim:
+    image: node:22-alpine
+    container_name: auth-shim
+    restart: unless-stopped
+    command:
+      - node
+      - /app/server.mjs
+    environment:
+      USERS_FILE: /etc/users.yaml
+    volumes:
+      - ./server.mjs:/app/server.mjs:ro
+      - ./yaml-tiny.mjs:/app/yaml-tiny.mjs:ro
+      - ../../.secrets/users.yaml:/etc/users.yaml:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    labels:
+      mesh.exempt: "true"
+      katenary.v3/ports: |-
+        - 8080
+      metrics.service_name: auth-shim
+      metrics.module_name: ${AUTH_SHIM_MODULE_NAME}
+      metrics.owned_by: ${AUTH_SHIM_OWNED_BY}

@@ -9,6 +9,7 @@ use server::db::Db;
 use server::error_log::ErrorLogLayer;
 use server::grafana::GrafanaClient;
 use server::greeter::GreeterSvc;
+use server::identity;
 use server::proto::hello::greeter_server::GreeterServer;
 use server::proto::metrics_v1::catalog_server::CatalogServer;
 use server::rpc_metrics::RpcMetricsLayer;
@@ -54,8 +55,16 @@ async fn main() -> Result<(), BoxError> {
         .layer(TraceContextLayer)
         .layer(metrics_layer)
         .layer(ErrorLogLayer)
-        .add_service(GreeterServer::new(GreeterSvc::new(db)))
-        .add_service(CatalogServer::new(CatalogSvc::new(grafana)))
+        // Compose user_interceptor + peer_interceptor at each service entry
+        // point. Both insert into request extensions; handlers read them
+        // for business logic without echoing PII onto OTel spans (the
+        // PII-at-ingress rule lives at the www edge).
+        .add_service(GreeterServer::with_interceptor(GreeterSvc::new(db), |req| {
+            identity::peer_interceptor(identity::user_interceptor(req)?)
+        }))
+        .add_service(CatalogServer::with_interceptor(CatalogSvc::new(grafana), |req| {
+            identity::peer_interceptor(identity::user_interceptor(req)?)
+        }))
         .serve(addr)
         .await?;
 
