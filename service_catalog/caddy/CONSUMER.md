@@ -17,7 +17,7 @@ The route table is auto-generated from every `[[services]]` entry across
 | Name              | Sample value             | Source  |
 |-------------------|--------------------------|---------|
 | `PROJECT_NAME`    | `metrics-collector`      | plugin  |
-| `LOCAL_DOMAIN`    | `tw-demo.local`          | plugin  |
+| `LOCAL_DOMAIN`    | `lvh.me`          | plugin  |
 | `CADDY_MODULE_NAME` | `caddy`                | plugin  |
 | `CADDY_OWNED_BY`  | `sre@example.com`        | plugin  |
 

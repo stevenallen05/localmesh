@@ -1,10 +1,8 @@
 # Begin ops team responsibility
 
-.PHONY: setup chart chart-lint certs check-hosts
+.PHONY: setup chart chart-lint certs
 
 CERTS_DIR       := .secrets/certs
-HOSTS_FILE      ?= /etc/hosts
-REQUIRED_HOSTS  ?= www grafana
 
 # TODO: standardize how contributors install pipx; pending prod infra & provider choices.
 setup:
@@ -23,8 +21,6 @@ setup:
 	docker compose up -d --wait grafana
 	@echo "==> Minting service-account token"
 	docker compose run --rm grafana-bootstrap
-	@echo "==> Checking /etc/hosts for ingress subdomains"
-	@$(MAKE) check-hosts
 	@echo "==> Setup complete. Run 'docker compose up -d --build' to start the stack."
 
 # TODO: detect OS/arch — tools/ binaries hardcoded to linux-amd64; pending prod infra & provider choices.
@@ -46,23 +42,6 @@ certs:
 	@rm -rf $(CERTS_DIR)
 	@./scripts/secrets-gen.py
 	@./tools/step certificate install $(CERTS_DIR)/ca.crt
-
-check-hosts:
-	@. .env 2>/dev/null && \
-	missing=""; \
-	for sub in $(REQUIRED_HOSTS); do \
-	   fqdn="$$sub.$$PROJECT_NAME.$$LOCAL_DOMAIN"; \
-	   if ! grep -qE "127\.0\.0\.1[[:space:]]+$$fqdn" $(HOSTS_FILE); then \
-	     missing="$$missing $$fqdn"; \
-	   fi; \
-	done; \
-	if [ -n "$$missing" ]; then \
-	   echo "Missing /etc/hosts entries:"; \
-	   for h in $$missing; do echo "    127.0.0.1   $$h"; done; \
-	   echo "Add the above lines to $(HOSTS_FILE) (requires sudo), then re-run."; \
-	   exit 1; \
-	fi
-# TODO: needs_prod_decisions seed /etc/hosts from project.toml via privileged-init script
 
 # End ops team responsibility
 

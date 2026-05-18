@@ -13,7 +13,7 @@ project_name      = "metrics-collector"
 project_namespace = "laptop"                      # OTel service.namespace + compose isolation
 tech_lead_email   = "sallen@amberstyle.ca"        # point person for questions
 external_domain   = "metrics.example.com"
-local_domain      = "tw-demo.local"               # dev DNS suffix; TODO: needs_prod_decisions real internal DNS
+local_domain      = "lvh.me"               # dev DNS suffix; TODO: needs_prod_decisions real internal DNS
 
 # App-tier services. Every container with an exposed port lives here or in
 # its plugin.toml. `make certs` reads these to mint certs (1 per service)

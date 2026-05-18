@@ -24,7 +24,7 @@ services:
       # project.toml directly and this duplication goes away.
       # service.namespace / deployment.environment.name are OTel semconv
       # identity attrs that the imported APM dashboard reads.
-      OTEL_RESOURCE_ATTRIBUTES: "service.namespace=tw-demo,deployment.environment.name=dev,module_name=app,owned_by=${TECH_LEAD_EMAIL}"
+      OTEL_RESOURCE_ATTRIBUTES: "service.namespace=${PROJECT_NAME},deployment.environment.name=dev,module_name=app,owned_by=${TECH_LEAD_EMAIL}"
       # Connection-string wiring is in place ahead of an actual postgres
       # client; what the server uses postgres for is still TBD. Server today
       # ignores this — when an RPC lands that needs it, the env is ready.
@@ -85,7 +85,7 @@ services:
       OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
       OTEL_SERVICE_NAME: www
       # See note on server above — same TECH_LEAD_EMAIL interpolation.
-      OTEL_RESOURCE_ATTRIBUTES: "service.namespace=tw-demo,deployment.environment.name=dev,module_name=app,owned_by=${TECH_LEAD_EMAIL}"
+      OTEL_RESOURCE_ATTRIBUTES: "service.namespace=${PROJECT_NAME},deployment.environment.name=dev,module_name=app,owned_by=${TECH_LEAD_EMAIL}"
       # @opentelemetry/instrumentation-http emits the legacy `http.server.duration`
       # (ms) by default; the imported APM dashboard queries the stable
       # `http.server.request.duration` (seconds). Opt in.
