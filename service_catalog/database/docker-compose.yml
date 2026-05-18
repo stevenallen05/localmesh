@@ -64,6 +64,8 @@ services:
       retries: 5
     labels:
       metrics.service_name: postgres
+      metrics.module_name: database
+      metrics.owned_by: sre@example.com
 
   # Postgres infra + pg_stat_statements metrics. Scraped by the per-module
   # sidecar collector (Task 3.3) which pushes OTLP to the main otel-collector.
@@ -92,6 +94,8 @@ services:
       # cluster-health uses. Not the same channel as module_name/owned_by on
       # the scraped series (that's Task 3.3, the sidecar collector).
       metrics.service_name: postgres
+      metrics.module_name: database
+      metrics.owned_by: sre@example.com
 
   grafana:
     configs:
@@ -111,8 +115,12 @@ services:
     labels:
       # Sidecar is functionally part of the observability plane; share the
       # `service=observability` lens with the main collector so cluster-health
-      # rolls them up together.
+      # rolls them up together. `module_name=database` though — catalog
+      # attribution follows where the service is declared, not its functional
+      # role; the two lenses are intentionally different on this service.
       metrics.service_name: observability
+      metrics.module_name: database
+      metrics.owned_by: sre@example.com
 
 configs:
   # Self-contained metrics emission for the database module. The sidecar

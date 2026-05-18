@@ -411,6 +411,8 @@ services:
       # Whole catalog module collapses to one row in service-glance.
       # See cadvisor metric_relabel_configs in this file.
       metrics.service_name: observability
+      metrics.module_name: observability
+      metrics.owned_by: sre@example.com
     # Docker's JSON log files are 640 root:root; the contrib image's default
     # UID 10001 can't read them. Running root here is the trade-off every
     # node-local log scraper makes (Promtail/Alloy/filebeat all do the
@@ -455,6 +457,8 @@ services:
       katenary.v3/ports: |-
         - 9100
       metrics.service_name: observability
+      metrics.module_name: observability
+      metrics.owned_by: sre@example.com
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.52.1
@@ -471,6 +475,8 @@ services:
       katenary.v3/ports: |-
         - 8080
       metrics.service_name: observability
+      metrics.module_name: observability
+      metrics.owned_by: sre@example.com
     devices:
       - /dev/kmsg
 
@@ -490,6 +496,8 @@ services:
       - vm-data:/victoria-metrics-data
     labels:
       metrics.service_name: observability
+      metrics.module_name: observability
+      metrics.owned_by: sre@example.com
     # No healthcheck: VM image is FROM scratch — no wget/curl/shell.
     # Reviewer-debug: `curl http://localhost:8428/health` from host.
 
@@ -504,6 +512,8 @@ services:
       - tempo-data:/var/tempo
     labels:
       metrics.service_name: observability
+      metrics.module_name: observability
+      metrics.owned_by: sre@example.com
     # Internal-only; Grafana proxies it. No healthcheck — Tempo's image
     # is minimal; rely on service_started for ordering.
 
@@ -532,6 +542,8 @@ services:
       - grafana-data:/var/lib/grafana
     labels:
       metrics.service_name: observability
+      metrics.module_name: observability
+      metrics.owned_by: sre@example.com
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
       interval: 10s
@@ -564,6 +576,8 @@ services:
     entrypoint: ["/bin/sh", "/bootstrap.sh"]
     labels:
       metrics.service_name: observability
+      metrics.module_name: observability
+      metrics.owned_by: sre@example.com
 
 volumes:
   vm-data: {}

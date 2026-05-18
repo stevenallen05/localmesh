@@ -56,6 +56,12 @@ services:
       # metric_relabel_configs for the propagation rule. Same value as
       # OTEL_SERVICE_NAME above so metrics + traces + logs all agree.
       metrics.service_name: server
+      # Identity channel for the Vector log-enrichment agent. Mirrors
+      # OTEL_RESOURCE_ATTRIBUTES above (the SDK channel for traces/metrics).
+      # One source of truth for both channels is a follow-up — see
+      # DESIGN_DECISIONS Open / TODO.md "Identity source consolidation."
+      metrics.module_name: app
+      metrics.owned_by: ${TECH_LEAD_EMAIL}
 
   www:
     # Same reason as server: proto/ must be in the build context.
@@ -98,3 +104,5 @@ services:
         hostname: ${EXTERNAL_DOMAIN}
         port: 3000
       metrics.service_name: www
+      metrics.module_name: app
+      metrics.owned_by: ${TECH_LEAD_EMAIL}
