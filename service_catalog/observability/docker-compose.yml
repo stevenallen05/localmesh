@@ -286,6 +286,7 @@ services:
     labels:
       # Whole catalog module collapses to one row in service-glance.
       # See cadvisor metric_relabel_configs in this file.
+      mesh.exempt: "true"
       metrics.service_name: observability
       metrics.module_name: observability
       metrics.owned_by: sre@example.com
@@ -317,6 +318,7 @@ services:
       # the docker network). Katenary needs a port to generate the
       # depends_on readiness init-container; declare it here. See
       # https://repo.katenary.io/katenary/katenary/issues/182.
+      mesh.exempt: "true"
       katenary.v3/ports: |-
         - 9100
       metrics.service_name: observability
@@ -335,6 +337,7 @@ services:
       - /dev/disk/:/dev/disk:ro
     labels:
       # See node-exporter above — cadvisor serves the prometheus scrape on 8080.
+      mesh.exempt: "true"
       katenary.v3/ports: |-
         - 8080
       metrics.service_name: observability
@@ -358,6 +361,7 @@ services:
     volumes:
       - vm-data:/victoria-metrics-data
     labels:
+      mesh.exempt: "true"
       metrics.service_name: observability
       metrics.module_name: observability
       metrics.owned_by: sre@example.com
@@ -374,6 +378,7 @@ services:
     volumes:
       - tempo-data:/var/tempo
     labels:
+      mesh.exempt: "true"
       metrics.service_name: observability
       metrics.module_name: observability
       metrics.owned_by: sre@example.com
@@ -404,6 +409,7 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
     labels:
+      mesh.exempt: "true"
       metrics.service_name: observability
       metrics.module_name: observability
       metrics.owned_by: sre@example.com
@@ -438,6 +444,7 @@ services:
       - grafana-token:/run/grafana
     entrypoint: ["/bin/sh", "/bootstrap.sh"]
     labels:
+      mesh.exempt: "true"
       metrics.service_name: observability
       metrics.module_name: observability
       metrics.owned_by: sre@example.com
