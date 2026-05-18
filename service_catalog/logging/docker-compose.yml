@@ -100,12 +100,22 @@ configs:
             del(.label)
 
       sinks:
-        # Console-only this chunk. Chunk 4 swaps to the loki sink.
-        console:
-          type: console
+        loki:
+          type: loki
           inputs: ["enrich"]
+          endpoint: http://loki:3100
           encoding:
             codec: json
+          # Cardinality contract: rules doc §2. trace_id / span_id will
+          # land as structured_metadata once parse_envelope (chunk 6)
+          # extracts them from the body — until then those fields don't
+          # exist on the event, so no structured_metadata block yet.
+          labels:
+            service_name: "{{ service_name }}"
+            module_name:  "{{ module_name }}"
+            owned_by:     "{{ owned_by }}"
+            deployment_environment_name: "{{ deployment_environment_name }}"
+            container_id: "{{ container_id }}"
 
 services:
   loki:
