@@ -1,0 +1,14 @@
+[identity]
+module_name = "observability"
+owned_by    = "sre@example.com"
+mesh_exempt = true               # observability stays plaintext; Caddy routes via http://
+
+# Only the user-facing UIs need to be listed here; internal-only services
+# (otel-collector, node-exporter, cadvisor, tempo, victoriametrics,
+# grafana-bootstrap) are reached via the docker network and don't need a
+# Caddy route.
+
+[[services]]
+container          = "grafana"
+port               = 3000
+expose_via_ingress = true

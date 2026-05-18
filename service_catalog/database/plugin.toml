@@ -2,5 +2,7 @@
 module_name = "database"
 owned_by    = "sre@example.com"
 
-[[certs]]
-id = "postgres"
+[[services]]
+container          = "postgres"
+port               = 5432
+expose_via_ingress = false        # east-west only; the server workload dials this

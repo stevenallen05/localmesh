@@ -2,11 +2,11 @@
 module_name = "caddy"
 owned_by    = "sre@example.com"
 
-[[certs]]
-id = "caddy"
+# Caddy IS the dev-facing ingress. Caddy doesn't route to itself; other
+# services with expose_via_ingress=true get a route in the generated Caddyfile.
 
-[[certs]]
-id = "www"
-
-[[certs]]
-id = "server"
+[[services]]
+container          = "caddy"
+port               = 8443
+ingress            = true
+expose_via_ingress = false

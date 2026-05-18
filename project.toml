@@ -9,9 +9,25 @@
 # seconds, cold. Anything that needs explanation belongs elsewhere —
 # in the catalogue or a deploy file.
 
-project_name    = "metrics-collector"
-tech_lead       = "sallen@amberstyle.ca"   # point person for questions
-external_domain = "metrics.example.com"
+project_name      = "metrics-collector"
+project_namespace = "laptop"                      # OTel service.namespace + compose isolation
+tech_lead_email   = "sallen@amberstyle.ca"        # point person for questions
+external_domain   = "metrics.example.com"
+local_domain      = "tw-demo.local"               # dev DNS suffix; TODO: needs_prod_decisions real internal DNS
+
+# App-tier services. Every container with an exposed port lives here or in
+# its plugin.toml. `make certs` reads these to mint certs (1 per service)
+# and write Caddy routes (for services with expose_via_ingress = true).
+
+[[services]]
+container          = "www"
+port               = 3443
+expose_via_ingress = true                          # https://www.${PROJECT_NAME}.${LOCAL_DOMAIN}:8443 → www:3443
+
+[[services]]
+container          = "server"
+port               = 50051
+expose_via_ingress = false                         # east-west only; www dials this directly
 
 # Could page compliance, gate the PR, or trigger a control review.
 [compliance]
