@@ -1,39 +1,58 @@
 # Tensorwave take-home
 
-> A reference implementation of the **LocalMesh** deployment pattern, demonstrated through a small Rust + Next.js metrics service.
+> **LocalMesh** is a deployment pattern I designed for this take-home and am bootstrapping through a small Rust + Next.js metrics service.
 
-The take-home asked for a metrics monitoring system. The artifact here is *one team's microservice repo* shaped the way LocalMesh expects: a top-level `docker-compose.yml` that `include:`s the org's `localmesh.yaml` plus a few LocalMesh plugins from a stub catalogue (observability, security, logging, database). The helm chart is generated from compose, not hand-maintained.
+The take-home asked for a metrics monitoring system. The artifact here is two things at once: the metrics service itself, and the early shape of LocalMesh — the pattern I built the service inside of. The top-level `docker-compose.yml` `include:`s the org's `localmesh.yaml` plus a few LocalMesh plugins from a stub catalogue: observability, security, logging, database. The helm chart is generated from compose, not hand-maintained. Everything past this point describes LocalMesh as the pattern intends to work; the repo is the first implementation against it.
 
 ## TL;DR
 
-**LocalMesh turns the `docker-compose.yaml` your teams already write for local dev into a helm chart your release pipeline can deploy.** It borrows Rails' omakase philosophy — opinionated curation of the boring infrastructure choices every project repeats — and applies it to the dev/prod gap. SRE assembles the catalogue; teams include one line per piece they need.
+**LocalMesh turns the `docker-compose.yaml` your teams already write for local dev, into a helm chart your k8s can use.** It borrows the [Rails "omakase" philosophy](https://rubyonrails.org/doctrine#omakase); opinionated curation of the boring infrastructure choices every project repeats - applies it to the dev/prod gap. SRE assembles the catalogue; teams include one line per piece they need.
 
 ## What "omakase" means here
 
-Rails put a name on a stance every team rediscovers: an opinionated framework that picks the boring choices on your behalf — the ORM, the routing layer, the templating, the dozen libraries every web app needs — so devs spend their time on the parts of the app that are actually theirs. The wins come from *not deciding*. Defaults that someone good has already picked, applied uniformly, beat bespoke decisions made by every team in parallel.
+Ruby on Rails is an opinionated web framework. It picks the ORM, the routing layer, the templating engine, and the dozen libraries every web app needs. Teams don't repeat those choices on every project. The trade-off is flexibility for not having to decide. Pre-picked defaults applied uniformly beat bespoke decisions each team makes in parallel.
 
-LocalMesh borrows the move for infrastructure. The boring choices most projects make — which postgres, which queue, what observability looks like, where secrets live, how identity propagates — get curated by SRE once, packaged as a catalogue of plugins, and pulled in by teams with one line in `docker-compose.yaml`. Devs accept the defaults, and SRE owns the prod posture. Both sides win the same way the Rails crowd does: less time spent on solved problems.
+LocalMesh applies the same idea to infrastructure. Most projects make the same boring choices: which postgres, which queue, what observability looks like, where secrets live, how identity propagates. SRE curates them once and packages them as a catalogue of plugins. Teams pull them in with one line in `docker-compose.yaml`. Devs accept the defaults. SRE owns the prod posture. Both sides save time on solved problems.
 
 ## What a service mesh is, briefly
 
-Picture a condo tower. Each service is a unit; the team owns what's inside. SRE owns the building — wiring, plumbing, the shared amenities. A service mesh is the building.
+A condo tower is a useful analogy. Each service is a unit; the team owns what's inside. SRE owns the building — wiring, plumbing, shared amenities. A service mesh is the building.
 
-Concretely, it's the layer of network infrastructure that handles everything happening *between* services: encryption, identity, routing, observability. The boundary is loose on purpose — anything ops can install for the whole building counts. Every cross-service call goes through it; teams don't write code in each app to make it happen. It's wired in once, applied to every service automatically. Under the hood, the keycard is mTLS — every service holds one the mesh issues at startup, the way your condo card opens certain floors and not others. To devs, it's just a card.
+Concretely, a service mesh is the layer of network infrastructure between services. It handles encryption, identity, routing, and observability. The boundary is loose on purpose. Anything ops can install for the whole building counts. Every cross-service call goes through it. Teams don't write code in each app to make it happen — it's wired in once and applied to every service automatically. Mechanically: mTLS. Every service gets a certificate at startup, signed by the mesh's CA. Apps don't manage it; they just have it.
 
-**And LocalMesh is that same trick, applied to docker-compose.** Where a service mesh imposes opinionated curation on the network layer, LocalMesh imposes it on the compose layer — so what teams run locally is the same shape as what prod installs. Long form: [`docs/WHAT_IS_MESH.md`](./docs/WHAT_IS_MESH.md).
+**LocalMesh applies the same pattern to docker-compose.** A service mesh imposes opinionated curation on the network layer. LocalMesh imposes it on the compose layer. What teams run locally is the same shape as what prod installs. Long form: [`docs/WHAT_IS_MESH.md`](./docs/WHAT_IS_MESH.md).
 
 ## The dev/prod gap
 
-In most companies, prod and local dev disagree about reality. Prod gets the real load balancer, the real identity provider, the real managed database, the real secrets backend; local dev gets shims, mocks, or "works on my machine." Drift accumulates one component at a time. SRE spends their week closing it ticket by ticket — a developer hits a thing prod does that compose doesn't, files a platform ticket, waits.
+In most companies, prod and local dev are different setups with different behavior. Prod has the real load balancer, identity provider, managed database, and secrets backend. Local dev has shims, mocks, or "works on my machine." Drift accumulates one component at a time. SRE spends their week closing it ticket by ticket. A developer hits something prod does that compose doesn't, files a platform ticket, waits.
 
-LocalMesh closes the gap by making local dev a literal compile target of prod. Same plugins, same defaults, same wire shape. Fix a bug in local, prod has the fix on the next deploy. Devs maintain prod for SRE without ever opening a ticket.
+LocalMesh closes the gap by treating local dev as a compile target of prod. Both run the same plugins with the same defaults. A bug fix in local lands in prod on the next deploy. Devs maintain prod for SRE without filing tickets.
+
+## The pattern: Resource Definitions
+
+LocalMesh implements the **Resource Definition pattern** (also called the Platform Orchestrator pattern). The same shape shows up under different names: Score and Humanitec call them Resource Definitions, Kratix calls them Promises, Radius calls them Recipes, Crossplane calls them Compositions. The pattern separates *what* an app needs from *how* the platform provides it:
+
+- **Workload specification** — declared by the app team. Says "I need a postgres" without saying which postgres or how to provision it.
+- **Resource Definition** — authored by SRE. The recipe: hardening, sizing, backups, IAM, log retention, all the boring details, encoded once.
+- **Platform Orchestrator** — matches a workload's declared needs against the available Resource Definitions and runs the provisioning.
+
+LocalMesh's terms map onto this directly:
+
+| Pattern concept | LocalMesh |
+|---|---|
+| Workload specification | A team's `docker-compose.yaml` |
+| Resource Definition | A LocalMesh plugin |
+| Service catalog | The catalogue |
+| Platform Orchestrator | Katenary plus the downstream provisioner (Crossplane, a Terraform Operator, ACK, whatever the rendered helm chart triggers) |
+
+LocalMesh's twist on the pattern: each Resource Definition has **two render targets**, not one. The compose half of a plugin is the local-dev render; the helm dependency is the prod render. Same definition, same defaults, two outputs. That dual render is what closes the dev/prod gap — devs and SRE work against the same artifact.
 
 ## The parts of LocalMesh
 
 Before the parts: here's what it looks like in a team's repo.
 
 ```yaml
-# A team's docker-compose.yaml
+# A team's docker-compose.yaml — the workload specification
 include:
   - repo:/localmesh.yaml          # one line — that's "LocalMesh installed"
   - repo:/database/postgres.yaml  # picked from the catalogue
@@ -48,7 +67,8 @@ services:
 ```
 
 ```yaml
-# service_catalog/localmesh.yaml — assembled by SRE, one per org
+# service_catalog/localmesh.yaml — the org's baseline Resource Definition,
+# assembled by SRE, one per org
 include:
   - repo:/mesh/baseline.yaml
   - repo:/observability/baseline.yaml
@@ -57,7 +77,8 @@ include:
 ```
 
 ```yaml
-# service_catalog/database/postgres.yaml — what SRE puts in the catalogue
+# service_catalog/database/postgres.yaml — a Resource Definition in
+# LocalMesh's format; what SRE puts in the catalogue
 services:
   postgres:
     image: postgres:16
@@ -69,7 +90,8 @@ services:
     labels:
       katenary.v3/secrets: |-
         - POSTGRES_PASSWORD
-      # The compose half above runs locally. The prod half is this helm chart.
+      # The compose service above is the local-dev render.
+      # The katenary.v3/dependencies below is the prod render — owned by SRE.
       katenary.v3/dependencies: |-
         - name: postgresql
           repository: oci://registry-1.docker.io/bitnamicharts
@@ -113,29 +135,29 @@ The dev/SRE split is visible right in the file. The team's `api` service referen
 
 The parts:
 
-- **`localmesh.yaml`** — the plugin SRE assembles to bundle the bits every project at this org gets. Installing LocalMesh = including this file. Same shape as any other plugin; plugins all the way down. Mandatory in the sense that every project includes it; *what's in it* is whatever SRE decided this org needs.
-- **A LocalMesh plugin** — one file that runs a thing locally (compose half) and points at the prod equivalent (helm half, via `katenary.v3/dependencies`). Devs use it with one `include:` line.
-- **The catalogue** — wherever SRE keeps the plugins. A git repo, an internal wiki, an AWS Service Catalog instance. LocalMesh doesn't prescribe.
-- **[`project.toml`](./project.toml)** — one file per project capturing identity, ownership, compliance flags, billing code. Compliance, legal, and billing read the same file engineers do; flipping `handles_pii = true` pages the right people without anyone wiring up the page.
-- **The compose→helm boundary** — strict on purpose. Devs write compose. SRE owns helm. The translation is machine-enforced (via [katenary](https://docs.katenary.io/)); SRE can change anything past the chart without breaking devs.
+- **`localmesh.yaml`** — the org's baseline Resource Definition. Bundles every plugin every project at this org gets. Installing LocalMesh = including this file. Same shape as any other plugin; it just happens to include other plugins itself. Mandatory in the sense that every project includes it; the contents are whatever SRE decided this org needs.
+- **A LocalMesh plugin** — a Resource Definition in LocalMesh's format. One file that defines two render targets for the same logical dependency: the local-dev shape (the compose half) and the prod shape (the helm dependency, declared via `katenary.v3/dependencies`). Devs use it with one `include:` line.
+- **The catalogue** — LocalMesh's service catalog. Wherever SRE keeps the plugins. A git repo, an internal wiki, an AWS Service Catalog instance, an OCI registry. LocalMesh doesn't prescribe.
+- **[`project.toml`](./project.toml)** — workload metadata. One file per project capturing identity, ownership, compliance flags, billing code. Compliance, legal, and billing read the same file engineers do; flipping `handles_pii = true` pages the right people without anyone wiring up the page.
+- **The compose→helm boundary** — the Platform Orchestrator seam, machine-enforced. Devs author the workload spec (compose). SRE owns the prod render (helm). Katenary does the translation. SRE can change anything past the chart without breaking devs.
 
 ## FAQ
 
 **So what does a team actually do day-to-day?**
 
-Write a `docker-compose.yaml`. Include `localmesh.yaml` and whichever plugins from the catalogue the team needs. Reference the env vars those plugins wire in (`DATABASE_URL`, `REDIS_URL`, etc.). That's it — never open a platform ticket, never write helm, never reinvent observability. The compose runs locally; the chart generated from it runs in prod, same shape.
+Write a `docker-compose.yaml`. Include `localmesh.yaml` and whichever plugins from the catalogue the team needs. Reference the env vars those plugins wire in (`DATABASE_URL`, `REDIS_URL`, etc.). That's it. No platform tickets, no hand-written helm. The compose runs locally; the generated chart deploys to prod with the same configuration.
 
-**How is this different from Backstage / Crossplane / umbrella helm charts?**
+**How is this different from Backstage / Crossplane / umbrella helm charts / Score?**
 
-Backstage is a portal over the services you already have; LocalMesh is the *definition* of them. Crossplane provisions cloud resources from k8s, exposed as custom resources; LocalMesh defines what your compose includes, and the helm chart it renders is what eventually uses Crossplane (or doesn't — that's SRE's choice). Umbrella helm charts let you compose helm packages; LocalMesh lets you compose *compose files* and gets you the helm chart as build output.
+Backstage is a portal over the services you already have; LocalMesh is what defines them. Crossplane is one possible target for the Platform Orchestrator step — a plugin's helm dependency can render a Crossplane Claim, but it can equally render an ACK CR, a Terraform Operator CR, or an in-cluster chart; SRE decides per plugin. Umbrella helm charts let you compose helm packages; LocalMesh composes *compose files* and emits the helm chart as build output, so the dev never writes helm. Score is the closest peer — same Resource Definition pattern, different workload-spec format. LocalMesh uses compose because compose is already the local-dev artifact; Score uses its own YAML and leaves local dev to a separate tool.
 
 **What doesn't LocalMesh solve?**
 
-It doesn't pick your cloud. It doesn't host the catalogue — SRE picks the form. It doesn't replace the SRE-maintained services the plugins use (the mesh itself, the cert authority, the observability backend) — those still need to exist. And it doesn't deploy the rendered chart — you bring the release pipeline. The obvious shape is k8s + CD, but anything ending in a partially-automated, helm-readable release works: mobile apps, binary drivers, anything compose-shaped in dev with a path to prod that can be triggered from a chart. Fully manual releases don't fit.
+It doesn't pick your cloud. It doesn't host the catalogue — SRE picks the form. It doesn't replace the SRE-maintained services the plugins use: the mesh itself, the cert authority, the observability backend. Those still need to exist. And it doesn't deploy the rendered chart — you bring the release pipeline. The obvious shape is k8s + CD. Anything ending in a partially-automated, helm-readable release also works: mobile apps, binary drivers, anything compose-shaped in dev with a release path that can be triggered from a chart. Fully manual releases don't fit.
 
 **Do I need this if I have three services?**
 
-Probably not. The value comes from removing the platform-ticket bottleneck, and at three services the bottleneck doesn't exist yet. The break-even is when SRE is approving the same five things every quarter — at which point packaging them as plugins pays for itself.
+Probably not. The value comes from removing the platform-ticket bottleneck. At three services, that bottleneck doesn't exist yet. The break-even is when SRE is approving the same five things every quarter. At that point, packaging them as plugins pays for itself.
 
 ## Read these first
 
@@ -192,7 +214,7 @@ docker compose up -d --build
   [22784](https://grafana.com/grafana/dashboards/22784) by Cyrille Le
   Clerc ([source](https://github.com/cyrille-leclerc/opentelemetry-service-dashboard)),
   imported with three small patches: datasource defaults, identity-tuple
-  defaults (`tw-demo`/`dev`), and template-var queries that source from
+  defaults (`${PROJECT_NAME}`/`dev`), and template-var queries that source from
   `label_values()` directly because VictoriaMetrics 1.106 doesn't expose
   Prometheus 3.x's `keep_identifying_resource_attributes` knob. The fact
   that an unmodified dashboard from the broader OTel community works
