@@ -24,16 +24,44 @@ services:
     container_name: postgres
     environment:
       POSTGRES_DB: app
-      POSTGRES_USER: app
-      # Demo-only password. In prod this comes from compose secrets / vault.
-      POSTGRES_PASSWORD: app
-      # Resource attrs the otel-collector sees on every pg_tracing span via
-      # the OTLP HTTP/JSON payload (pg_tracing reads OTEL_RESOURCE_ATTRIBUTES
-      # like any OTel SDK).
+      POSTGRES_USER: postgres
+      # The postgres image's entrypoint refuses to initdb without one of
+      # POSTGRES_PASSWORD or POSTGRES_HOST_AUTH_METHOD. We override pg_hba
+      # via the file mount anyway, so the generated default is irrelevant;
+      # setting trust here just satisfies the entrypoint's check.
+      POSTGRES_HOST_AUTH_METHOD: trust
       OTEL_RESOURCE_ATTRIBUTES: "module_name=database,owned_by=sre@example.com"
       OTEL_SERVICE_NAME: postgres
+    # Wrap the image's entrypoint: copy the bind-mounted cert files into a
+    # postgres-owned location with the strict perms postgres requires
+    # (0600 on .key, owned by the postgres user). The bind-mount is uid
+    # 1000 on the host; postgres runs as uid 999 inside the container and
+    # cannot read files owned by another uid even at perm 0644.
+    #
+    # TODO: needs_prod_decisions cert delivery in prod (cert-manager Secret
+    # mount, SPIRE Workload API, or sidecar copy) makes this gymnastics
+    # unnecessary.
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -e
+        mkdir -p /etc/postgres-ssl
+        install -m 0600 -o postgres -g postgres /run/postgres/id.key  /etc/postgres-ssl/server.key
+        install -m 0644 -o postgres -g postgres /run/postgres/id.crt  /etc/postgres-ssl/server.crt
+        install -m 0644 -o postgres -g postgres /run/postgres/trust.ca.crt /etc/postgres-ssl/root.crt
+        exec /usr/local/bin/docker-entrypoint.sh "$@"
+      - --
     command:
       - postgres
+      # Point at our own config + hba files; the postgres image's defaults
+      # are overridden so we can require mTLS at the auth layer. SSL paths
+      # land inside /etc/postgres-ssl/ thanks to the entrypoint wrapper
+      # (see above) — postgresql.conf is updated to match.
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+      - -c
+      - hba_file=/etc/postgresql/pg_hba.conf
       # Load the extension up-front; it has to be listed in
       # shared_preload_libraries before CREATE EXTENSION will succeed.
       - -c
@@ -57,8 +85,14 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./initdb:/docker-entrypoint-initdb.d:ro
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ../../.secrets/certs/postgres:/run/postgres:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      # Local unix-socket connection as `postgres` (no SSL needed). Verifies
+      # the database is up; cert auth is exercised by the actual mTLS
+      # connections from server + postgres-exporter.
+      test: ["CMD-SHELL", "pg_isready -U postgres -d app"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -74,10 +108,33 @@ services:
   postgres-exporter:
     image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
     container_name: postgres-exporter
+    # Same dance as postgres: the Go `pq` driver enforces strict perms on
+    # .key (must be 0600 / 0640). Copy bind-mounted certs into /tmp/pgx-
+    # ssl/ with the right mode, then drop privileges and run the original
+    # entrypoint. The image's stock entrypoint is the exporter binary.
+    user: "0:0"
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        mkdir -p /tmp/pgx-ssl
+        cp /run/postgres-exporter/id.crt  /tmp/pgx-ssl/id.crt
+        cp /run/postgres-exporter/id.key  /tmp/pgx-ssl/id.key
+        cp /run/postgres-exporter/trust.ca.crt /tmp/pgx-ssl/trust.ca.crt
+        chmod 0600 /tmp/pgx-ssl/id.key
+        chown -R nobody:nobody /tmp/pgx-ssl
+        exec su -s /bin/sh nobody -c '/bin/postgres_exporter "$$@"' -- "$@"
+      - --
     command:
       - --extend.query-path=/etc/postgres-exporter/queries.yaml
     environment:
-      DATA_SOURCE_NAME: "postgresql://app:app@postgres:5432/app?sslmode=disable"
+      # LocalMesh mTLS: postgres-exporter presents its own LocalMesh cert
+      # (CN=postgres-exporter) and connects as the cert-bound role of the
+      # same name. Role was provisioned by initdb/00-roles.sql.
+      DATA_SOURCE_NAME: "postgresql://postgres-exporter@postgres:5432/app?sslmode=verify-full&sslrootcert=/tmp/pgx-ssl/trust.ca.crt&sslcert=/tmp/pgx-ssl/id.crt&sslkey=/tmp/pgx-ssl/id.key"
+    volumes:
+      - ../../.secrets/certs/postgres-exporter:/run/postgres-exporter:ro
     configs:
       - source: database_pgexporter_queries
         target: /etc/postgres-exporter/queries.yaml

@@ -130,6 +130,10 @@ def issue(container: str, project_name: str, local_domain: str, is_ingress: bool
     (out / "trust.ca.crt").write_bytes((CERTS / "ca.crt").read_bytes())
     crt, key = out / "id.crt", out / "id.key"
     if crt.exists() and key.exists():
+        # Already issued — still ensure perms are container-readable. See
+        # the perm-rationale comment further down.
+        os.chmod(crt, 0o644)
+        os.chmod(key, 0o644)
         return
     san_args = sum(
         [["--san", s] for s in san_list_for(container, project_name, local_domain, is_ingress)],
@@ -144,7 +148,17 @@ def issue(container: str, project_name: str, local_domain: str, is_ingress: bool
         "--not-after", "87600h",
         "--insecure", "--no-password",
     ])
-    os.chmod(key, 0o600)
+    # Dev convenience: cert + key are 0644 on the host so containers running
+    # under arbitrary uids can read them via bind-mount. Postgres demands
+    # 0600 on .key and rejects bind-mounted uid-1000 files outright; the
+    # database/ plugin's entrypoint wrapper copies them into the postgres-
+    # owned /etc/postgres-ssl/ at startup. Other consumers (rust sqlx, node
+    # @grpc/grpc-js, caddy) don't enforce perm checks.
+    #
+    # TODO: needs_prod_decisions tight key perms (0600 owned by the workload
+    # uid) once cert delivery is sidecar / SPIRE-managed instead of bind-mount.
+    os.chmod(crt, 0o644)
+    os.chmod(key, 0o644)
 
 
 def mint_certs(project: dict, plugins: list[tuple[str, dict]]):
