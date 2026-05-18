@@ -222,6 +222,10 @@ def caddyfile_lines(project: dict, plugins: list[tuple[str, dict]]) -> list[str]
         "",
         "{",
         "  admin localhost:2019",
+        "  # We supply certs via the per-site `tls` directive (read from",
+        "  # /run/caddy/id.{crt,key}). Disable Caddy's automatic cert",
+        "  # acquisition so it doesn't issue its own and override ours.",
+        "  auto_https disable_certs",
         "  log {",
         "    output stdout",
         "    format json",
@@ -243,7 +247,7 @@ def caddyfile_lines(project: dict, plugins: list[tuple[str, dict]]) -> list[str]
             lines.append(f"  reverse_proxy {upstream} {{")
             lines.append(f"    transport http {{")
             lines.append(f"      tls")
-            lines.append(f"      tls_trusted_ca_certs /run/caddy/trust.ca.crt")
+            lines.append(f"      tls_trust_pool file /run/caddy/trust.ca.crt")
             lines.append(f"      tls_client_auth /run/caddy/id.crt /run/caddy/id.key")
             lines.append(f"    }}")
             lines.append(f"  }}")
