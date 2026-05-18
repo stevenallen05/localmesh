@@ -99,23 +99,116 @@ configs:
             .deployment_environment_name = "dev"
             del(.label)
 
+        # Parse the app envelope out of `.message` (which is a JSON string for
+        # conformant emitters; everything else just falls through unchanged).
+        # parse_json! errors are caught and the event is left alone so non-app
+        # sources (postgres native, grafana logfmt, etc.) can be normalised
+        # downstream by the per-source remaps.
+        parse_envelope:
+          type: remap
+          inputs: ["enrich"]
+          source: |
+            parsed, err = parse_json(.message)
+            if err == null {
+              # merge (no !) is infallible — VRL's bang variant is for
+              # fallible operations only.
+              . = merge(., object!(parsed))
+            }
+
+        # Per-source routing. Two real per-source remaps (postgres, grafana —
+        # the non-app sources whose severity matters to dashboards); everything
+        # else falls through to normalise._unmatched and norm_default.
+        # Spec §4.3.
+        normalise:
+          type: route
+          inputs: ["parse_envelope"]
+          route:
+            postgres:        '.service_name == "postgres"'
+            grafana:         '.service_name == "observability" && .container_name == "grafana"'
+
+        # Postgres 15+ with log_destination=jsonlog emits {timestamp,
+        # error_severity, message, ...}. Map error_severity enum into the
+        # contract's lowercase level enum. Guard against missing field —
+        # VRL `||` short-circuits on null/error, but `.error_severity` may be
+        # absent, so `exists()` is the safe form.
+        norm_postgres:
+          type: remap
+          inputs: ["normalise.postgres"]
+          source: |
+            sev = if exists(.error_severity) { downcase(string!(.error_severity)) } else { "info" }
+            .level = if sev == "warning" { "warn"
+              } else if sev == "panic"   { "fatal"
+              } else if sev == "notice"  { "info"
+              } else                     { sev }
+            del(.error_severity)
+
+        # Grafana emits logfmt by default. lvl ∈ {dbug, info, warn, eror, crit}.
+        norm_grafana:
+          type: remap
+          inputs: ["normalise.grafana"]
+          source: |
+            parsed = parse_logfmt!(.message)
+            .timestamp = parsed.t
+            .level     = if parsed.lvl == "eror" { "error"
+                         } else if parsed.lvl == "dbug" { "debug"
+                         } else if parsed.lvl == "crit" { "fatal"
+                         } else                          { parsed.lvl }
+            .message   = parsed.msg
+
+        # Catch-all for everything not explicitly routed. App events (server,
+        # www) fall here too — they already have .level set by parse_envelope,
+        # so the `if !exists` guard makes this a no-op for them. Infra sources
+        # we haven't written a per-source remap for get a level=info default
+        # so they're searchable but not severity-filtered (spec §4.3).
+        norm_default:
+          type: remap
+          inputs: ["normalise._unmatched"]
+          source: |
+            if !exists(.level) { .level = "info" }
+
+        # Severity-enum validator. Lowercase + bound to the 6-value contract
+        # enum; drop the field (rather than coerce) for malformed values, so
+        # a typo at the source can't grow the Loki label set forever. Spec §4.2.
+        # Inputs are ONLY the per-source normalisers — parse_envelope events
+        # all flow through the route to one of them; reading parse_envelope
+        # directly here would duplicate every event.
+        validate:
+          type: remap
+          inputs: ["norm_postgres", "norm_grafana", "norm_default"]
+          source: |
+            .level = if exists(.level) { downcase(string!(.level)) } else { null }
+            allowed = ["trace", "debug", "info", "warn", "error", "fatal"]
+            if .level != null && !includes(allowed, .level) { del(.level) }
+            # Loki sink's structured_metadata block reads {{ trace_id }} /
+            # {{ span_id }} and fails to render the entire event if the
+            # field is missing. Default to empty string so non-span events
+            # (most infra logs) still ship cleanly. Empty structured
+            # metadata is accepted by Loki.
+            if !exists(.trace_id) { .trace_id = "" }
+            if !exists(.span_id)  { .span_id  = "" }
+
       sinks:
         loki:
           type: loki
-          inputs: ["enrich"]
+          inputs: ["validate"]
           endpoint: http://loki:3100
           encoding:
             codec: json
-          # Cardinality contract: rules doc §2. trace_id / span_id will
-          # land as structured_metadata once parse_envelope (chunk 6)
-          # extracts them from the body — until then those fields don't
-          # exist on the event, so no structured_metadata block yet.
+          # Cardinality contract: rules doc §2. Labels = bounded indexed
+          # dimensions; structured_metadata = high-cardinality queryable;
+          # body = the full JSON event (encoding.codec=json).
           labels:
             service_name: "{{ service_name }}"
             module_name:  "{{ module_name }}"
             owned_by:     "{{ owned_by }}"
             deployment_environment_name: "{{ deployment_environment_name }}"
+            level:        "{{ level }}"
             container_id: "{{ container_id }}"
+          # trace_id / span_id from parse_envelope — addressable in LogQL
+          # via `| trace_id="…"` without being indexed (spec AC 5).
+          structured_metadata:
+            trace_id: "{{ trace_id }}"
+            span_id:  "{{ span_id }}"
 
 services:
   loki:
