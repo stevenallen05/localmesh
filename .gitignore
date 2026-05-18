@@ -22,3 +22,7 @@ docs/superpowers
 # LocalMesh dev artifacts (CA + per-plugin certs + per-plugin env + user list)
 .localmesh/
 .env.localmesh
+
+# Python bytecode caches from scripts/ tests
+__pycache__/
+*.pyc

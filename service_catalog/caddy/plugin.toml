@@ -1,0 +1,8 @@
+[identity]
+module_name = "caddy"
+owned_by    = "sre@example.com"
+
+[[certs]]
+id     = "caddy"
+server = true
+client = true
