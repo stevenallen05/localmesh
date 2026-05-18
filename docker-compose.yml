@@ -88,6 +88,12 @@ services:
       # `http.server.request.duration` (seconds). Opt in.
       OTEL_SEMCONV_STABILITY_OPT_IN: http
       HOSTNAME: ${HOSTNAME:-}
+    volumes:
+      # LocalMesh mesh cert dir — used by lib/grpc-credentials.ts to dial
+      # server:50051 over mTLS, and by www/server.ts for inbound HTTPS
+      # (lands in a later chunk). See docs/superpowers/specs/
+      # 2026-05-18-localmesh-service-mesh-design.md §8.
+      - ./.secrets/certs/www:/run/www:ro
     ports:
       - "3000:3000"
     depends_on:

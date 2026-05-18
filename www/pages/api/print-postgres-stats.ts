@@ -4,6 +4,7 @@ import * as protoLoader from '@grpc/proto-loader';
 import { promisify } from 'util';
 import path from 'path';
 import { logger } from '../../lib/logger';
+import { meshChannelCredentials } from '../../lib/grpc-credentials';
 
 // WORKDIR /app in the container; proto/ lands at /app/proto/.
 const PROTO_PATH = path.resolve(process.cwd(), 'proto/hello.proto');
@@ -39,10 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const target = process.env.SERVER_ADDR ?? 'server:50051';
-  const client = new hello.Greeter(
-    target,
-    grpc.credentials.createInsecure(),
-  ) as GreeterClient;
+  const client = new hello.Greeter(target, meshChannelCredentials()) as GreeterClient;
   const printStats = promisify(client.PrintPostgresStats.bind(client));
 
   try {

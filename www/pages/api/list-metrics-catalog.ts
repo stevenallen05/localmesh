@@ -4,6 +4,7 @@ import * as protoLoader from '@grpc/proto-loader';
 import { promisify } from 'util';
 import path from 'path';
 import { logger } from '../../lib/logger';
+import { meshChannelCredentials } from '../../lib/grpc-credentials';
 
 const PROTO_PATH = path.resolve(process.cwd(), 'proto/metrics.proto');
 
@@ -25,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const target = process.env.SERVER_ADDR ?? 'server:50051';
-  const client = new CatalogCtor(target, grpc.credentials.createInsecure());
+  const client = new CatalogCtor(target, meshChannelCredentials());
   const listDataSources = promisify(client.ListDataSources.bind(client)) as
     (req: object) => Promise<{ data_sources: DataSource[] }>;
   const listMetrics = promisify(client.ListMetrics.bind(client)) as
