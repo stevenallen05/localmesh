@@ -19,6 +19,7 @@ docs/superpowers
 
 .worktrees/
 .project-ai
+/.claude/
 
 # LocalMesh dev artifacts (CA + per-service certs + dev user list)
 .secrets/
