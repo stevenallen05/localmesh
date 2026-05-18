@@ -67,6 +67,46 @@ configs:
             # trace_id / span_id intentionally not indexed —
             # structured-metadata only (see observability filelog operators).
 
+  # Vector log pipeline — runs in parallel with the otel-collector's filelog
+  # receiver during chunks 3-4 (transient duplication); chunk 5 removes the
+  # collector path so Vector is the sole log source. Spec §4.1.
+  #
+  # `.label."metrics.service_name"` field references are based on Vector's
+  # documented docker_logs schema. If a fresh release flips the plural,
+  # find/replace to `.labels.*` — flagged in spec §4.1.
+  vector_config:
+    content: |
+      sources:
+        docker:
+          type: docker_logs
+          docker_host: unix:///var/run/docker.sock
+          # Restrict to containers in this compose project. The host may
+          # also be running other containers we don't own.
+          include_labels:
+            - "com.docker.compose.project=${PROJECT_NAME}"
+
+      transforms:
+        # Agent-side identity enrichment — apps emit the envelope, the agent
+        # supplies the resource attrs from container labels. Rules doc §3.
+        enrich:
+          type: remap
+          inputs: ["docker"]
+          source: |
+            .service_name   = .label."metrics.service_name"
+            .module_name    = .label."metrics.module_name"
+            .owned_by       = .label."metrics.owned_by"
+            .container_id   = .container_id
+            .deployment_environment_name = "dev"
+            del(.label)
+
+      sinks:
+        # Console-only this chunk. Chunk 4 swaps to the loki sink.
+        console:
+          type: console
+          inputs: ["enrich"]
+          encoding:
+            codec: json
+
 services:
   loki:
     image: grafana/loki:3.3.2
@@ -88,6 +128,26 @@ services:
     # Loki image is distroless — no wget/curl/shell. Use service_started
     # ordering; the otel-collector's loki exporter will retry on its own
     # if Loki isn't accepting writes yet.
+
+  vector:
+    image: timberio/vector:0.46.0-debian
+    container_name: vector
+    configs:
+      - source: vector_config
+        target: /etc/vector/vector.yaml
+    # Reading the docker socket needs either root or membership in the
+    # host `docker` group. Same trade-off the otel-collector made for
+    # /var/lib/docker access; mount is read-only.
+    user: "0:0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      metrics.service_name: logging
+      metrics.module_name: logging
+      metrics.owned_by: sre@example.com
+    depends_on:
+      loki:
+        condition: service_started
 
 volumes:
   loki-data: {}

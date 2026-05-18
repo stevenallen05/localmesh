@@ -1,0 +1,45 @@
+services:
+  anythingllm:
+    image: mintplexlabs/anythingllm:latest
+    container_name: anythingllm
+
+    ports:
+      - "3001:3001"
+
+    cap_add:
+      - SYS_ADMIN
+
+    environment:
+      STORAGE_DIR: /app/server/storage
+
+      # Example provider config
+      # OpenAI:
+      LLM_PROVIDER: openai
+      OPEN_AI_KEY: ${OPENAI_API_KEY}
+
+      # Optional:
+      EMBEDDING_ENGINE: openai
+
+      # Alternative local setup:
+      # LLM_PROVIDER: ollama
+      # OLLAMA_BASE_PATH: http://ollama:11434
+
+    volumes:
+      # Persistent app state
+      - ./anythingllm-storage:/app/server/storage
+
+      # Persistent env/config
+      - ./anythingllm.env:/app/server/.env
+
+      # Mount onboarding knowledge
+      - ./.project-ai:/project-context:ro
+
+    restart: unless-stopped
+
+# Optional local inference
+#  ollama:
+#    image: ollama/ollama:latest
+#    ports:
+#      - "11434:11434"
+#    volumes:
+#      - ./ollama:/root/.ollama
