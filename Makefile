@@ -1,6 +1,6 @@
 # Begin ops team responsibility
 
-.PHONY: setup chart chart-lint certs certs-force trust untrust localmesh-clean check-hosts
+.PHONY: setup chart chart-lint certs check-hosts
 
 CERTS_DIR       := .secrets/certs
 HOSTS_FILE      ?= /etc/hosts
@@ -30,35 +30,18 @@ chart:
 chart-lint:
 	./tools/helm-v4.1.4-linux-amd64 lint chart
 
-# LocalMesh dev-machine bootstrap. See docs/superpowers/specs/
-# 2026-05-18-localmesh-service-mesh-design.md §7 and
-# scripts/secrets-gen.py for the actual work.
+# LocalMesh dev-machine bootstrap. One button: untrust the old CA, blow
+# away .secrets/certs/, regenerate everything via scripts/secrets-gen.py
+# (CA + per-service leaf certs + .env managed section + Caddyfile.generated),
+# then install the new CA into the host trust store. Always clean-slate;
+# granular subtargets are out of scope for this phase.
 #
-# `certs` mints the LocalMesh CA + per-service leaf certs into
-# .secrets/certs/<container>/, writes .env's managed section with
-# UPCASE_SNAKECASE TOML fields for compose interpolation, generates
-# service_catalog/caddy/Caddyfile.generated, and installs the CA into
-# the host trust store via `step certificate install`. Idempotent.
+# See docs/superpowers/specs/2026-05-18-localmesh-service-mesh-design.md §7.
 certs:
-	@./scripts/secrets-gen.py
-	@./tools/step certificate install $(CERTS_DIR)/ca.crt
-
-# Destructive: untrust the CA, blow away every cert, regenerate.
-certs-force:
 	@./tools/step certificate uninstall $(CERTS_DIR)/ca.crt 2>/dev/null || true
 	@rm -rf $(CERTS_DIR)
-	@$(MAKE) certs
-
-trust:
+	@./scripts/secrets-gen.py
 	@./tools/step certificate install $(CERTS_DIR)/ca.crt
-
-untrust:
-	@./tools/step certificate uninstall $(CERTS_DIR)/ca.crt 2>/dev/null || true
-
-# Removes the entire .secrets/ tree after untrusting the CA. Note: this
-# is distinct from `setup`'s docker compose down -v sledgehammer.
-localmesh-clean: untrust
-	@rm -rf .secrets
 
 check-hosts:
 	@. .env 2>/dev/null && \
