@@ -41,20 +41,21 @@ def test_upcase_snake(tmp_path, monkeypatch):
 def test_san_list_includes_spiffe_dns_localhost_and_ips(tmp_path, monkeypatch):
     mod = _load(monkeypatch, tmp_path)
     sans = mod.san_list_for("server", "demo", "tw-demo.local", is_ingress=False)
-    assert "URI:spiffe://server.demo.tw-demo.local" in sans
-    assert "DNS:server" in sans
-    assert "DNS:localhost" in sans
-    assert "DNS:server.demo.tw-demo.local" in sans
-    assert "DNS:demo.tw-demo.local" in sans
-    assert "IP:127.0.0.1" in sans
-    assert "IP:::1" in sans
-    assert "DNS:*.demo.tw-demo.local" not in sans
+    # Bare values — step CLI autodetects URI / IP / DNS from value shape.
+    assert "spiffe://server.demo.tw-demo.local" in sans
+    assert "server" in sans
+    assert "localhost" in sans
+    assert "server.demo.tw-demo.local" in sans
+    assert "demo.tw-demo.local" in sans
+    assert "127.0.0.1" in sans
+    assert "::1" in sans
+    assert "*.demo.tw-demo.local" not in sans
 
 
 def test_san_list_for_ingress_adds_wildcard(tmp_path, monkeypatch):
     mod = _load(monkeypatch, tmp_path)
     sans = mod.san_list_for("caddy", "demo", "tw-demo.local", is_ingress=True)
-    assert "DNS:*.demo.tw-demo.local" in sans
+    assert "*.demo.tw-demo.local" in sans
 
 
 def test_env_lines_strict_upcase_snakecase(tmp_path, monkeypatch):

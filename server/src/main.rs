@@ -45,7 +45,12 @@ async fn main() -> Result<(), BoxError> {
     // must come first so a span is entered before any inner layer can emit
     // events under it (the error-log layer attaches its WARN/ERROR
     // emissions to the active span via the tracing-opentelemetry bridge).
+    // Inbound mTLS: server's leaf cert + LocalMesh CA for client verify-CA.
+    // See server/src/tls.rs.
+    let tls = server::tls::server_tls_config()?;
+
     Server::builder()
+        .tls_config(tls)?
         .layer(TraceContextLayer)
         .layer(metrics_layer)
         .layer(ErrorLogLayer)

@@ -91,17 +91,23 @@ def services_iter(project: dict, plugins: list[tuple[str, dict]]):
 # Cert generation
 
 def san_list_for(container: str, project_name: str, local_domain: str, is_ingress: bool) -> list[str]:
+    """Bare SAN values — step CLI autodetects type from value shape.
+
+    URIs are detected by the presence of `://`; IPs by valid IP parse;
+    everything else is treated as a DNS name. So we pass values raw,
+    without `URI:`/`DNS:`/`IP:` prefixes.
+    """
     sans = [
-        f"URI:spiffe://{container}.{project_name}.{local_domain}",
-        f"DNS:{container}",
-        "DNS:localhost",
-        f"DNS:{container}.{project_name}.{local_domain}",
-        f"DNS:{project_name}.{local_domain}",
+        f"spiffe://{container}.{project_name}.{local_domain}",
+        container,
+        "localhost",
+        f"{container}.{project_name}.{local_domain}",
+        f"{project_name}.{local_domain}",
     ]
     if is_ingress:
-        sans.append(f"DNS:*.{project_name}.{local_domain}")
+        sans.append(f"*.{project_name}.{local_domain}")
     for ip in IP_SANS:
-        sans.append(f"IP:{ip}")
+        sans.append(ip)
     return sans
 
 

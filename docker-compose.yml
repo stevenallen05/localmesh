@@ -33,13 +33,19 @@ services:
       GRAFANA_API_TOKEN_FILE: /run/grafana/token
     volumes:
       - grafana-token:/run/grafana:ro
+      # LocalMesh mesh cert dir for inbound gRPC mTLS termination. See
+      # server/src/tls.rs and docs/superpowers/specs/
+      # 2026-05-18-localmesh-service-mesh-design.md §8.
+      - ./.secrets/certs/server:/run/server:ro
     depends_on:
       otel-collector:
         condition: service_started
       postgres:
         condition: service_healthy
     healthcheck:
-      # bash built-in TCP test — no extra packages on bookworm.
+      # bash built-in TCP test — no extra packages on bookworm. mTLS doesn't
+      # complete the handshake here, but the TCP listener answer is the
+      # readiness signal we care about.
       test: ["CMD", "bash", "-c", "</dev/tcp/localhost/50051"]
       interval: 10s
       timeout: 3s

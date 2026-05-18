@@ -7,6 +7,7 @@ pub mod grafana;
 pub mod greeter;
 pub mod rpc_metrics;
 pub mod telemetry;
+pub mod tls;
 pub mod trace_context;
 pub mod proto {
     pub mod hello {
