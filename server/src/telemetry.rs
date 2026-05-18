@@ -115,22 +115,18 @@ pub fn init_meter() -> Result<SdkMeterProvider, BoxError> {
 pub struct RootSpanGuard(#[allow(dead_code)] tracing::span::EnteredSpan);
 
 /// Install the global `tracing` subscriber and open the process-wide
-/// root span carrying the contract's required constants. Returns a
-/// guard that must outlive every event emission.
+/// root span. Returns a guard that must outlive every event emission.
+///
+/// Identity attributes (`service.name`, `module_name`, `owned_by`) are no
+/// longer embedded in the root span — Vector enriches log events from
+/// container labels at the agent boundary (see
+/// `docs/engineering/rules/logging-platform.md` §3). The root span still
+/// exists so the OTel context is active for the process lifetime.
 ///
 /// Call **after** `init_tracer` so the `tracing-opentelemetry` layer
 /// can attach to the global tracer provider.
 pub fn init_logging(tracer: Tracer) -> RootSpanGuard {
     use tracing_subscriber::{fmt, prelude::*, EnvFilter};
-
-    let service = std::env::var("OTEL_SERVICE_NAME").unwrap_or_else(|_| "server".into());
-    let resource = parse_otel_resource_attrs(
-        std::env::var("OTEL_RESOURCE_ATTRIBUTES")
-            .unwrap_or_default()
-            .as_str(),
-    );
-    let module_name = resource.get("module_name").cloned().unwrap_or_default();
-    let owned_by = resource.get("owned_by").cloned().unwrap_or_default();
 
     tracing_subscriber::registry()
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
@@ -144,16 +140,7 @@ pub fn init_logging(tracer: Tracer) -> RootSpanGuard {
         .with(tracing_opentelemetry::layer().with_tracer(tracer))
         .init();
 
-    // Process-wide root span; with_current_span(true) on the fmt layer
-    // serialises its fields under "span":{...} on every event. The
-    // collector's filelog operators flatten span.* back to top-level
-    // attributes before promoting to Loki labels.
-    let span = tracing::info_span!(
-        "app",
-        service = %service,
-        module_name = %module_name,
-        owned_by = %owned_by,
-    );
+    let span = tracing::info_span!("app");
     RootSpanGuard(span.entered())
 }
 
