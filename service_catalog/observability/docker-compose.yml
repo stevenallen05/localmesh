@@ -72,111 +72,6 @@ configs:
                     regex: ';(.+)'
                     target_label: service
                     replacement: '$1'
-        # Tails the docker JSON log driver output for every container on
-        # the host. The k8s overlay swaps this `include:` to
-        # /var/log/containers/*.log (kubelet's path) — same receiver,
-        # different glob. The bind mount declared on otel-collector's
-        # `volumes:` (below) is what makes this readable; katenary
-        # translates it to a hostPath volume.
-        #
-        # Filtering to this compose project would need docker_observer
-        # enrichment (not a one-liner); dashboards filter by
-        # `module_name` / `service.name` instead.
-        filelog:
-          include: ['/var/lib/docker/containers/*/*-json.log']
-          start_at: end
-          include_file_path: true
-          operators:
-            # Docker writes one JSON object per line: {"log","stream","time"}.
-            - type: json_parser
-              timestamp:
-                parse_from: attributes.time
-                layout: '%Y-%m-%dT%H:%M:%S.%LZ'
-            # Extract the container id from the filename so dashboards can
-            # filter by container without a separate enrichment step.
-            - type: regex_parser
-              regex: '^/var/lib/docker/containers/(?P<container_id>[^/]+)/'
-              parse_from: attributes["log.file.path"]
-            # Promote container_id to resource scope — Loki's OTLP endpoint
-            # only indexes resource attributes as labels (see logging/
-            # docker-compose.yml distributor.otlp_config).
-            - type: move
-              from: attributes.container_id
-              to: resource["container_id"]
-            # The actual log line — move out of attributes.log into body
-            # so Loki's payload is the message itself.
-            - type: move
-              from: attributes.log
-              to: body
-            - type: move
-              from: attributes.stream
-              to: attributes["log.iostream"]
-            # Cross-language structured-log contract. Apps emit JSON to
-            # stdout with at minimum {timestamp, level, service, message,
-            # trace_id, span_id, module_name, owned_by}. The json_parser
-            # tries to parse the body; non-JSON lines (postgres, grafana,
-            # etc.) pass through unchanged thanks to send_quiet.
-            - type: json_parser
-              parse_from: body
-              parse_to: attributes
-              on_error: send_quiet
-            # tracing-subscriber (Rust) emits the root span's fields under
-            # a nested `"span":{...}` object. json_parser preserves that as
-            # a real nested map (NOT dotted-key flatten). Address via
-            # `attributes.span.service` and lean on expr-lang's optional
-            # chaining (`attributes.span?.service`) to make the `if:` guard
-            # safe when there's no `span` key at all (non-JSON lines, or
-            # Pino which emits service at top level).
-            - type: move
-              from: attributes.span.service
-              to: attributes.service
-              if: 'attributes.span?.service != nil'
-            - type: move
-              from: attributes.span.module_name
-              to: attributes.module_name
-              if: 'attributes.span?.module_name != nil'
-            - type: move
-              from: attributes.span.owned_by
-              to: attributes.owned_by
-              if: 'attributes.span?.owned_by != nil'
-            - type: move
-              from: attributes.span.trace_id
-              to: attributes.trace_id
-              if: 'attributes.span?.trace_id != nil'
-            - type: move
-              from: attributes.span.span_id
-              to: attributes.span_id
-              if: 'attributes.span?.span_id != nil'
-            # Promote contract fields to resource scope. Loki's distributor
-            # config (logging/docker-compose.yml) turns resource attrs into
-            # indexed labels via default_resource_attributes_as_index_labels.
-            # trace_id and span_id intentionally stay in attributes —
-            # Loki accepts them as structured metadata (not indexed),
-            # addressable in queries like {service="server"} | trace_id="abc"
-            # without cardinality cost.
-            - type: move
-              from: attributes.service
-              to: resource["service"]
-              if: 'attributes.service != nil'
-            # Alias service → service.name for the imported APM dashboard,
-            # which queries Loki by `service_name` (OTel-canonical). Same
-            # value, two indexed labels — cheap cardinality cost.
-            - type: copy
-              from: resource["service"]
-              to: resource["service.name"]
-              if: 'resource["service"] != nil'
-            - type: move
-              from: attributes.level
-              to: resource["level"]
-              if: 'attributes.level != nil'
-            - type: move
-              from: attributes.module_name
-              to: resource["module_name"]
-              if: 'attributes.module_name != nil'
-            - type: move
-              from: attributes.owned_by
-              to: resource["owned_by"]
-              if: 'attributes.owned_by != nil'
       processors:
         # Stamps `project_name=${PROJECT_NAME}` on every span and log.
         # The value comes from .env's PROJECT_NAME, which mirrors
@@ -199,15 +94,6 @@ configs:
                 - set(attributes["module_name"], "database") where attributes["service.name"] == "PostgreSQL_Server"
                 - set(attributes["owned_by"], "sre@example.com") where attributes["service.name"] == "PostgreSQL_Server"
                 - set(attributes["service.name"], "postgres") where attributes["service.name"] == "PostgreSQL_Server"
-        # Normalise log-level case. Rust's tracing-subscriber emits levels
-        # uppercase ("INFO"); Pino + the contract use lowercase. Lowercasing
-        # at the collector means the Loki label is consistent and dashboard
-        # filters work without case-insensitive flags.
-        transform/logs:
-          log_statements:
-            - context: resource
-              statements:
-                - set(attributes["level"], ConvertCase(attributes["level"], "lower")) where attributes["level"] != nil
       exporters:
         # Apps push OTLP metrics to the collector; the collector translates
         # to Prom remote-write on VM's behalf. The translation IS the
@@ -225,12 +111,6 @@ configs:
           endpoint: tempo:4317
           tls:
             insecure: true
-        # Loki push API. Container id + iostream become indexed labels;
-        # the rest stays as structured metadata (cardinality control).
-        otlphttp/loki:
-          endpoint: http://loki:3100/otlp
-          tls:
-            insecure: true
       service:
         extensions: [health_check]
         pipelines:
@@ -242,10 +122,6 @@ configs:
             receivers: [otlp]
             processors: [transform/database, resource/project]
             exporters: [otlp/tempo, debug]
-          logs:
-            receivers: [filelog]
-            processors: [resource/project, transform/logs]
-            exporters: [otlphttp/loki]
 
   grafana_vm_datasource:
     content: |
@@ -413,28 +289,15 @@ services:
       metrics.service_name: observability
       metrics.module_name: observability
       metrics.owned_by: sre@example.com
-    # Docker's JSON log files are 640 root:root; the contrib image's default
-    # UID 10001 can't read them. Running root here is the trade-off every
-    # node-local log scraper makes (Promtail/Alloy/filebeat all do the
-    # same on k8s via DaemonSet privileges). Constrained to read-only mount.
-    user: "0:0"
     configs:
       - source: otel_collector_config
         target: /etc/otelcol-contrib/config.yaml
-    volumes:
-      # Docker's JSON log driver output for every container on the host.
-      # Read-only — the collector only tails, never writes. katenary
-      # translates this to a hostPath volume in helm; the k8s overlay
-      # also swaps the filelog `include:` path to /var/log/containers.
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
     depends_on:
       victoriametrics:
         condition: service_started
       node-exporter:
         condition: service_started
       cadvisor:
-        condition: service_started
-      loki:
         condition: service_started
 
   node-exporter:
