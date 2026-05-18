@@ -1,8 +1,5 @@
 use std::sync::Arc;
 
-use opentelemetry::global::{self, BoxedSpan};
-use opentelemetry::trace::{SpanKind, Tracer};
-use opentelemetry::KeyValue;
 use tonic::{Request, Response, Status};
 
 use crate::grafana::{
@@ -15,7 +12,6 @@ use crate::proto::metrics_v1::{
     ListDashboardsResponse, ListDataSourcesRequest, ListDataSourcesResponse, ListMetricsRequest,
     ListMetricsResponse, StatPanel, TablePanel, TimeseriesPanel, UpdateDashboardRequest,
 };
-use crate::telemetry::MetadataMap;
 
 pub struct CatalogSvc {
     grafana: Arc<GrafanaClient>,
@@ -25,23 +21,6 @@ impl CatalogSvc {
     pub fn new(grafana: Arc<GrafanaClient>) -> Self {
         Self { grafana }
     }
-}
-
-// Returns the span guard rather than holding it locally — the caller must
-// bind it (e.g., `let _span = open_span(...);`) so Drop fires at end of the
-// handler, not at end of this helper.
-fn open_span(req_metadata: &tonic::metadata::MetadataMap, method: &'static str) -> BoxedSpan {
-    let parent_cx =
-        global::get_text_map_propagator(|p| p.extract(&MetadataMap(req_metadata)));
-    let tracer = global::tracer("server");
-    tracer
-        .span_builder(format!("Catalog/{method}"))
-        .with_kind(SpanKind::Server)
-        .with_attributes([
-            KeyValue::new("rpc.system", "grpc"),
-            KeyValue::new("rpc.method", method),
-        ])
-        .start_with_context(&tracer, &parent_cx)
 }
 
 impl From<GrafanaError> for Status {
@@ -133,22 +112,22 @@ fn build_dashboard_payload(d: &Dashboard, overwrite: bool) -> Result<serde_json:
 
 #[tonic::async_trait]
 impl Catalog for CatalogSvc {
+    #[tracing::instrument(skip_all, fields(rpc.method = "list_data_sources"))]
     async fn list_data_sources(
         &self,
-        req: Request<ListDataSourcesRequest>,
+        _req: Request<ListDataSourcesRequest>,
     ) -> Result<Response<ListDataSourcesResponse>, Status> {
-        let _span = open_span(req.metadata(), "list_data_sources");
         let items = self.grafana.list_data_sources().await?;
         Ok(Response::new(ListDataSourcesResponse {
             data_sources: items.into_iter().map(to_proto_data_source).collect(),
         }))
     }
 
+    #[tracing::instrument(skip_all, fields(rpc.method = "get_data_source"))]
     async fn get_data_source(
         &self,
         req: Request<GetDataSourceRequest>,
     ) -> Result<Response<DataSource>, Status> {
-        let _span = open_span(req.metadata(), "get_data_source");
         let uid = req.into_inner().uid;
         if uid.is_empty() {
             return Err(Status::invalid_argument("uid empty"));
@@ -157,11 +136,11 @@ impl Catalog for CatalogSvc {
         Ok(Response::new(to_proto_data_source(gf)))
     }
 
+    #[tracing::instrument(skip_all, fields(rpc.method = "list_dashboards"))]
     async fn list_dashboards(
         &self,
-        req: Request<ListDashboardsRequest>,
+        _req: Request<ListDashboardsRequest>,
     ) -> Result<Response<ListDashboardsResponse>, Status> {
-        let _span = open_span(req.metadata(), "list_dashboards");
         let entries = self.grafana.list_dashboard_entries().await?;
         // N+1: per-uid get to pull full panel info. Acceptable at <100
         // dashboards (demo scale); spec documents the cap.
@@ -173,11 +152,11 @@ impl Catalog for CatalogSvc {
         Ok(Response::new(ListDashboardsResponse { dashboards: out }))
     }
 
+    #[tracing::instrument(skip_all, fields(rpc.method = "get_dashboard"))]
     async fn get_dashboard(
         &self,
         req: Request<GetDashboardRequest>,
     ) -> Result<Response<Dashboard>, Status> {
-        let _span = open_span(req.metadata(), "get_dashboard");
         let uid = req.into_inner().uid;
         if uid.is_empty() {
             return Err(Status::invalid_argument("uid empty"));
@@ -186,11 +165,11 @@ impl Catalog for CatalogSvc {
         Ok(Response::new(to_proto_dashboard(gf)))
     }
 
+    #[tracing::instrument(skip_all, fields(rpc.method = "create_dashboard"))]
     async fn create_dashboard(
         &self,
         req: Request<CreateDashboardRequest>,
     ) -> Result<Response<Dashboard>, Status> {
-        let _span = open_span(req.metadata(), "create_dashboard");
         let mut d = req
             .into_inner()
             .dashboard
@@ -201,11 +180,11 @@ impl Catalog for CatalogSvc {
         Ok(Response::new(to_proto_dashboard(gf)))
     }
 
+    #[tracing::instrument(skip_all, fields(rpc.method = "update_dashboard"))]
     async fn update_dashboard(
         &self,
         req: Request<UpdateDashboardRequest>,
     ) -> Result<Response<Dashboard>, Status> {
-        let _span = open_span(req.metadata(), "update_dashboard");
         let d = req
             .into_inner()
             .dashboard
@@ -218,11 +197,11 @@ impl Catalog for CatalogSvc {
         Ok(Response::new(to_proto_dashboard(gf)))
     }
 
+    #[tracing::instrument(skip_all, fields(rpc.method = "delete_dashboard"))]
     async fn delete_dashboard(
         &self,
         req: Request<DeleteDashboardRequest>,
     ) -> Result<Response<()>, Status> {
-        let _span = open_span(req.metadata(), "delete_dashboard");
         let uid = req.into_inner().uid;
         if uid.is_empty() {
             return Err(Status::invalid_argument("uid empty"));
@@ -231,11 +210,11 @@ impl Catalog for CatalogSvc {
         Ok(Response::new(()))
     }
 
+    #[tracing::instrument(skip_all, fields(rpc.method = "list_metrics"))]
     async fn list_metrics(
         &self,
         req: Request<ListMetricsRequest>,
     ) -> Result<Response<ListMetricsResponse>, Status> {
-        let _span = open_span(req.metadata(), "list_metrics");
         let ds_uid = req.into_inner().datasource_uid;
         if ds_uid.is_empty() {
             return Err(Status::invalid_argument("datasource_uid empty"));

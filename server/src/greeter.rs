@@ -1,14 +1,12 @@
 use std::sync::Arc;
 
-use opentelemetry::global;
-use opentelemetry::trace::{Span, SpanKind, Tracer};
-use opentelemetry::KeyValue;
+use opentelemetry::trace::TraceContextExt as _;
 use tonic::{Request, Response, Status};
+use tracing_opentelemetry::OpenTelemetrySpanExt as _;
 
 use crate::db::{Db, DbError};
 use crate::proto::hello::greeter_server::Greeter;
 use crate::proto::hello::{HelloReply, HelloRequest, PostgresStatsReply};
-use crate::telemetry::MetadataMap;
 
 pub struct GreeterSvc {
     db: Arc<Db>,
@@ -41,23 +39,8 @@ impl From<DbError> for Status {
 
 #[tonic::async_trait]
 impl Greeter for GreeterSvc {
+    #[tracing::instrument(skip_all, fields(rpc.method = "say_hello"))]
     async fn say_hello(&self, req: Request<HelloRequest>) -> Result<Response<HelloReply>, Status> {
-        // Extract the upstream W3C context off the incoming metadata, then
-        // start a server-kind span as a child of it. The named `_span`
-        // binding keeps the span alive until end-of-scope — binding to bare
-        // `_` would drop it immediately and record zero duration.
-        let parent_cx =
-            global::get_text_map_propagator(|p| p.extract(&MetadataMap(req.metadata())));
-        let tracer = global::tracer("server");
-        let _span = tracer
-            .span_builder("Greeter/say_hello")
-            .with_kind(SpanKind::Server)
-            .with_attributes([
-                KeyValue::new("rpc.system", "grpc"),
-                KeyValue::new("rpc.method", "say_hello"),
-            ])
-            .start_with_context(&tracer, &parent_cx);
-
         let name = req.into_inner().name;
         let name = if name.is_empty() { "world" } else { &name };
         Ok(Response::new(HelloReply {
@@ -65,34 +48,20 @@ impl Greeter for GreeterSvc {
         }))
     }
 
+    #[tracing::instrument(skip_all, fields(rpc.method = "print_postgres_stats"))]
     async fn print_postgres_stats(
         &self,
-        req: Request<()>,
+        _req: Request<()>,
     ) -> Result<Response<PostgresStatsReply>, Status> {
-        // Same span-creation pattern as say_hello — kept inline rather than
-        // lifted into a shared helper, per the spec (don't half-migrate a
-        // third call site).
-        let parent_cx =
-            global::get_text_map_propagator(|p| p.extract(&MetadataMap(req.metadata())));
-        let tracer = global::tracer("server");
-        let span = tracer
-            .span_builder("Greeter/print_postgres_stats")
-            .with_kind(SpanKind::Server)
-            .with_attributes([
-                KeyValue::new("rpc.system", "grpc"),
-                KeyValue::new("rpc.method", "print_postgres_stats"),
-            ])
-            .start_with_context(&tracer, &parent_cx);
-
-        // Clone the SpanContext now so the borrow on `span` ends before we
-        // move into the async DB calls. `span` lives to end of scope and
-        // exports on Drop after the Ok(...) expression evaluates.
-        let span_ctx = span.span_context().clone();
+        // The OTel server span is set by TraceContextLayer + #[instrument];
+        // pull its SpanContext for pg_tracing to stitch SQL spans under.
+        // Bind the OTel context to a `let` so the SpanRef lifetime extends
+        // across the .span_context() call.
+        let cx = tracing::Span::current().context();
+        let span_ctx = cx.span().span_context().clone();
 
         self.db.record_noise_event("button_press", &span_ctx).await?;
         let stats = self.db.top_stats(&span_ctx).await?;
-
-        let _keep_span_alive = span;
 
         Ok(Response::new(PostgresStatsReply {
             num_backends:    stats.num_backends,

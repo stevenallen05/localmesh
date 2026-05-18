@@ -6,12 +6,14 @@ use tonic::transport::Server;
 
 use server::catalog::CatalogSvc;
 use server::db::Db;
+use server::error_log::ErrorLogLayer;
 use server::grafana::GrafanaClient;
 use server::greeter::GreeterSvc;
 use server::proto::hello::greeter_server::GreeterServer;
 use server::proto::metrics_v1::catalog_server::CatalogServer;
 use server::rpc_metrics::RpcMetricsLayer;
 use server::telemetry::{init_logging, init_meter, init_tracer, BoxError};
+use server::trace_context::TraceContextLayer;
 
 #[tokio::main]
 async fn main() -> Result<(), BoxError> {
@@ -39,8 +41,14 @@ async fn main() -> Result<(), BoxError> {
 
     let metrics_layer = RpcMetricsLayer::new(&global::meter("server.rpc"));
 
+    // Layer order — first .layer() call is the outermost. TraceContextLayer
+    // must come first so a span is entered before any inner layer can emit
+    // events under it (the error-log layer attaches its WARN/ERROR
+    // emissions to the active span via the tracing-opentelemetry bridge).
     Server::builder()
+        .layer(TraceContextLayer)
         .layer(metrics_layer)
+        .layer(ErrorLogLayer)
         .add_service(GreeterServer::new(GreeterSvc::new(db)))
         .add_service(CatalogServer::new(CatalogSvc::new(grafana)))
         .serve(addr)
