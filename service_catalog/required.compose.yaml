@@ -13,3 +13,4 @@ include:
   - path: observability/docker-compose.yml
   - path: security/docker-compose.yml
   - path: logging/docker-compose.yml
+  - path: caddy/docker-compose.yml

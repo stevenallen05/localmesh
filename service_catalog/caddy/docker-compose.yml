@@ -1,0 +1,37 @@
+# LocalMesh north-south ingress. Required catalog plugin. Browser hits
+# https://<workload>.${PROJECT_NAME}.${LOCAL_DOMAIN}:8443; Caddy
+# terminates TLS and reverse-proxies to the upstream service (mTLS for
+# mesh-participating workloads, plaintext for mesh-exempt ones).
+#
+# Routes come from service_catalog/caddy/Caddyfile.generated, which is
+# emitted by scripts/secrets-gen.py from project.toml + plugin.toml. The
+# static Caddyfile here imports that file.
+#
+# TODO: needs_prod_decisions prod swaps Caddy for the mesh's sidecar
+# runtime (Envoy / linkerd-proxy / Cilium) via katenary chart selection.
+
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - "8443:8443"
+      - "127.0.0.1:2019:2019"          # admin API, localhost-only
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./Caddyfile.generated:/etc/caddy/Caddyfile.generated:ro
+      - ../../.secrets/certs/caddy:/run/caddy:ro
+    environment:
+      PROJECT_NAME: ${PROJECT_NAME}
+      LOCAL_DOMAIN: ${LOCAL_DOMAIN}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:2019/config/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    labels:
+      katenary.v3/ports: |-
+        - 8443
+      metrics.service_name: caddy
+      metrics.module_name: ${CADDY_MODULE_NAME}
+      metrics.owned_by: ${CADDY_OWNED_BY}
