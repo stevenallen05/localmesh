@@ -10,6 +10,27 @@ pub struct HelloRequest {
 pub struct HelloReply {
     #[prost(string, tag = "1")]
     pub message: ::prost::alloc::string::String,
+    /// surfaces mesh identity facts in the response payload
+    #[prost(message, optional, tag = "2")]
+    pub who_am_i: ::core::option::Option<WhoAmI>,
+}
+/// Identity surface populated by the server from request extensions (set
+/// by the user + peer interceptors). Carried as response payload, not OTel
+/// span attribute — server-side handlers stay PII-clean per spec §9.3.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct WhoAmI {
+    /// SPIFFE URI from the inbound TLS peer cert
+    #[prost(string, tag = "1")]
+    pub mtls_peer_uri: ::prost::alloc::string::String,
+    /// from x-user-id gRPC metadata; "" if absent
+    #[prost(string, tag = "2")]
+    pub user_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub user_email: ::prost::alloc::string::String,
+    /// current OTel trace, hex
+    #[prost(string, tag = "4")]
+    pub trace_id: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
