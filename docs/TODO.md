@@ -127,6 +127,77 @@ context-dependent.
 
 ## Dashboards
 
+The default-dashboard set ships four files:
+
+- `service_catalog/caddy/ingress.json` — ingress request rates, response codes, upstream health
+- `service_catalog/database/postgres.json` — postgres health, query rates, pg_stat_statements
+- `service_catalog/observability/apm.json` — RED panels, traces waterfall, RPC server panels
+- `service_catalog/observability/cluster-health.json` — cadvisor container resource panels
+
+### Identity-pivot reconciliation
+
+**Outcomes.**
+
+- **One identity-pivot vocabulary across every default dashboard.** Pickers
+  expose `namespace` and `service` (or `container_name`, where cadvisor labels
+  are the natural axis). No `environment` picker — dev only runs one
+  environment and multi-env promotion has its own separate design. The picker
+  shape mirrors the canonical identity tuple in
+  [`plugin-conventions.md`](../engineering/rules/plugin-conventions.md) §1,
+  so a dev who learns it on one dashboard reads every other dashboard the
+  same way.
+- **Every panel query respects the picker that drives it.** Identity-axis
+  label selectors (`service_namespace=~"$namespace"`,
+  `service_name=~"$service"`, or the cadvisor equivalent
+  `service=~"$container_name"`) appear on per-service / per-container panels.
+  Headline aggregate panels (cluster totals, "running containers", title
+  banners) stay unfiltered. If a panel cannot accept the filter cleanly
+  (mixed-source merges, metrics that don't carry the label), leave it alone
+  — the picker is allowed to be a no-op for that panel rather than break it.
+- **No stale `environment` references in non-picker sites.** Panel
+  descriptions, dashboard header markdown (`<h1>` blocks), and Tempo
+  trace-search `tags:` arrays sometimes carry
+  `${deployment_environment_name}` or equivalent. Drop these in the same
+  pass as the picker removal so the dashboard's UI text matches the
+  picker's surface.
+
+**Why.** A clean identity pivot across every default dashboard, aligned
+with the now-canonical identity tuple from `plugin-conventions.md`.
+Multi-env promotion reintroduces the environment dimension later; until
+then it is dead UI that invites picker-blindness.
+
+**Known constraints for the reconciliation.**
+
+- **cadvisor metrics don't carry `service_namespace` natively** — they are
+  scraped directly, not via the OTel-collector resource pipeline. A
+  `namespace` picker on a cadvisor-shaped dashboard (cluster-health,
+  ingress) will be informational unless joined with `target_info`.
+  Pragmatic call is to filter cadvisor panels by `service`/`name` only and
+  let the `namespace` picker stand as a cross-dashboard convention
+  placeholder; document the asymmetry in the picker description.
+- **The cadvisor `service` label is set by `metric_relabel_configs`** in
+  `service_catalog/observability/docker-compose.yml`. It promotes
+  `container_label_metrics_service_name` (and falls back to the container
+  `name`) so cadvisor series can pivot on the same identity vocabulary as
+  OTel-emitted series. The picker query is
+  `label_values(container_last_seen, service)` (or whichever cadvisor
+  metric is canonical at the time of reconciliation).
+- **OTel-shaped identity labels are `service_namespace` / `service_name`**
+  (underscored — Prometheus mangles the dots in OTel attribute names).
+  Picker queries source from
+  `label_values(target_info, service_namespace)` /
+  `label_values(target_info, service_name)` when both vars are intended
+  for OTel panels. Avoid `label_values(<label>)` bare-form on Victoria
+  Metrics — it ignores the index hint that `target_info`-scoped form
+  provides.
+- **Mixed-target panels (`up` + `traces_spanmetrics_calls_total`)** will
+  accept the namespace filter on the traces target but not on `up`
+  (Prometheus self-scrape doesn't carry resource attrs). If such a panel
+  breaks under a global filter, leave it unfiltered rather than splitting
+  the targets.
+
+### Content gaps (independent of the pivot work)
+
 - **Outbound RPC client metrics (`rpc.client.duration`).** The imported
   APM dashboard's "RPC outbound" panels query `rpc_client_duration_*`,
   which only the *caller* emits. We instrument the Rust gRPC server via
