@@ -49,11 +49,21 @@ pub fn user_interceptor(mut req: Request<()>) -> Result<Request<()>, Status> {
 }
 
 /// Tonic interceptor: extracts the SPIFFE URI from the inbound TLS peer
-/// cert (stashed by the TLS layer) and inserts it into request extensions
-/// as a typed `PeerIdentity`. Skipped if the connection is somehow non-TLS
-/// or the cert carries no SPIFFE URI SAN.
+/// cert (provided by tonic's TLS layer via `TlsConnectInfo` in request
+/// extensions) and inserts it into request extensions as a typed
+/// `PeerIdentity`. Skipped if the connection is non-TLS, the peer
+/// presented no cert, or the cert carries no SPIFFE URI SAN.
 pub fn peer_interceptor(mut req: Request<()>) -> Result<Request<()>, Status> {
-    if let Some(leaf) = req.extensions().get::<crate::tls::PeerLeafCert>().cloned() {
+    use tonic::transport::server::{TcpConnectInfo, TlsConnectInfo};
+
+    let leaf_der: Option<Vec<u8>> = req
+        .extensions()
+        .get::<TlsConnectInfo<TcpConnectInfo>>()
+        .and_then(|tls| tls.peer_certs())
+        .and_then(|certs| certs.first().map(|c| c.as_ref().to_vec()));
+
+    if let Some(der) = leaf_der {
+        let leaf = crate::tls::PeerLeafCert { der };
         if let Some(uri) = leaf.spiffe_uri() {
             req.extensions_mut().insert(PeerIdentity { spiffe_uri: uri });
         }
@@ -107,26 +117,14 @@ mod tests {
         assert!(req.extensions().get::<User>().is_none());
     }
 
-    #[test]
-    fn peer_interceptor_inserts_when_leaf_present() {
-        let leaf = crate::tls::PeerLeafCert {
-            der: {
-                let hex = include_str!("testdata/id.server.der.hex").trim();
-                (0..hex.len())
-                    .step_by(2)
-                    .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
-                    .collect()
-            },
-        };
-        let mut req = Request::new(());
-        req.extensions_mut().insert(leaf);
-        let req = peer_interceptor(req).unwrap();
-        let p = req.extensions().get::<PeerIdentity>().unwrap();
-        assert!(p.spiffe_uri.starts_with("spiffe://"));
-    }
+    // Note: peer_interceptor now reads from tonic's TlsConnectInfo
+    // extension instead of a directly-injected PeerLeafCert. Building a
+    // TlsConnectInfo in a unit test requires private tonic internals; the
+    // SPIFFE-URI extraction itself is covered in `tls::tests` via the DER
+    // fixture. Only the no-op (non-TLS) path is unit-testable here.
 
     #[test]
-    fn peer_interceptor_no_op_when_no_leaf() {
+    fn peer_interceptor_no_op_when_no_tls_info() {
         let req = peer_interceptor(Request::new(())).unwrap();
         assert!(req.extensions().get::<PeerIdentity>().is_none());
     }

@@ -10,7 +10,20 @@
 # TODO: needs_prod_decisions prod swaps Caddy for the mesh's sidecar
 # runtime (Envoy / linkerd-proxy / Cilium) via katenary chart selection.
 
+configs:
+  # Mounted into Grafana as /etc/grafana/dashboards/caddy/ingress.json
+  # via the additive `grafana` service entry below — same pattern as
+  # database/'s postgres.json. Query layer is Loki-based, driven by
+  # the caddy_enrich VRL in service_catalog/logging/.
+  caddy_dashboard_ingress:
+    file: ./ingress.json
+
 services:
+  grafana:
+    configs:
+      - source: caddy_dashboard_ingress
+        target: /etc/grafana/dashboards/caddy/ingress.json
+
   caddy:
     image: caddy:2.8-alpine
     restart: unless-stopped

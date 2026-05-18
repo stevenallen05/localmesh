@@ -3,6 +3,12 @@ import { useState } from 'react';
 export default function Home() {
   const [input, setInput] = useState('');
   const [response, setResponse] = useState<string | null>(null);
+  const [whoAmI, setWhoAmI] = useState<{
+    mtls_peer_uri: string;
+    user_id: string;
+    user_email: string;
+    trace_id: string;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,6 +78,7 @@ export default function Home() {
       }
 
       setResponse(data.message);
+      setWhoAmI(data.who_am_i ?? null);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -151,6 +158,20 @@ export default function Home() {
         }}>
           <strong>Response from Rust server:</strong>
           <div style={{ marginTop: '10px', fontSize: '18px' }}>{response}</div>
+          {whoAmI && (
+            <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#fff',
+                          border: '1px solid #ddd', borderRadius: '4px', fontFamily: 'monospace',
+                          fontSize: '13px' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '6px', fontFamily: 'system-ui' }}>
+                Mesh identity
+              </div>
+              <div>peer: <code>{whoAmI.mtls_peer_uri || '—'}</code></div>
+              <div>user: <code>{whoAmI.user_id || '—'}</code>
+                {whoAmI.user_email && <span style={{ color: '#666' }}> &lt;{whoAmI.user_email}&gt;</span>}
+              </div>
+              <div>trace: <code>{whoAmI.trace_id || '—'}</code></div>
+            </div>
+          )}
         </div>
       )}
 

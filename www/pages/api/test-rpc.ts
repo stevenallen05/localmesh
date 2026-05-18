@@ -19,7 +19,13 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 });
 const { hello } = grpc.loadPackageDefinition(packageDefinition) as any;
 
-type SayHelloReply = { message: string };
+type WhoAmI = {
+  mtls_peer_uri: string;
+  user_id: string;
+  user_email: string;
+  trace_id: string;
+};
+type SayHelloReply = { message: string; who_am_i?: WhoAmI };
 
 type GreeterClient = {
   SayHello: (

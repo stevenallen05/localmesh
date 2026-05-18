@@ -1,0 +1,91 @@
+{
+  "title": "Ingress",
+  "uid": "localmesh-ingress",
+  "schemaVersion": 39,
+  "version": 1,
+  "tags": ["localmesh", "caddy", "ingress"],
+  "timezone": "",
+  "refresh": "10s",
+  "time": { "from": "now-15m", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Request rate (per minute) by HTTP status",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum by (http_status) (count_over_time({service_name=\"caddy\"} | json | http_status != \"\" [$__auto]))",
+          "legendFormat": "status={{http_status}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "p50 / p95 ingress latency (ms)",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "quantile_over_time(0.5, {service_name=\"caddy\"} | json | duration_ms != \"\" | unwrap duration_ms [$__auto])",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "quantile_over_time(0.95, {service_name=\"caddy\"} | json | duration_ms != \"\" | unwrap duration_ms [$__auto])",
+          "legendFormat": "p95",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Recent ingress errors (4xx + 5xx)",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum by (level) (count_over_time({service_name=\"caddy\", level=~\"warn|error\"} | json [$__auto]))",
+          "legendFormat": "level={{level}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Denied by mesh policy (placeholder)",
+      "description": "Always 0 in dev. TODO: needs_prod_decisions default-deny via mesh AuthorizationPolicy in prod.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "vector(0)",
+          "legendFormat": "denied",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "gray" },
+          "unit": "short",
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      }
+    }
+  ]
+}

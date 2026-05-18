@@ -5,8 +5,9 @@ use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt as _;
 
 use crate::db::{Db, DbError};
+use crate::identity::{PeerIdentity, User};
 use crate::proto::hello::greeter_server::Greeter;
-use crate::proto::hello::{HelloReply, HelloRequest, PostgresStatsReply};
+use crate::proto::hello::{HelloReply, HelloRequest, PostgresStatsReply, WhoAmI};
 
 pub struct GreeterSvc {
     db: Arc<Db>,
@@ -41,10 +42,39 @@ impl From<DbError> for Status {
 impl Greeter for GreeterSvc {
     #[tracing::instrument(skip_all, fields(rpc.method = "say_hello"))]
     async fn say_hello(&self, req: Request<HelloRequest>) -> Result<Response<HelloReply>, Status> {
+        // Pull identity facts from request extensions (set by the user +
+        // peer interceptors); they go into the response payload, NOT into
+        // span attributes — PII-at-ingress rule (spec §9.3).
+        let user = req.extensions().get::<User>().cloned();
+        let peer = req.extensions().get::<PeerIdentity>().cloned();
+
+        tracing::debug!(
+            user.id = user.as_ref().map(|u| u.id.as_str()).unwrap_or(""),
+            peer.uri = peer.as_ref().map(|p| p.spiffe_uri.as_str()).unwrap_or(""),
+            "handling say_hello"
+        );
+
+        // Current OTel trace id, hex-encoded, so the response payload can
+        // datalink into Tempo.
+        let trace_id = tracing::Span::current()
+            .context()
+            .span()
+            .span_context()
+            .trace_id()
+            .to_string();
+
+        let who = WhoAmI {
+            mtls_peer_uri: peer.map(|p| p.spiffe_uri).unwrap_or_default(),
+            user_id:       user.as_ref().map(|u| u.id.clone()).unwrap_or_default(),
+            user_email:    user.as_ref().map(|u| u.email.clone()).unwrap_or_default(),
+            trace_id,
+        };
+
         let name = req.into_inner().name;
         let name = if name.is_empty() { "world" } else { &name };
         Ok(Response::new(HelloReply {
-            message: format!("hello, {name}"),
+            message:  format!("hello, {name}"),
+            who_am_i: Some(who),
         }))
     }
 

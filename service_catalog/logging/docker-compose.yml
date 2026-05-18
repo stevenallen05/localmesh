@@ -125,6 +125,7 @@ configs:
           route:
             postgres:        '.service_name == "postgres"'
             grafana:         '.service_name == "observability" && .container_name == "grafana"'
+            caddy:           '.service_name == "caddy"'
 
         # Postgres 15+ with log_destination=jsonlog emits {timestamp,
         # error_severity, message, ...}. Map error_severity enum into the
@@ -155,6 +156,35 @@ configs:
                          } else                          { parsed.lvl }
             .message   = parsed.msg
 
+        # Caddy ingress access logs (JSON format). Lifts mTLS + HTTP fields
+        # onto the event so dashboards / structured metadata can address
+        # them. Severity derived from status (4xx → warn, 5xx → error).
+        # Spec §11.1.
+        norm_caddy:
+          type: remap
+          inputs: ["normalise.caddy"]
+          source: |
+            if exists(.status) {
+              .http_status = to_int(.status) ?? 0
+              .level = if .http_status >= 500 { "error"
+                       } else if .http_status >= 400 { "warn"
+                       } else                         { "info" }
+            } else {
+              .level = "info"
+            }
+            if exists(.request.method) { .http_method = .request.method }
+            if exists(.request.uri)    { .http_path   = .request.uri }
+            if exists(.request.tls.client.subject) {
+              .mtls_peer_subject = .request.tls.client.subject
+            }
+            if exists(.request.tls.version) {
+              .mtls_tls_version = .request.tls.version
+            }
+            if exists(.duration) {
+              d, err = to_float(.duration)
+              if err == null { .duration_ms = d * 1000.0 }
+            }
+
         # Catch-all for everything not explicitly routed. App events (server,
         # www) fall here too — they already have .level set by parse_envelope,
         # so the `if !exists` guard makes this a no-op for them. Infra sources
@@ -174,7 +204,7 @@ configs:
         # directly here would duplicate every event.
         validate:
           type: remap
-          inputs: ["norm_postgres", "norm_grafana", "norm_default"]
+          inputs: ["norm_postgres", "norm_grafana", "norm_caddy", "norm_default"]
           source: |
             .level = if exists(.level) { downcase(string!(.level)) } else { null }
             allowed = ["trace", "debug", "info", "warn", "error", "fatal"]
@@ -184,8 +214,14 @@ configs:
             # field is missing. Default to empty string so non-span events
             # (most infra logs) still ship cleanly. Empty structured
             # metadata is accepted by Loki.
-            if !exists(.trace_id) { .trace_id = "" }
-            if !exists(.span_id)  { .span_id  = "" }
+            if !exists(.trace_id)          { .trace_id          = "" }
+            if !exists(.span_id)           { .span_id           = "" }
+            if !exists(.mtls_peer_subject) { .mtls_peer_subject = "" }
+            if !exists(.mtls_tls_version)  { .mtls_tls_version  = "" }
+            if !exists(.http_method)       { .http_method       = "" }
+            if !exists(.http_path)         { .http_path         = "" }
+            if !exists(.http_status)       { .http_status       = "" }
+            if !exists(.duration_ms)       { .duration_ms       = "" }
 
       sinks:
         loki:
@@ -206,9 +242,17 @@ configs:
             container_id: "{{ container_id }}"
           # trace_id / span_id from parse_envelope — addressable in LogQL
           # via `| trace_id="…"` without being indexed (spec AC 5).
+          # Caddy-only mtls/http fields piggy-back here; absent on non-caddy
+          # events thanks to Loki accepting empty structured-metadata values.
           structured_metadata:
             trace_id: "{{ trace_id }}"
             span_id:  "{{ span_id }}"
+            mtls_peer_subject: "{{ mtls_peer_subject }}"
+            mtls_tls_version:  "{{ mtls_tls_version }}"
+            http_method:       "{{ http_method }}"
+            http_path:         "{{ http_path }}"
+            http_status:       "{{ http_status }}"
+            duration_ms:       "{{ duration_ms }}"
 
 services:
   loki:
