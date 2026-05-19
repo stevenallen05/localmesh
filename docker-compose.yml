@@ -14,6 +14,7 @@ services:
       context: .
       dockerfile: server/Dockerfile
     image: metrics-stack/server:0.1.0  # Rule 1
+    restart: unless-stopped
     environment:
       # Plaintext bind on loopback. server-inbound (ghostunnel) terminates
       # mTLS on :50051 and forwards plain TCP here. App + sidecar share
@@ -78,6 +79,7 @@ services:
       context: .
       dockerfile: www/Dockerfile
     image: metrics-stack/www:0.1.0  # Rule 1
+    restart: unless-stopped
     environment:
       # gRPC dials www-outbound on the shared netns; the sidecar wraps
       # mTLS to server:50051. Value is loopback now, so no chart-time
@@ -151,6 +153,7 @@ services:
     depends_on:
       server:
         condition: service_started
+    # Applies to all three sidecars in this file.
     # TODO: needs_prod_decisions ghostunnel sidecar shape needs richer dep manager
     labels:
       metrics.service_name: ghostunnel
@@ -183,7 +186,6 @@ services:
     depends_on:
       www:
         condition: service_started
-    # TODO: needs_prod_decisions ghostunnel sidecar shape needs richer dep manager
     labels:
       metrics.service_name: ghostunnel
       metrics.module_name: mesh
@@ -214,7 +216,6 @@ services:
         condition: service_started
       server-inbound:
         condition: service_started
-    # TODO: needs_prod_decisions ghostunnel sidecar shape needs richer dep manager
     labels:
       metrics.service_name: ghostunnel
       metrics.module_name: mesh
