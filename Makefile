@@ -1,6 +1,6 @@
 # Begin ops team responsibility
 
-.PHONY: setup chart chart-lint certs caddy-image demo-auth
+.PHONY: setup chart chart-lint certs trust-ca untrust-ca caddy-image demo-auth
 
 CERTS_DIR       := .secrets/certs
 
@@ -32,16 +32,27 @@ chart-lint:
 
 # LocalMesh dev-machine bootstrap. One button: untrust the old CA, blow
 # away .secrets/certs/, regenerate everything via scripts/secrets-gen.py
-# (CA + per-service leaf certs + .env managed section + Caddyfile.generated),
-# then install the new CA into the host trust store. Always clean-slate;
-# granular subtargets are out of scope for this phase.
+# (CA + per-service leaf certs + .env managed section + Caddyfile.generated
+# + dex.yaml.generated), then install the new CA into the host trust store.
+# Always clean-slate; granular subtargets are out of scope for this phase.
 #
 # See docs/superpowers/specs/2026-05-18-localmesh-service-mesh-design.md §7.
-certs:
-	@./tools/step certificate uninstall $(CERTS_DIR)/ca.crt 2>/dev/null || true
+certs: untrust-ca
 	@rm -rf $(CERTS_DIR)
 	@./scripts/secrets-gen.py
+	@$(MAKE) trust-ca
+
+# Install the LocalMesh CA into the host trust store so browsers / curl /
+# libraries verify cleanly. Idempotent. Run standalone after a fresh clone
+# (with an existing .secrets/certs/ca.crt) or to re-trust without regen.
+trust-ca:
 	@./tools/step certificate install $(CERTS_DIR)/ca.crt
+
+# Remove the LocalMesh CA from the host trust store. Silent if not present
+# so this is safe to chain from `certs` on first run. Useful standalone
+# when uninstalling the project.
+untrust-ca:
+	@./tools/step certificate uninstall $(CERTS_DIR)/ca.crt 2>/dev/null || true
 
 caddy-image:
 	docker build -t localmesh/caddy:dev service_catalog/caddy/
