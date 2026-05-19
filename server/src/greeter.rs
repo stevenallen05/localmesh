@@ -7,7 +7,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt as _;
 use crate::db::{Db, DbError};
 use crate::identity::{PeerIdentity, User};
 use crate::proto::hello::greeter_server::Greeter;
-use crate::proto::hello::{HelloReply, HelloRequest, PostgresStatsReply, WhoAmI};
+use crate::proto::hello::{HelloReply, HelloRequest, WhoAmI};
 
 pub struct GreeterSvc {
     db: Arc<Db>,
@@ -90,30 +90,6 @@ impl Greeter for GreeterSvc {
         Ok(Response::new(HelloReply {
             message:  reply_message,
             who_am_i: Some(who),
-        }))
-    }
-
-    #[tracing::instrument(skip_all, fields(rpc.method = "print_postgres_stats"))]
-    async fn print_postgres_stats(
-        &self,
-        _req: Request<()>,
-    ) -> Result<Response<PostgresStatsReply>, Status> {
-        // The OTel server span is set by TraceContextLayer + #[instrument];
-        // pull its SpanContext for pg_tracing to stitch SQL spans under.
-        // Bind the OTel context to a `let` so the SpanRef lifetime extends
-        // across the .span_context() call.
-        let cx = tracing::Span::current().context();
-        let span_ctx = cx.span().span_context().clone();
-
-        self.db.record_noise_event("button_press", &span_ctx).await?;
-        let stats = self.db.top_stats(&span_ctx).await?;
-
-        Ok(Response::new(PostgresStatsReply {
-            num_backends:    stats.num_backends,
-            xact_commit:     stats.xact_commit,
-            xact_rollback:   stats.xact_rollback,
-            cache_hit_ratio: stats.cache_hit_ratio,
-            db_size_bytes:   stats.db_size_bytes,
         }))
     }
 }

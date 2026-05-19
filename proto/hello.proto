@@ -2,14 +2,10 @@ syntax = "proto3";
 
 package hello;
 
-import "google/protobuf/empty.proto";
-
 // v0 stub. Real MetricsIngest / MetricsQuery (see DESIGN_DECISIONS.md) land in
-// their own spec; this is just enough proto to wire NextJS server -> Rust server,
-// plus a demo postgres-stats RPC.
+// their own spec; this is just enough proto to wire NextJS server -> Rust server.
 service Greeter {
   rpc SayHello (HelloRequest) returns (HelloReply);
-  rpc PrintPostgresStats (google.protobuf.Empty) returns (PostgresStatsReply);
 }
 
 message HelloRequest {
@@ -29,12 +25,4 @@ message WhoAmI {
   string user_id       = 2;  // from x-user-id gRPC metadata; "" if absent
   string user_email    = 3;
   string trace_id      = 4;  // current OTel trace, hex
-}
-
-message PostgresStatsReply {
-  int32  num_backends    = 1;  // open connections
-  int64  xact_commit     = 2;  // committed txns since stats reset
-  int64  xact_rollback   = 3;  // rolled-back txns
-  double cache_hit_ratio = 4;  // blks_hit / (blks_hit + blks_read)
-  int64  db_size_bytes   = 5;  // pg_database_size(current_database())
 }

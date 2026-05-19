@@ -1,6 +1,6 @@
-//! Postgres client wrapper. Owns the pool, runs migrations, exposes the two
-//! queries the demo `PrintPostgresStats` RPC needs. No `tonic` dependency —
-//! the gRPC error mapping lives in `greeter.rs` where the orphan rule allows it.
+//! Postgres client wrapper. Owns the pool, runs migrations, exposes the
+//! INSERT used by `Greeter.SayHello`. No `tonic` dependency — the gRPC
+//! error mapping lives in `greeter.rs` where the orphan rule allows it.
 
 use opentelemetry::trace::SpanContext;
 use sqlx::postgres::{PgPool, PgPoolOptions};
@@ -37,15 +37,6 @@ impl From<sqlx::migrate::MigrateError> for DbError {
     fn from(e: sqlx::migrate::MigrateError) -> Self { Self::Migrate(e) }
 }
 
-#[derive(Debug, sqlx::FromRow)]
-pub struct TopStats {
-    pub num_backends:    i32,
-    pub xact_commit:     i64,
-    pub xact_rollback:   i64,
-    pub cache_hit_ratio: f64,
-    pub db_size_bytes:   i64,
-}
-
 pub struct Db {
     pool: PgPool,
 }
@@ -71,21 +62,6 @@ impl Db {
         Ok(())
     }
 
-    /// Writes one row to `noise_events`. The traceparent comment is prepended
-    /// so pg_tracing can stitch the INSERT under the caller's gRPC span.
-    pub async fn record_noise_event(
-        &self,
-        kind: &str,
-        parent: &SpanContext,
-    ) -> Result<(), DbError> {
-        let sql = format!(
-            "{} INSERT INTO noise_events (kind) VALUES ($1)",
-            traceparent_comment_for(parent),
-        );
-        sqlx::query(&sql).bind(kind).execute(&self.pool).await?;
-        Ok(())
-    }
-
     /// Insert one hello_messages row. Prepends the traceparent comment so
     /// pg_tracing stitches parse/plan/exec spans under the gRPC server span.
     pub async fn record_hello_message(
@@ -107,30 +83,7 @@ impl Db {
             .await?;
         Ok(())
     }
-
-    /// Reads the five headline `pg_stat_database` metrics for the current
-    /// database. `numbackends` is cast to int4 to match `TopStats::num_backends`;
-    /// `cache_hit_ratio` is guarded against divide-by-zero on a freshly reset
-    /// stats view.
-    pub async fn top_stats(&self, parent: &SpanContext) -> Result<TopStats, DbError> {
-        let sql = format!("{} {}", traceparent_comment_for(parent), TOP_STATS_SQL);
-        let row: TopStats = sqlx::query_as(&sql).fetch_one(&self.pool).await?;
-        Ok(row)
-    }
 }
-
-const TOP_STATS_SQL: &str = r#"
-    SELECT
-      numbackends::int4              AS num_backends,
-      xact_commit                    AS xact_commit,
-      xact_rollback                  AS xact_rollback,
-      CASE WHEN (blks_hit + blks_read) = 0 THEN 0.0
-           ELSE blks_hit::float8 / (blks_hit + blks_read)
-      END                            AS cache_hit_ratio,
-      pg_database_size(datname)      AS db_size_bytes
-    FROM pg_stat_database
-    WHERE datname = current_database()
-"#;
 
 /// Format a `SpanContext` as a pg_tracing-compatible SQL comment carrying a
 /// W3C traceparent. The sampled-flag byte is **derived** from the context's

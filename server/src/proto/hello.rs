@@ -32,25 +32,6 @@ pub struct WhoAmI {
     #[prost(string, tag = "4")]
     pub trace_id: ::prost::alloc::string::String,
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct PostgresStatsReply {
-    /// open connections
-    #[prost(int32, tag = "1")]
-    pub num_backends: i32,
-    /// committed txns since stats reset
-    #[prost(int64, tag = "2")]
-    pub xact_commit: i64,
-    /// rolled-back txns
-    #[prost(int64, tag = "3")]
-    pub xact_rollback: i64,
-    /// blks_hit / (blks_hit + blks_read)
-    #[prost(double, tag = "4")]
-    pub cache_hit_ratio: f64,
-    /// pg_database_size(current_database())
-    #[prost(int64, tag = "5")]
-    pub db_size_bytes: i64,
-}
 /// Generated server implementations.
 pub mod greeter_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
@@ -62,17 +43,9 @@ pub mod greeter_server {
             &self,
             request: tonic::Request<super::HelloRequest>,
         ) -> std::result::Result<tonic::Response<super::HelloReply>, tonic::Status>;
-        async fn print_postgres_stats(
-            &self,
-            request: tonic::Request<()>,
-        ) -> std::result::Result<
-            tonic::Response<super::PostgresStatsReply>,
-            tonic::Status,
-        >;
     }
     /// v0 stub. Real MetricsIngest / MetricsQuery (see DESIGN_DECISIONS.md) land in
-    /// their own spec; this is just enough proto to wire NextJS server -> Rust server,
-    /// plus a demo postgres-stats RPC.
+    /// their own spec; this is just enough proto to wire NextJS server -> Rust server.
     #[derive(Debug)]
     pub struct GreeterServer<T: Greeter> {
         inner: _Inner<T>,
@@ -181,47 +154,6 @@ pub mod greeter_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = SayHelloSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/hello.Greeter/PrintPostgresStats" => {
-                    #[allow(non_camel_case_types)]
-                    struct PrintPostgresStatsSvc<T: Greeter>(pub Arc<T>);
-                    impl<T: Greeter> tonic::server::UnaryService<()>
-                    for PrintPostgresStatsSvc<T> {
-                        type Response = super::PostgresStatsReply;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(&mut self, request: tonic::Request<()>) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as Greeter>::print_postgres_stats(&inner, request).await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let inner = inner.0;
-                        let method = PrintPostgresStatsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
