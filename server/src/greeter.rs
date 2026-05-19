@@ -5,7 +5,7 @@ use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt as _;
 
 use crate::db::{Db, DbError};
-use crate::identity::{PeerIdentity, User};
+use crate::identity::User;
 use crate::proto::hello::greeter_server::Greeter;
 use crate::proto::hello::{HelloReply, HelloRequest, WhoAmI};
 
@@ -43,11 +43,12 @@ impl Greeter for GreeterSvc {
     #[tracing::instrument(skip_all, fields(rpc.method = "say_hello"))]
     async fn say_hello(&self, req: Request<HelloRequest>) -> Result<Response<HelloReply>, Status> {
         // Read all extensions BEFORE consuming `req` via into_inner().
-        // Identity facts (User, PeerIdentity) go into the response payload,
-        // NOT into span attributes — PII-at-ingress rule (spec §9.3).
-        // ClaimsForDb feeds the hello_messages INSERT below.
+        // Identity facts (User) go into the response payload, NOT into
+        // span attributes — PII-at-ingress rule (spec §9.3). ClaimsForDb
+        // feeds the hello_messages INSERT below. Per-peer SPIFFE URI is
+        // gone: ghostunnel is L4 for HTTP/2 and the sidecar's --allow-uri
+        // glob is the channel-level trust anchor; no per-call injection.
         let user = req.extensions().get::<User>().cloned();
-        let peer = req.extensions().get::<PeerIdentity>().cloned();
         let claims_for_db = req.extensions()
             .get::<crate::identity::ClaimsForDb>()
             .cloned()
@@ -55,7 +56,6 @@ impl Greeter for GreeterSvc {
 
         tracing::debug!(
             user.id = user.as_ref().map(|u| u.id.as_str()).unwrap_or(""),
-            peer.uri = peer.as_ref().map(|p| p.spiffe_uri.as_str()).unwrap_or(""),
             "handling say_hello"
         );
 
@@ -66,7 +66,7 @@ impl Greeter for GreeterSvc {
         let trace_id = span_ctx.trace_id().to_string();
 
         let who = WhoAmI {
-            mtls_peer_uri: peer.map(|p| p.spiffe_uri).unwrap_or_default(),
+            mtls_peer_uri: String::new(),
             user_id:       user.as_ref().map(|u| u.id.clone()).unwrap_or_default(),
             user_email:    user.as_ref().map(|u| u.email.clone()).unwrap_or_default(),
             trace_id,

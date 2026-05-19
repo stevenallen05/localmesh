@@ -15,7 +15,10 @@ services:
       dockerfile: server/Dockerfile
     image: metrics-stack/server:0.1.0  # Rule 1
     environment:
-      SERVER_ADDR: 0.0.0.0:50051
+      # Plaintext bind on loopback. server-inbound (ghostunnel) terminates
+      # mTLS on :50051 and forwards plain TCP here. App + sidecar share
+      # the same netns via `network_mode: "service:server"`.
+      SERVER_BIND_ADDR: 127.0.0.1:50052
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
       OTEL_SERVICE_NAME: server
@@ -32,18 +35,11 @@ services:
       # workload name matches the postgres role declared in
       # service_catalog/database/initdb/00-roles.sql).
       DATABASE_URL: postgres://server@postgres:5432/app?sslmode=verify-full&sslrootcert=/run/server/trust.ca.crt&sslcert=/run/server/id.crt&sslkey=/run/server/id.key
-      # JWKS / OIDC — DEX_JWKS_URL is the internal docker-network plaintext
-      # endpoint used to prime + refresh the in-memory key cache.
-      # DEX_ISSUER is the browser-facing URL Dex stamps into the `iss`
-      # claim (must match exactly). OIDC_AUDIENCE is what oauth2-proxy
-      # requested + Dex stamps into `aud`.
-      DEX_JWKS_URL: http://dex:5556/dex/keys
-      DEX_ISSUER:   https://dex.${PROJECT_NAME}.${LOCAL_DOMAIN}:8443/dex
-      OIDC_AUDIENCE: localmesh-dev
     volumes:
-      # LocalMesh cert dir for the server workload — used both for inbound
-      # gRPC mTLS termination (server/src/tls.rs) and outbound postgres
-      # mTLS (sqlx reads the sslcert/sslkey paths interpolated above).
+      # LocalMesh cert dir for the server workload. App uses it for
+      # outbound postgres mTLS (sqlx reads sslcert/sslkey via DATABASE_URL).
+      # Inbound gRPC mTLS now lives in the server-inbound sidecar; that
+      # service mounts the same dir for ghostunnel.
       - ./.secrets/certs/server:/run/server:ro
     depends_on:
       otel-collector:
@@ -51,10 +47,9 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      # bash built-in TCP test — no extra packages on bookworm. mTLS doesn't
-      # complete the handshake here, but the TCP listener answer is the
-      # readiness signal we care about.
-      test: ["CMD", "bash", "-c", "</dev/tcp/localhost/50051"]
+      # bash built-in TCP test — probes the plaintext loopback bind on
+      # :50052 since the app no longer terminates TLS itself.
+      test: ["CMD", "bash", "-c", "</dev/tcp/localhost/50052"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -129,3 +124,40 @@ services:
       metrics.service_name: www
       metrics.module_name: app
       metrics.owned_by: ${TECH_LEAD_EMAIL}
+
+  server-inbound:
+    # ghostunnel sidecar terminating east-west mTLS on server's :50051 and
+    # forwarding plain TCP to the app on 127.0.0.1:50052. Shares server's
+    # netns via `network_mode: "service:server"`, so the LocalMesh DNS
+    # resolution `server:50051` lands on this listener.
+    image: ghostunnel/ghostunnel:v1.7.3
+    restart: unless-stopped
+    network_mode: "service:server"
+    command:
+      - server
+      - --listen=:50051
+      - --target=127.0.0.1:50052
+      - --cert=/run/server/id.crt
+      - --key=/run/server/id.key
+      - --cacert=/run/server/trust.ca.crt
+      # ghostunnel uses --allow-uri (not --allow-uri-san). ghostunnel's
+      # URI matcher only accepts `*` as a complete path segment, so the
+      # trust-domain-level glob (`spiffe://*.${PROJECT_NAME}.${LOCAL_DOMAIN}`)
+      # is rejected; SPIFFE authorities have no path separator to glob.
+      # List explicit peer URIs instead. www is the only caller today; new
+      # callers join the list. Prod policy is per-route AuthorizationPolicy.
+      - --allow-uri=spiffe://www.${PROJECT_NAME}.${LOCAL_DOMAIN}
+      # Status/metrics endpoint on parent loopback; collector scrapes via
+      # `server:9090` because the sidecar shares server's netns.
+      - --status=127.0.0.1:9090
+    volumes:
+      - ./.secrets/certs/server:/run/server:ro
+    depends_on:
+      server:
+        condition: service_started
+    # TODO: needs_prod_decisions ghostunnel sidecar shape needs richer dep manager
+    labels:
+      metrics.service_name: ghostunnel
+      metrics.module_name: mesh
+      metrics.owned_by: sre@example.com
+      mesh.role: inbound
