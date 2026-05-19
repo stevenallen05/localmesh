@@ -4,14 +4,11 @@ use std::sync::Arc;
 use opentelemetry::global;
 use tonic::transport::Server;
 
-use server::catalog::CatalogSvc;
 use server::db::Db;
 use server::error_log::ErrorLogLayer;
-use server::grafana::GrafanaClient;
 use server::greeter::GreeterSvc;
 use server::identity;
 use server::proto::hello::greeter_server::GreeterServer;
-use server::proto::metrics_v1::catalog_server::CatalogServer;
 use server::rpc_metrics::RpcMetricsLayer;
 use server::telemetry::{init_logging, init_meter, init_tracer, BoxError};
 use server::trace_context::TraceContextLayer;
@@ -35,8 +32,6 @@ async fn main() -> Result<(), BoxError> {
     let db = Arc::new(Db::connect_from_env().await?);
     db.run_migrations().await?;
     tracing::info!("postgres pool ready, migrations applied");
-
-    let grafana = Arc::new(GrafanaClient::from_env().await?);
 
     tracing::info!(address = %addr, "listening");
 
@@ -79,29 +74,18 @@ async fn main() -> Result<(), BoxError> {
         .layer(TraceContextLayer)
         .layer(metrics_layer)
         .layer(ErrorLogLayer)
-        // Compose auth_interceptor + peer_interceptor at each service entry
-        // point. Both insert into request extensions; handlers read them
-        // for business logic without echoing PII onto OTel spans (the
-        // PII-at-ingress rule lives at the Caddy edge via enduser_attrs).
-        // JWKS instantiated above; primed once at startup, refreshed every
-        // 15 min by a background task. The Arc clone is cheap per request;
-        // the cache read is sync.
+        // auth_interceptor (verifies JWT → User + ClaimsForDb extensions) is
+        // composed with peer_interceptor (mTLS SPIFFE URI → PeerIdentity).
+        // Handlers read extensions for business logic without echoing PII
+        // onto OTel spans (the PII-at-ingress rule lives at the Caddy edge
+        // via enduser_attrs). Arc clone is cheap; JWKS cache read is sync.
         .add_service(GreeterServer::with_interceptor(
             GreeterSvc::new(db),
             {
                 let auth = identity::auth_interceptor(jwks.clone());
                 // `Status` is large but boxing it would break tonic's
-                // interceptor signature; same trade-off documented in
+                // interceptor signature; same trade-off as
                 // identity::auth_interceptor.
-                #[allow(clippy::result_large_err)]
-                let f = move |req| identity::peer_interceptor(auth(req)?);
-                f
-            },
-        ))
-        .add_service(CatalogServer::with_interceptor(
-            CatalogSvc::new(grafana),
-            {
-                let auth = identity::auth_interceptor(jwks.clone());
                 #[allow(clippy::result_large_err)]
                 let f = move |req| identity::peer_interceptor(auth(req)?);
                 f

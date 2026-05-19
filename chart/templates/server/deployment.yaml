@@ -42,11 +42,6 @@ spec:
         resources:
           {{ .Values.server.resources | toYaml | nindent 10 }}
         {{- end }}
-        volumeMounts:
-        {{- if .Values.server.persistence.grafana_token.enabled }}
-        - mountPath: /run/grafana
-          name: grafana-token
-        {{- end }}
       {{- if .Values.pullSecrets }}
       imagePullSecrets:
       {{- .Values.pullSecrets | toYaml | nindent 6 }}
@@ -57,10 +52,4 @@ spec:
       {{- end }}
       {{- if ne .Values.server.serviceAccount "" }}
       serviceAccountName: {{ .Values.server.serviceAccount | quote }}
-      {{- end }}
-      volumes:
-      {{- if .Values.server.persistence.grafana_token.enabled }}
-      - name: grafana-token
-        persistentVolumeClaim:
-          claimName: '{{ include "challenge.fullname" . }}-server-grafana-token'
       {{- end }}

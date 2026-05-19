@@ -32,8 +32,6 @@ services:
       # workload name matches the postgres role declared in
       # service_catalog/database/initdb/00-roles.sql).
       DATABASE_URL: postgres://server@postgres:5432/app?sslmode=verify-full&sslrootcert=/run/server/trust.ca.crt&sslcert=/run/server/id.crt&sslkey=/run/server/id.key
-      GRAFANA_API_URL: http://grafana:3000
-      GRAFANA_API_TOKEN_FILE: /run/grafana/token
       # JWKS / OIDC — DEX_JWKS_URL is the internal docker-network plaintext
       # endpoint used to prime + refresh the in-memory key cache.
       # DEX_ISSUER is the browser-facing URL Dex stamps into the `iss`
@@ -43,7 +41,6 @@ services:
       DEX_ISSUER:   https://dex.${PROJECT_NAME}.${LOCAL_DOMAIN}:8443/dex
       OIDC_AUDIENCE: localmesh-dev
     volumes:
-      - grafana-token:/run/grafana:ro
       # LocalMesh cert dir for the server workload — used both for inbound
       # gRPC mTLS termination (server/src/tls.rs) and outbound postgres
       # mTLS (sqlx reads the sslcert/sslkey paths interpolated above).

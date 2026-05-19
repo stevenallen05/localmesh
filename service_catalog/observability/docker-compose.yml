@@ -236,44 +236,6 @@ configs:
             # so each module gets its own folder.
             foldersFromFilesStructure: true
 
-  grafana_bootstrap_script:
-    # `$$` escapes the `$` from docker-compose interpolation — the rendered
-    # file ends up with single `$` so /bin/sh sees normal shell variables.
-    content: |
-      #!/bin/sh
-      # Assumes a fresh Grafana state — `make setup` runs `docker compose
-      # down -v` first, so admin/admin is the default and no token name
-      # collision is possible. See the Makefile note for the sledgehammer
-      # caveat.
-      set -eu
-      TOKEN_FILE=/run/grafana/token
-      GF="http://grafana:3000"
-      AUTH="admin:admin"
-
-      # curl -sS (no -f): always capture body, even on HTTP error, so we can
-      # echo it for diagnostics. Detect failure by absence of expected field.
-      CREATE_RESP=$$(curl -sS -u "$$AUTH" -H "Content-Type: application/json" \
-              -X POST "$$GF/api/serviceaccounts" \
-              -d '{"name":"rust-server","role":"Editor"}')
-      SA_ID=$$(printf '%s' "$$CREATE_RESP" | sed -n 's/.*"id":\([0-9]*\).*/\1/p' | head -n1)
-      if [ -z "$$SA_ID" ]; then
-        echo "bootstrap: SA create returned: $$CREATE_RESP" >&2
-        exit 1
-      fi
-
-      MINT_RESP=$$(curl -sS -u "$$AUTH" -H "Content-Type: application/json" \
-              -X POST "$$GF/api/serviceaccounts/$$SA_ID/tokens" \
-              -d '{"name":"rust-server-bootstrap"}')
-      TOKEN=$$(printf '%s' "$$MINT_RESP" | sed -n 's/.*"key":"\([^"]*\)".*/\1/p')
-
-      if [ -z "$$TOKEN" ]; then
-        echo "bootstrap: token mint failed; grafana response: $$MINT_RESP" >&2
-        exit 1
-      fi
-
-      printf '%s' "$$TOKEN" > "$$TOKEN_FILE"
-      echo "bootstrap: token written to $$TOKEN_FILE"
-
   # Bookmark-worthy production-ops dashboards. Each is a JSON file under
   # ./ (alongside this compose file) — externalised because inlining gets
   # unwieldy past a couple of panels. The file provider configured above
@@ -442,35 +404,7 @@ services:
       victoriametrics:
         condition: service_started
 
-  grafana-bootstrap:
-    image: curlimages/curl:8.10.1
-    container_name: grafana-bootstrap
-    # Profile-gated: `docker compose up` skips it. Invoked explicitly by
-    # `make setup` via `docker compose run --rm grafana-bootstrap`, which
-    # still honors depends_on so grafana is healthy before we hit the API.
-    profiles: ["bootstrap"]
-    # curlimages/curl runs as UID 100 by default; the grafana-token named
-    # volume is created with root ownership and the curl_user can't write
-    # to it. Short-lived container — root is fine here.
-    user: root
-    depends_on:
-      grafana:
-        condition: service_healthy
-    configs:
-      - source: grafana_bootstrap_script
-        target: /bootstrap.sh
-        mode: 0755
-    volumes:
-      - grafana-token:/run/grafana
-    entrypoint: ["/bin/sh", "/bootstrap.sh"]
-    labels:
-      mesh.exempt: "true"
-      metrics.service_name: observability
-      metrics.module_name: observability
-      metrics.owned_by: sre@example.com
-
 volumes:
   vm-data: {}
   grafana-data: {}
   tempo-data: {}
-  grafana-token: {}

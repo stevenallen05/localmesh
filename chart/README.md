@@ -59,10 +59,6 @@ The following table lists the configurable parameters of the challenge chart and
 | `redis.repository.tag`                                    | `7.4-alpine`                           |
 | `redis.serviceAccount`                                    | ``                                     |
 | `server.imagePullPolicy`                                  | `IfNotPresent`                         |
-| `server.persistence.grafana_token.accessMode[0].value`    | `ReadWriteOnce`                        |
-| `server.persistence.grafana_token.enabled`                | `true`                                 |
-| `server.persistence.grafana_token.size`                   | `1Gi`                                  |
-| `server.persistence.grafana_token.storageClass`           | `-`                                    |
 | `server.replicas`                                         | `1`                                    |
 | `server.repository.image`                                 | `metrics-stack/server`                 |
 | `server.repository.tag`                                   | ``                                     |

@@ -17,10 +17,6 @@ setup:
 	docker compose down -v
 	@echo "==> Regenerating LocalMesh CA + per-service certs + .env + Caddyfile"
 	@$(MAKE) certs
-	@echo "==> Bringing up fresh grafana"
-	docker compose up -d --wait grafana
-	@echo "==> Minting service-account token"
-	docker compose run --rm grafana-bootstrap
 	@echo "==> Setup complete. Run 'docker compose up -d --build' to start the stack."
 
 # TODO: detect OS/arch — tools/ binaries hardcoded to linux-amd64; pending prod infra & provider choices.

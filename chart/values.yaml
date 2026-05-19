@@ -242,23 +242,6 @@ server:
     # key: server.repository.tag
     tag: ""
 
-  # key: server.persistence
-  persistence:
-    # key: server.persistence.grafana_token
-    grafana_token:
-      # Storage class to use for PVCs
-      # storageClass: "-" means use default
-      # storageClass: "" means do not specify
-      # storageClass: "foo" means use that storageClass
-      # key: server.persistence.grafana_token.storageClass
-      storageClass: '-'
-      # key: server.persistence.grafana_token.size
-      size: 1Gi
-      # key: server.persistence.grafana_token.accessMode
-      accessMode:
-        - ReadWriteOnce
-      # key: server.persistence.grafana_token.enabled
-      enabled: true
   # key: server.replicas
   replicas: 1
   # key: server.nodeSelector

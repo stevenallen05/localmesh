@@ -13,19 +13,6 @@ Off-the-shelf OpenTelemetry collector + Grafana + Loki + Victoria Metrics + Temp
 | `OTEL_SERVICE_NAME` | `server` | app, per [`../../docs/engineering/rules/plugin-conventions.md`](../../docs/engineering/rules/plugin-conventions.md) |
 | `OTEL_RESOURCE_ATTRIBUTES` | `service.namespace=${PROJECT_NAME},deployment.environment.name=dev,module_name=app,owned_by=${TECH_LEAD_EMAIL}` | app, per [`../../docs/engineering/rules/plugin-conventions.md`](../../docs/engineering/rules/plugin-conventions.md) |
 | `OTEL_SEMCONV_STABILITY_OPT_IN` | `http` | app (Node-only — the legacy `http.server.duration` metric is renamed to `http.server.request.duration` on opt-in; required for the APM dashboard's RED panels. Rust SDKs use stable semconv by default) |
-| `GRAFANA_API_URL` | `http://grafana:3000` | plugin |
-| `GRAFANA_API_TOKEN_FILE` | `/run/grafana/token` | plugin |
-
-`GRAFANA_API_*` are only needed by services that call the Grafana API (e.g. the catalog server). Apps that only emit telemetry and never read from Grafana can omit them.
-
-## Volumes
-
-```yaml
-volumes:
-  - grafana-token:/run/grafana:ro
-```
-
-The `grafana-bootstrap` one-shot writes a service-account token there; consumers read it. Skip the mount if `GRAFANA_API_TOKEN_FILE` is not wired.
 
 ## depends_on
 
@@ -61,11 +48,6 @@ services:
       OTEL_RESOURCE_ATTRIBUTES: "service.namespace=${PROJECT_NAME},deployment.environment.name=dev,module_name=app,owned_by=${TECH_LEAD_EMAIL}"
       # Node only:
       # OTEL_SEMCONV_STABILITY_OPT_IN: http
-      # Only if this service calls the Grafana API:
-      GRAFANA_API_URL: http://grafana:3000
-      GRAFANA_API_TOKEN_FILE: /run/grafana/token
-    volumes:
-      - grafana-token:/run/grafana:ro
     depends_on:
       otel-collector:
         condition: service_started
