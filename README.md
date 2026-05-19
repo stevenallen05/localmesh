@@ -208,7 +208,7 @@ docker compose up -d --build
 
 ## What to look at
 
-**Grafana** at `localhost:3001` (admin / admin), three provisioned dashboards:
+**Grafana** at `localhost:3001` (admin / admin), four provisioned dashboards:
 
 - **Lightweight APM for OpenTelemetry** (`/d/apm`) — community dashboard
   [22784](https://grafana.com/grafana/dashboards/22784) by Cyrille Le
@@ -229,6 +229,10 @@ docker compose up -d --build
   stripped (we don't run on k8s in dev). Adds one custom **top-N slow queries**
   table panel sourced from `pg_stat_statements` — no community dashboard
   surveyed had a slow-query panel matching our exporter's metric names.
+- **Ingress** (`/d/localmesh-ingress`) — request rates by HTTP status,
+  p50/p95 ingress latency, upstream health. Sourced from Caddy access
+  logs (Loki). Custom — no upstream community dashboard fits the
+  Caddy-as-mesh-ingress shape.
 
 **www** at `localhost:3000` — three demo buttons (`PrintPostgresStats`,
 `ListGrafanaDatasources`, `TestRPC`) that exercise the trace path
