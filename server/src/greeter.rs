@@ -42,11 +42,16 @@ impl From<DbError> for Status {
 impl Greeter for GreeterSvc {
     #[tracing::instrument(skip_all, fields(rpc.method = "say_hello"))]
     async fn say_hello(&self, req: Request<HelloRequest>) -> Result<Response<HelloReply>, Status> {
-        // Pull identity facts from request extensions (set by the user +
-        // peer interceptors); they go into the response payload, NOT into
-        // span attributes — PII-at-ingress rule (spec §9.3).
+        // Read all extensions BEFORE consuming `req` via into_inner().
+        // Identity facts (User, PeerIdentity) go into the response payload,
+        // NOT into span attributes — PII-at-ingress rule (spec §9.3).
+        // ClaimsForDb feeds the hello_messages INSERT below.
         let user = req.extensions().get::<User>().cloned();
         let peer = req.extensions().get::<PeerIdentity>().cloned();
+        let claims_for_db = req.extensions()
+            .get::<crate::identity::ClaimsForDb>()
+            .cloned()
+            .unwrap_or_default();
 
         tracing::debug!(
             user.id = user.as_ref().map(|u| u.id.as_str()).unwrap_or(""),
@@ -54,14 +59,11 @@ impl Greeter for GreeterSvc {
             "handling say_hello"
         );
 
-        // Current OTel trace id, hex-encoded, so the response payload can
-        // datalink into Tempo.
-        let trace_id = tracing::Span::current()
-            .context()
-            .span()
-            .span_context()
-            .trace_id()
-            .to_string();
+        // Current OTel SpanContext for pg_tracing trace-stitching AND the
+        // WhoAmI response trace_id (one extraction, two consumers).
+        let cx = tracing::Span::current().context();
+        let span_ctx = cx.span().span_context().clone();
+        let trace_id = span_ctx.trace_id().to_string();
 
         let who = WhoAmI {
             mtls_peer_uri: peer.map(|p| p.spiffe_uri).unwrap_or_default(),
@@ -70,10 +72,23 @@ impl Greeter for GreeterSvc {
             trace_id,
         };
 
+        // Now safe to consume req.
         let name = req.into_inner().name;
         let name = if name.is_empty() { "world" } else { &name };
+        let reply_message = format!("hello, {name}");
+
+        // Persist verified JWT-derived identity into business data.
+        // The PII-at-ingress rule constrains telemetry, not business data we
+        // choose to write — see DESIGN_DECISIONS row :56.
+        self.db.record_hello_message(
+            &reply_message,
+            &claims_for_db.iss,
+            &claims_for_db.sub,
+            &span_ctx,
+        ).await?;
+
         Ok(Response::new(HelloReply {
-            message:  format!("hello, {name}"),
+            message:  reply_message,
             who_am_i: Some(who),
         }))
     }

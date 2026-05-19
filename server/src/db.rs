@@ -86,6 +86,28 @@ impl Db {
         Ok(())
     }
 
+    /// Insert one hello_messages row. Prepends the traceparent comment so
+    /// pg_tracing stitches parse/plan/exec spans under the gRPC server span.
+    pub async fn record_hello_message(
+        &self,
+        message: &str,
+        jwt_issuer: &str,
+        jwt_subject: &str,
+        parent: &SpanContext,
+    ) -> Result<(), DbError> {
+        let sql = format!(
+            "{} INSERT INTO hello_messages (message, jwt_issuer, jwt_subject) VALUES ($1, $2, $3)",
+            traceparent_comment_for(parent),
+        );
+        sqlx::query(&sql)
+            .bind(message)
+            .bind(jwt_issuer)
+            .bind(jwt_subject)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     /// Reads the five headline `pg_stat_database` metrics for the current
     /// database. `numbackends` is cast to int4 to match `TopStats::num_backends`;
     /// `cache_hit_ratio` is guarded against divide-by-zero on a freshly reset
