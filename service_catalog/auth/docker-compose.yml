@@ -77,14 +77,15 @@ services:
     command:
       - dex
       - serve
-      - /etc/dex.yaml
       - /etc/dex.yaml.generated
     environment:
       PROJECT_NAME: ${PROJECT_NAME}
       LOCAL_DOMAIN: ${LOCAL_DOMAIN}
       LOCALMESH_OIDC_CLIENT_SECRET: ${LOCALMESH_OIDC_CLIENT_SECRET}
     volumes:
-      - ./dex.yaml:/etc/dex.yaml:ro
+      # Only the merged file goes to dex; dex.yaml is read by secrets-gen.py
+      # as source, then merged with the per-user mockCallback connectors
+      # into dex.yaml.generated (dex's CLI accepts only one config file).
       - ./dex.yaml.generated:/etc/dex.yaml.generated:ro
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:5556/dex/healthz"]

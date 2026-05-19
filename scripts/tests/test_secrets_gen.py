@@ -251,8 +251,8 @@ def test_caddyfile_requires_auth_false_emits_ungated_template(tmp_path, monkeypa
     assert "span ingress" not in text
 
 
-def test_dex_yaml_generated_emits_one_mock_connector_per_user(tmp_path, monkeypatch):
-    """Reads users.yaml, writes dex.yaml.generated with one mockCallback per user."""
+def test_dex_yaml_generated_merges_base_plus_one_mock_connector_per_user(tmp_path, monkeypatch):
+    """Reads dex.yaml + users.yaml, writes a merged dex.yaml.generated."""
     _seed(
         tmp_path,
         project_toml='project_name = "demo"\nlocal_domain = "lvh.me"\n',
@@ -266,6 +266,12 @@ def test_dex_yaml_generated_emits_one_mock_connector_per_user(tmp_path, monkeypa
             "auth": 'services:\n  dex:\n    image: dex\n    labels:\n      mesh.exempt: "true"\n',
         },
     )
+    # dex.yaml lives in the plugin dir; dex's CLI takes only one config file,
+    # so secrets-gen.py merges base + connectors into dex.yaml.generated.
+    (tmp_path / "service_catalog" / "auth" / "dex.yaml").write_text(
+        'issuer: https://dex.demo.lvh.me:8443/dex\n'
+        'storage:\n  type: memory\n'
+    )
     secrets = tmp_path / ".secrets"
     secrets.mkdir()
     (secrets / "users.yaml").write_text(
@@ -277,13 +283,16 @@ def test_dex_yaml_generated_emits_one_mock_connector_per_user(tmp_path, monkeypa
     project, plugins = mod.load_manifests()
     mod.write_dex_connectors()
     generated = (tmp_path / "service_catalog" / "auth" / "dex.yaml.generated").read_text()
+    # Base block preserved verbatim.
+    assert "issuer: https://dex.demo.lvh.me:8443/dex" in generated
+    assert "type: memory" in generated
+    # Connectors block appended below.
     assert "type: mockCallback" in generated
     assert "id: user-alice" in generated
     assert "userID: alice" in generated
     assert 'email: alice@example.invalid' in generated
     assert "id: user-bob" in generated
     assert 'email: bob@example.invalid' in generated
-    # Two connectors, both mockCallback.
     assert generated.count("type: mockCallback") == 2
 
 
