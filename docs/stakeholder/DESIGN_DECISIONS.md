@@ -4,7 +4,7 @@ Current state of every design choice — one row each. Implementation specifics 
 
 Companion: [`ENGINEERING_RULES.md`](./ENGINEERING_RULES.md), [`PROJECT_SCOPE.md`](./PROJECT_SCOPE.md), [`PRODUCTION_DISCUSSIONS.md`](./PRODUCTION_DISCUSSIONS.md).
 
-This repo is a reference implementation of the **microservice-template + service-catalogue pattern** — the design pattern that becomes [LocalMesh](../../README.md#localmesh) once an org's SRE-owned plugins are in place. The Rust + Next.js parts are one team's microservice; observability, logging, `caddy` (north-south ingress), `auth_shim` (dev user picker), and the optional database are catalogue modules the team includes from a stub catalogue.
+This repo is a reference implementation of the **microservice-template + service-catalogue pattern** — the design pattern that becomes [LocalMesh](../../README.md) once an org's SRE-owned plugins are in place. The Rust + Next.js parts are one team's microservice; observability, logging, `caddy` (north-south ingress), `auth_shim` (dev user picker), and the optional database are catalogue modules the team includes from a stub catalogue.
 
 ## Starting assumptions
 
