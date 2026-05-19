@@ -22,6 +22,15 @@ dev-only; the same data is available on prod, but those collectors are owned
 by ops. The dev env version is just to provide fidelity and give the same 
 observability DX between prod and 'my machine'
 
+Fourth, revisit cadvisor's project-filter regex (`'${PROJECT_NAME}|'` with
+the empty alternative) introduced when prometheus moved to docker_sd
+discovery. The empty branch is load-bearing: it lets non-cadvisor series
+through the shared `discovered` job because they don't carry
+`container_label_com_docker_compose_project`. Worth re-reading once muscle
+memory on Prometheus relabel semantics is back — there might be a cleaner
+way to scope the filter to cadvisor's series only (e.g., job split, or
+matching `__name__=~"container_.+"` instead of the empty-string trick).
+
 ## Cross-cutting conventions
 
 - **`metrics.*` compose-label namespace.** Inhabitants are
