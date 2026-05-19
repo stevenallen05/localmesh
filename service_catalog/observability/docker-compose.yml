@@ -29,56 +29,88 @@ configs:
         prometheus:
           config:
             scrape_configs:
-              # `module_name` attributes each scrape job to the catalogue
-              # module whose compose file declares it; `owned_by` names the
-              # team accountable for the data. Other catalogue includes set
-              # their own values on scrape jobs they own — app code uses
-              # OTEL_RESOURCE_ATTRIBUTES on the container instead.
-              - job_name: caddy
-                # Caddy's Prometheus endpoint on its admin API (:2019/metrics).
-                # Exposes caddy_http_request_duration_seconds_*,
-                # caddy_http_requests_in_flight, reverse_proxy_* etc.
-                # Enabled via the `metrics` global option in the generated
-                # Caddyfile (scripts/secrets-gen.py).
-                static_configs:
-                  - targets: ['caddy:2019']
-                    labels:
-                      module_name: caddy
-                      owned_by: sre@example.com
-                scrape_interval: 15s
-              - job_name: node-exporter
-                # Host kernel metrics — dev-fidelity only. In prod, ops
-                # owns the equivalent collectors and this scrape job is
-                # removed by the prod overlay.
-                static_configs:
-                  - targets: ['node-exporter:9100']
-                    labels:
-                      module_name: observability
-                      owned_by: sre@example.com
-                scrape_interval: 30s
-              - job_name: cadvisor
-                static_configs:
-                  - targets: ['cadvisor:8080']
-                    labels:
-                      module_name: observability
-                      owned_by: sre@example.com
-                scrape_interval: 30s
-                metric_relabel_configs:
-                  # Drop samples from containers outside this compose
-                  # project (e.g. the dev-environment agentbox-*
-                  # containers on the host daemon). Closes the TODO
-                  # entry on cluster-health host noise.
-                  - source_labels: [container_label_com_docker_compose_project]
-                    regex: '${PROJECT_NAME}'
+              # Single docker_sd discovery job covering all Pattern-A
+              # scrape targets. Emitter containers opt in via
+              # prometheus.io/scrape=true; port and path come from labels.
+              # Pattern B sidecar collectors (e.g. database-collector
+              # pushing OTLP) are unaffected.
+              # TODO: needs_prod_decisions kubernetes_sd_configs replaces docker_sd_configs in prod
+              # TODO: needs_prod_decisions localmesh CLI emits prometheus.io/* labels from plugin.toml [[exports.metrics]]
+              - job_name: discovered
+                docker_sd_configs:
+                  - host: unix:///var/run/docker.sock
+                    refresh_interval: 30s
+                relabel_configs:
+                  # Keep only containers explicitly opting in
+                  - source_labels: [__meta_docker_container_label_prometheus_io_scrape]
+                    regex: "true"
                     action: keep
-                  # Stamp `service` from the docker label set by every
-                  # compose service. Two-step fallback to container name —
-                  # if the docker label is set, step 1 copies it and step
-                  # 2's leading-semicolon-anchored regex no-ops; if the
-                  # label is absent, step 1 produces empty and step 2's
-                  # regex captures the container name.
+                  # Strip the leading slash from Docker's container-name label
+                  - source_labels: [__meta_docker_container_name]
+                    target_label: __tmp_name
+                    regex: "/(.+)"
+                    replacement: "$1"
+                  # target = <container-name>:<port-from-label>. The
+                  # two source labels join via `separator: ":"` and the
+                  # default `regex: (.+)` + `replacement: $1` writes the
+                  # whole joined string to __address__.
+                  - source_labels: [__tmp_name, __meta_docker_container_label_prometheus_io_port]
+                    target_label: __address__
+                    separator: ":"
+                  # Custom metrics path, default /metrics if label absent
+                  - source_labels: [__meta_docker_container_label_prometheus_io_path]
+                    target_label: __metrics_path__
+                    regex: (.+)
+                  # Propagate the catalog's identity tuple from container
+                  # labels. We write `job` (not `service_name`) because the
+                  # OTel prometheus receiver translates Prom `job` →
+                  # OTLP `service.name`, which becomes the `service_name`
+                  # series label after resource_to_telemetry_conversion.
+                  # That's the same path the old static jobs took
+                  # (`job_name: caddy` → `service_name=caddy`); Pattern B's
+                  # OTLP-pushed metrics carry `service_name` via the same
+                  # resource attr — the two paths converge.
+                  - source_labels: [__meta_docker_container_label_metrics_service_name]
+                    target_label: job
+                  - source_labels: [__meta_docker_container_label_metrics_module_name]
+                    target_label: module_name
+                  - source_labels: [__meta_docker_container_label_metrics_owned_by]
+                    target_label: owned_by
+                metric_relabel_configs:
+                  # Three carry-forward rules from the prior cadvisor static
+                  # job. They only fire on cadvisor's per-container series
+                  # (where `container_label_*` source labels exist); for
+                  # non-cadvisor series these rules no-op naturally because
+                  # the source labels are absent.
+                  #
+                  # Rule 1 — project filter. Drops samples from containers
+                  # outside this compose project (e.g. agentbox-* on the
+                  # host daemon). The `|` empty alternative lets
+                  # non-cadvisor series through (they don't carry
+                  # container_label_com_docker_compose_project).
+                  # TODO: revisit the empty-alternative trick once
+                  # the docker_sd migration settles — see docs/TODO.md.
+                  - source_labels: [container_label_com_docker_compose_project]
+                    regex: '${PROJECT_NAME}|'
+                    action: keep
+                  # Rule 2 — copy cadvisor's observed-container metrics
+                  # label into `service`. Step 1 of the two-step fallback.
                   - source_labels: [container_label_metrics_service_name]
                     target_label: service
+                  # Rule 3 — fallback to container name when rule 2
+                  # produced an empty `service`. Two-step pattern: rule 2
+                  # copies the metrics label if present; rule 3's regex
+                  # `;(.+)` matches the joined `service;name` string only
+                  # when service is empty, capturing `name` as the
+                  # replacement.
+                  #
+                  # Scope caveat: rules 2 and 3 run on every discovered
+                  # target's metrics, not just cadvisor's. They no-op on
+                  # non-cadvisor series because container_label_* source
+                  # labels are absent. If a future non-cadvisor target
+                  # ever exposes a `name` label, rule 3 would overwrite
+                  # its `service` — keep that in mind when adding
+                  # emitters.
                   - source_labels: [service, name]
                     separator: ';'
                     regex: ';(.+)'
@@ -257,6 +289,14 @@ services:
     image: otel/opentelemetry-collector-contrib:0.152.0
     container_name: otel-collector
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    # Reading the docker socket needs either root or membership in the
+    # host `docker` group. Same trade-off vector made in logging/. Mount
+    # is read-only; prod uses kubernetes_sd_configs and the socket goes
+    # away.
+    # TODO: needs_prod_decisions docker socket scope; prod uses kubernetes_sd_configs
+    user: "0:0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     labels:
       # Whole catalog module collapses to one row in service-glance.
       # See cadvisor metric_relabel_configs in this file.
@@ -293,6 +333,8 @@ services:
       # depends_on readiness init-container; declare it here. See
       # https://repo.katenary.io/katenary/katenary/issues/182.
       mesh.exempt: "true"
+      prometheus.io/scrape: "true"
+      prometheus.io/port:   "9100"
       katenary.v3/ports: |-
         - 9100
       metrics.service_name: observability
@@ -312,6 +354,8 @@ services:
     labels:
       # See node-exporter above — cadvisor serves the prometheus scrape on 8080.
       mesh.exempt: "true"
+      prometheus.io/scrape: "true"
+      prometheus.io/port:   "8080"
       katenary.v3/ports: |-
         - 8080
       metrics.service_name: observability

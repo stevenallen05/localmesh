@@ -48,6 +48,9 @@ services:
       timeout: 3s
       retries: 5
     labels:
+      prometheus.io/scrape: "true"
+      prometheus.io/port:   "2019"
+      prometheus.io/path:   "/metrics"
       katenary.v3/ports: |-
         - 8443
       metrics.service_name: caddy
