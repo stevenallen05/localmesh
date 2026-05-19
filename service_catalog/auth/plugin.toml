@@ -1,0 +1,14 @@
+[identity]
+module_name = "auth"
+owned_by    = "sre@example.com"
+
+[[services]]
+container     = "oauth2-proxy"
+port          = 4180
+requires_auth = false           # IS the auth decider; can't gate itself
+
+[[services]]
+container          = "dex"
+port               = 5556
+expose_via_ingress = true       # browser hits dex.${PROJECT_NAME}.${LOCAL_DOMAIN} for the OIDC handshake
+requires_auth      = false      # IdP can't gate itself

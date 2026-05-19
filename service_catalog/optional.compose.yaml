@@ -5,4 +5,3 @@
 
 include:
   - path: database/docker-compose.yml
-  - path: auth_shim/docker-compose.yml

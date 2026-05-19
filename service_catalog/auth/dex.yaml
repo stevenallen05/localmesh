@@ -1,0 +1,26 @@
+# Dex base config — hand-written. The mockCallback connectors are
+# appended by importing dex.yaml.generated (written by secrets-gen.py
+# from .secrets/users.yaml).
+#
+# TODO: needs_prod_decisions swap mock connectors for real OIDC IdP
+
+issuer: https://dex.${PROJECT_NAME}.${LOCAL_DOMAIN}:8443/dex
+
+storage:
+  type: memory
+
+web:
+  http: 0.0.0.0:5556
+
+oauth2:
+  skipApprovalScreen: true       # dev UX: don't make the user click "Approve" after picking a tile
+
+staticClients:
+  - id:     localmesh-dev
+    name:   "LocalMesh"
+    secret: $LOCALMESH_OIDC_CLIENT_SECRET
+    redirectURIs:
+      - https://www.${PROJECT_NAME}.${LOCAL_DOMAIN}:8443/oauth2/callback
+
+# Connectors are imported from dex.yaml.generated at container start
+# via the dex CLI's --config flag (we pass both files).
