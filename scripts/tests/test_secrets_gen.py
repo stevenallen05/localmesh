@@ -233,3 +233,95 @@ def test_caddyfile_requires_auth_false_emits_ungated_template(tmp_path, monkeypa
     text = "\n".join(mod.caddyfile_lines(project, plugins))
     assert "forward_auth" not in text
     assert "reverse_proxy https://www:3443" in text
+
+
+def test_dex_yaml_generated_emits_one_mock_connector_per_user(tmp_path, monkeypatch):
+    """Reads users.yaml, writes dex.yaml.generated with one mockCallback per user."""
+    _seed(
+        tmp_path,
+        project_toml='project_name = "demo"\nlocal_domain = "lvh.me"\n',
+        plugins={
+            "auth": (
+                '[identity]\nmodule_name = "auth"\nowned_by = "sre@example.com"\n'
+                '[[services]]\ncontainer = "dex"\nport = 5556\nexpose_via_ingress = true\nrequires_auth = false\n'
+            ),
+        },
+        composes={
+            "auth": 'services:\n  dex:\n    image: dex\n    labels:\n      mesh.exempt: "true"\n',
+        },
+    )
+    secrets = tmp_path / ".secrets"
+    secrets.mkdir()
+    (secrets / "users.yaml").write_text(
+        'users:\n'
+        '  - { id: alice,   email: alice@example.invalid,   name: "Alice Example" }\n'
+        '  - { id: bob,     email: bob@example.invalid,     name: "Bob Tester" }\n'
+    )
+    mod = _load(monkeypatch, tmp_path)
+    project, plugins = mod.load_manifests()
+    mod.write_dex_connectors()
+    generated = (tmp_path / "service_catalog" / "auth" / "dex.yaml.generated").read_text()
+    assert "type: mockCallback" in generated
+    assert "id: user-alice" in generated
+    assert "userID: alice" in generated
+    assert 'email: alice@example.invalid' in generated
+    assert "id: user-bob" in generated
+    assert 'email: bob@example.invalid' in generated
+    # Two connectors, both mockCallback.
+    assert generated.count("type: mockCallback") == 2
+
+
+def test_dex_yaml_generated_skipped_when_auth_plugin_absent(tmp_path, monkeypatch):
+    """If service_catalog/auth/ doesn't exist, no dex.yaml.generated is written."""
+    _seed(
+        tmp_path,
+        project_toml='project_name = "demo"\nlocal_domain = "lvh.me"\n',
+        plugins={},
+    )
+    secrets = tmp_path / ".secrets"
+    secrets.mkdir()
+    (secrets / "users.yaml").write_text('users:\n  - { id: a, email: a@x, name: A }\n')
+    mod = _load(monkeypatch, tmp_path)
+    mod.write_dex_connectors()    # should be a no-op
+    assert not (tmp_path / "service_catalog" / "auth" / "dex.yaml.generated").exists()
+
+
+def test_oidc_client_secret_minted_and_persisted(tmp_path, monkeypatch):
+    """First run mints LOCALMESH_OIDC_CLIENT_SECRET; second run preserves it."""
+    _seed(
+        tmp_path,
+        project_toml='project_name = "demo"\nlocal_domain = "lvh.me"\n',
+        plugins={},
+    )
+    mod = _load(monkeypatch, tmp_path)
+    project, plugins = mod.load_manifests()
+    mod.write_env(project, plugins)
+    text1 = (tmp_path / ".env").read_text()
+    assert "LOCALMESH_OIDC_CLIENT_SECRET=" in text1
+    secret_line_1 = [l for l in text1.splitlines() if l.startswith("LOCALMESH_OIDC_CLIENT_SECRET=")][0]
+    assert len(secret_line_1.split("=", 1)[1]) >= 32
+
+    mod.write_env(project, plugins)
+    text2 = (tmp_path / ".env").read_text()
+    secret_line_2 = [l for l in text2.splitlines() if l.startswith("LOCALMESH_OIDC_CLIENT_SECRET=")][0]
+    assert secret_line_1 == secret_line_2     # stable across runs
+
+
+def test_cookie_secret_minted_and_persisted(tmp_path, monkeypatch):
+    """OAUTH2_PROXY_COOKIE_SECRET minted once, preserved on re-run."""
+    _seed(
+        tmp_path,
+        project_toml='project_name = "demo"\nlocal_domain = "lvh.me"\n',
+        plugins={},
+    )
+    mod = _load(monkeypatch, tmp_path)
+    project, plugins = mod.load_manifests()
+    mod.write_env(project, plugins)
+    text1 = (tmp_path / ".env").read_text()
+    cookie_1 = [l for l in text1.splitlines() if l.startswith("OAUTH2_PROXY_COOKIE_SECRET=")][0]
+    assert len(cookie_1.split("=", 1)[1]) >= 32
+
+    mod.write_env(project, plugins)
+    text2 = (tmp_path / ".env").read_text()
+    cookie_2 = [l for l in text2.splitlines() if l.startswith("OAUTH2_PROXY_COOKIE_SECRET=")][0]
+    assert cookie_1 == cookie_2

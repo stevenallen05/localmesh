@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import secrets as _secrets
 import subprocess
 import sys
 import tomllib
@@ -218,6 +219,32 @@ def fmt_value(value) -> str:
     return str(value)
 
 
+def _existing_env_value(key: str) -> str | None:
+    """Read a value from the existing .env (any section, managed or not)."""
+    if not ENV_FILE.exists():
+        return None
+    for line in ENV_FILE.read_text().splitlines():
+        if line.startswith(f"{key}="):
+            return line.split("=", 1)[1]
+    return None
+
+
+def ensure_secret(key: str, mint) -> str:
+    """Return existing .env value for key, or mint + return a new one."""
+    existing = _existing_env_value(key)
+    if existing:
+        return existing
+    return mint()
+
+
+def mint_hex(n_bytes: int = 16) -> str:
+    return _secrets.token_hex(n_bytes)
+
+
+def mint_base64(n_bytes: int = 32) -> str:
+    return _secrets.token_urlsafe(n_bytes)
+
+
 def env_lines(project: dict, plugins: list[tuple[str, dict]]) -> list[str]:
     lines: list[str] = []
 
@@ -242,6 +269,10 @@ def env_lines(project: dict, plugins: list[tuple[str, dict]]) -> list[str]:
         lines.append(f"{prefix}_EXPOSE_VIA_INGRESS={'true' if expose else 'false'}")
         if ingress:
             lines.append(f"{prefix}_INGRESS=true")
+
+    # Auth-plugin secrets. Minted once, preserved across runs.
+    lines.append(f"LOCALMESH_OIDC_CLIENT_SECRET={ensure_secret('LOCALMESH_OIDC_CLIENT_SECRET', mint_hex)}")
+    lines.append(f"OAUTH2_PROXY_COOKIE_SECRET={ensure_secret('OAUTH2_PROXY_COOKIE_SECRET', mint_base64)}")
 
     return lines
 
@@ -364,6 +395,41 @@ def write_caddyfile(project: dict, plugins: list[tuple[str, dict]]):
 
 
 # ---------------------------------------------------------------------------
+# Dex connector generation (auth plugin)
+
+AUTH_DIR = CATALOG / "auth"
+USERS_FILE = SECRETS / "users.yaml"
+DEX_GENERATED = AUTH_DIR / "dex.yaml.generated"
+
+
+def write_dex_connectors():
+    """Emit one mockCallback Dex connector per user in .secrets/users.yaml.
+
+    No-op when the auth plugin isn't present (catalog without auth/), so
+    this is safe to call unconditionally from main().
+    """
+    if not AUTH_DIR.exists() or not USERS_FILE.exists():
+        return
+    doc = yaml.safe_load(USERS_FILE.read_text()) or {}
+    users = doc.get("users") or []
+
+    blocks: list[str] = ["connectors:"]
+    for u in users:
+        uid = u["id"]
+        blocks.extend([
+            f"  - type: mockCallback",
+            f"    id: user-{uid}",
+            f"    name: \"{u['name']}\"",
+            f"    config:",
+            f"      userInfo:",
+            f"        userID: {uid}",
+            f"        username: \"{u['name']}\"",
+            f"        email: {u['email']}",
+        ])
+    DEX_GENERATED.write_text("\n".join(blocks) + "\n")
+
+
+# ---------------------------------------------------------------------------
 
 def main():
     if not PROJECT_TOML.exists():
@@ -373,6 +439,7 @@ def main():
     mint_certs(project, plugins)
     write_env(project, plugins)
     write_caddyfile(project, plugins)
+    write_dex_connectors()
     print("LocalMesh secrets: regenerated.")
 
 
