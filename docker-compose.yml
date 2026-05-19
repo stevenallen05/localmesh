@@ -79,8 +79,11 @@ services:
       dockerfile: www/Dockerfile
     image: metrics-stack/www:0.1.0  # Rule 1
     environment:
-      # Rule 4 rewrites this to `{{ .Release.Name }}-server:50051` in k8s.
-      SERVER_ADDR: server:50051
+      # gRPC dials www-outbound on the shared netns; the sidecar wraps
+      # mTLS to server:50051. Value is loopback now, so no chart-time
+      # rewrite is needed.
+      # TODO: needs_prod_decisions katenary same-pod label for sidecars
+      SERVER_ADDR: 127.0.0.1:50443
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
       OTEL_SERVICE_NAME: www
@@ -91,31 +94,24 @@ services:
       # `http.server.request.duration` (seconds). Opt in.
       OTEL_SEMCONV_STABILITY_OPT_IN: http
       HOSTNAME: ${HOSTNAME:-}
-      WWW_PORT: 3443
-    volumes:
-      # LocalMesh mesh cert dir — used by lib/grpc-credentials.ts to dial
-      # server:50051 over mTLS, and by server.mjs for inbound HTTPS from
-      # Caddy. See docs/superpowers/specs/
-      # 2026-05-18-localmesh-service-mesh-design.md §8.
-      - ./.secrets/certs/www:/run/www:ro
-    # No host port mapping — Caddy is the only ingress. Container exposes
-    # 3443 to the docker network for caddy's https://www:3443 upstream.
+      # Plaintext bind on loopback. www-inbound (ghostunnel) terminates
+      # mTLS on :3443 and forwards plain to here. App + sidecars share
+      # the same netns via `network_mode: "service:www"`.
+      WWW_PORT: 3444
+    # No host port mapping — Caddy is the only ingress. The www-inbound
+    # sidecar exposes :3443 on the shared netns for caddy's upstream.
     depends_on:
       server:
         condition: service_healthy
       otel-collector:
         condition: service_started
     healthcheck:
-      # BusyBox wget speaks HTTPS too; --no-check-certificate is fine for
-      # the in-container readiness check (we already trust the listener's
-      # cert by virtue of mounting our own CA into the same container).
-      test: ["CMD", "wget", "--no-check-certificate", "-qO-", "https://localhost:3443/"]
+      # Plaintext loopback probe — TLS termination is in the sidecar now.
+      test: ["CMD", "wget", "-qO-", "http://localhost:3444/"]
       interval: 10s
       timeout: 3s
       retries: 5
     labels:
-      katenary.v3/map-env: |-
-        SERVER_ADDR: '{{ .Release.Name }}-server:50051'
       # Rule 6: domain comes from .env's EXTERNAL_DOMAIN, mirroring
       # project.toml's external_domain. Prod overlay can still override.
       katenary.v3/ingress: |-
@@ -161,3 +157,66 @@ services:
       metrics.module_name: mesh
       metrics.owned_by: sre@example.com
       mesh.role: inbound
+
+  www-inbound:
+    # ghostunnel sidecar terminating east-west mTLS on www's :3443 and
+    # forwarding plain TCP to the app on 127.0.0.1:3444. Shares www's
+    # netns via `network_mode: "service:www"`, so caddy's upstream
+    # `https://www:3443` lands on this listener.
+    image: ghostunnel/ghostunnel:v1.7.3
+    restart: unless-stopped
+    network_mode: "service:www"
+    command:
+      - server
+      - --listen=:3443
+      - --target=127.0.0.1:3444
+      - --cert=/run/www/id.crt
+      - --key=/run/www/id.key
+      - --cacert=/run/www/trust.ca.crt
+      # Only caddy reaches this listener; list its SPIFFE URI explicitly.
+      # See the --allow-uri note on server-inbound for why the trust-domain
+      # glob doesn't work here.
+      - --allow-uri=spiffe://caddy.${PROJECT_NAME}.${LOCAL_DOMAIN}
+      - --status=127.0.0.1:9090
+    volumes:
+      - ./.secrets/certs/www:/run/www:ro
+    depends_on:
+      www:
+        condition: service_started
+    # TODO: needs_prod_decisions ghostunnel sidecar shape needs richer dep manager
+    labels:
+      metrics.service_name: ghostunnel
+      metrics.module_name: mesh
+      metrics.owned_by: sre@example.com
+      mesh.role: inbound
+
+  www-outbound:
+    # ghostunnel client-mode sidecar wrapping www's plaintext loopback gRPC
+    # dial into mTLS to server:50051. Listens on 127.0.0.1:50443 (shared
+    # netns with www) and connects out to server-inbound. Distinct status
+    # port (:9091) from www-inbound to avoid collision in the shared netns.
+    image: ghostunnel/ghostunnel:v1.7.3
+    restart: unless-stopped
+    network_mode: "service:www"
+    command:
+      - client
+      - --listen=127.0.0.1:50443
+      - --target=server:50051
+      - --cert=/run/www/id.crt
+      - --key=/run/www/id.key
+      - --cacert=/run/www/trust.ca.crt
+      - --verify-uri=spiffe://server.${PROJECT_NAME}.${LOCAL_DOMAIN}
+      - --status=127.0.0.1:9091
+    volumes:
+      - ./.secrets/certs/www:/run/www:ro
+    depends_on:
+      www:
+        condition: service_started
+      server-inbound:
+        condition: service_started
+    # TODO: needs_prod_decisions ghostunnel sidecar shape needs richer dep manager
+    labels:
+      metrics.service_name: ghostunnel
+      metrics.module_name: mesh
+      metrics.owned_by: sre@example.com
+      mesh.role: outbound

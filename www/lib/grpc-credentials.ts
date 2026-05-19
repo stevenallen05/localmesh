@@ -1,25 +1,13 @@
-// LocalMesh outbound mTLS for www → server gRPC dials.
+// Plain gRPC credentials. East-west mTLS is handled by the
+// `www-outbound` ghostunnel sidecar — www dials it on 127.0.0.1:50443
+// plaintext; the sidecar wraps mTLS to server:50051.
 //
-// Loads id.crt / id.key / trust.ca.crt from /run/www/ (the per-container
-// cert dir produced by `make certs` from project.toml's [[services]]
-// entry for `www`). Cached at module-load time — credentials are reused
-// across requests.
-//
-// TODO: needs_prod_decisions per-call SVID rotation; SPIRE Workload API
-// returns refreshing JWT/X.509 SVIDs in prod.
+// Kept as a one-line indirection so a future TLS re-introduction stays
+// at this single site rather than scattering grpc.credentials calls
+// across handlers.
 
 import * as grpc from '@grpc/grpc-js';
-import fs from 'fs';
-
-const CERTS_DIR = '/run/www';
-
-let cached: grpc.ChannelCredentials | null = null;
 
 export function meshChannelCredentials(): grpc.ChannelCredentials {
-  if (cached) return cached;
-  const rootCerts = fs.readFileSync(`${CERTS_DIR}/trust.ca.crt`);
-  const privateKey = fs.readFileSync(`${CERTS_DIR}/id.key`);
-  const certChain = fs.readFileSync(`${CERTS_DIR}/id.crt`);
-  cached = grpc.credentials.createSsl(rootCerts, privateKey, certChain);
-  return cached;
+  return grpc.credentials.createInsecure();
 }

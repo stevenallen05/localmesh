@@ -1,40 +1,22 @@
-// HTTPS listener wrapping the Next.js handler so the east-west hop from
-// Caddy → www is mTLS. Replaces `next start` (which listens on plaintext
-// HTTP) as the container's entrypoint.
+// Plain HTTP listener for Next.js. East-west mTLS termination is handled
+// by the `www-inbound` ghostunnel sidecar sharing this container's
+// netns. The sidecar listens on :3443 (TLS) and forwards plain to
+// 127.0.0.1:3444 — this is :3444.
 //
-// Loads /run/www/{id.crt,id.key,trust.ca.crt} per the LocalMesh cert
-// dir convention. Verify-CA: any client presenting a cert chained to the
-// LocalMesh CA is accepted; identity ENRICHMENT happens at the app layer
-// when WhoAmI lands.
-//
-// TODO: needs_prod_decisions Node-as-mTLS-terminator is dev-only; prod's
-// ingress controller terminates north-south, sidecar terminates east-west.
+// Binds 127.0.0.1 only so only the sidecars in the shared netns can
+// reach it. The container exposes no plaintext to the docker network.
 
-import https from 'node:https';
-import fs from 'node:fs';
+import http from 'node:http';
 import next from 'next';
 
-const CERTS_DIR = '/run/www';
-const port = Number(process.env.WWW_PORT ?? 3443);
-const hostname = '0.0.0.0';
+const port = Number(process.env.WWW_PORT ?? 3444);
+const hostname = '127.0.0.1';
 
-const app = next({
-  dev: false,
-  hostname,
-  port,
-});
+const app = next({ dev: false, hostname, port });
 const handle = app.getRequestHandler();
 
 await app.prepare();
 
-const tlsOpts = {
-  cert: fs.readFileSync(`${CERTS_DIR}/id.crt`),
-  key: fs.readFileSync(`${CERTS_DIR}/id.key`),
-  ca: fs.readFileSync(`${CERTS_DIR}/trust.ca.crt`),
-  requestCert: true,
-  rejectUnauthorized: true,
-};
-
-https.createServer(tlsOpts, (req, res) => handle(req, res)).listen(port, () => {
-  console.log(`> Ready on https://${hostname}:${port}`);
+http.createServer((req, res) => handle(req, res)).listen(port, hostname, () => {
+  console.log(`> Ready on http://${hostname}:${port}`);
 });
