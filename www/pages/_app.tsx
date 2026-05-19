@@ -9,8 +9,13 @@ import App from 'next/app';
 
 // Node lowercases header names. Each header is string | string[] | undefined;
 // multi-value (string[]) is rare for these headers but possible — pick first.
+// Caddy's `copy_headers field>name` (in forward_auth) desugars to setting
+// the upstream header to the literal placeholder `{http.reverse_proxy.header.field}`
+// when the source header is absent from the auth response — guard against
+// that leak so the banner doesn't render the raw placeholder.
 function pick(v: string | string[] | undefined): string {
-  return Array.isArray(v) ? v[0] ?? '' : v ?? '';
+  const s = Array.isArray(v) ? v[0] ?? '' : v ?? '';
+  return s.startsWith('{http.') ? '' : s;
 }
 
 type BannerProps = { name: string; email: string };
