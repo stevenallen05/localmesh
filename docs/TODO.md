@@ -75,6 +75,25 @@ matching `__name__=~"container_.+"` instead of the empty-string trick).
 - **Deprecated component aliases.** Collector 0.152 wants `otlp_grpc`,
   `otlp_http`, `file_log` instead of `otlp`, `otlphttp`, `filelog`.
   Rename now, before the aliases get removed.
+- **docker socket scope.** otel-collector mounts
+  `/var/run/docker.sock:ro` for `docker_sd_configs` discovery. It also
+  runs as `user: "0:0"` for socket-group access. cadvisor sets the
+  precedent for privileged-socket access. Prod uses
+  `kubernetes_sd_configs` reading pod labels — no socket. `TODO:
+  needs_prod_decisions docker socket scope`.
+- **TLS scrape config for mTLS-terminated emitters.** Once the
+  ghostunnel JSON-to-Prom adapter lands and the sidecar's `/_metrics`
+  endpoint becomes scrapable, the scrape will need TLS config to honor
+  the mTLS-terminated status port. Either label-derivable (scheme +
+  job-level tls_config) or sidecar-fronted with HTTP. `TODO:
+  needs_prod_decisions TLS scrape for mTLS-terminated emitters`.
+- **localmesh integration for `prometheus.io/*` labels.** Labels are
+  hand-added to caddy / cadvisor / node-exporter compose today. The
+  paused localmesh CLI spec will gain `[[exports.metrics]]` in
+  `plugin.toml`; localmesh will write the labels into
+  `localmesh.compose.yaml`'s overlay block. Hand-added labels migrate
+  to declarations at that point. `TODO: needs_prod_decisions localmesh
+  emits prometheus.io/* labels`.
 
 ## LocalMesh follow-ups
 
