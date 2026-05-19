@@ -74,12 +74,10 @@ inline as `TODO: needs_prod_decisions <≤10 words>` at the relevant call
 site so they're greppable. Listed here for visibility; resolution is
 context-dependent.
 
-- **PII enforcement.** The PII-at-ingress rule (`enduser.*` stamps only at
-  www's API-route entry) is documented + code-reviewed today. Mechanical
-  enforcement (Vector / Tempo regex scrubbing, lint rule on `.setAttributes`
-  call sites, ESLint custom rule, semconv attribute allowlist on
-  downstream services) is deferred. Picking the right enforcement layer
-  depends on real-world PII contracts SRE settles on.
+- **PII enforcement, downstream layer.** The setAttributes-call-site
+  enforcement closes in T9 (no remaining sites in www
+  post-ingress-auth-revamp). Per-data-class regex scrubbing at Vector /
+  Tempo / Loki is still SRE's choice when real PII contracts settle.
 - **Default-deny mesh policy.** No `AuthorizationPolicy` enforcement in
   dev. The `mesh.exempt: "true"` compose label is the CEL predicate the
   policy generator will read in prod to write carve-outs. Picking the
@@ -124,6 +122,19 @@ context-dependent.
 - **gRPC client-side instrumentation in Node.** The www → server gRPC
   call still lacks `@opentelemetry/instrumentation-grpc`. Pre-existing
   gap; carries over from the logging delivery.
+- **xcaddy build provenance.** `service_catalog/caddy/Dockerfile` pins
+  `xcaddy` + the local `enduser_attrs` plugin via build args. Prod needs
+  pinned-SHA xcaddy + plugin checksum verification + signed image.
+  `TODO: needs_prod_decisions caddy xcaddy build provenance + image signing`.
+- **Dex JWKS key rotation strategy.** Dev uses long-lived in-memory keys.
+  Server's JWKS cache TTL is 15 min (configurable). Prod IdP swap rotates
+  keys on its own schedule; TTL should follow.
+  `TODO: needs_prod_decisions JWKS cache TTL for prod IdP rotation`.
+- **Prod IdP swap.** Dex with mockCallback connectors is dev-only. Prod
+  swaps the whole `auth/` plugin's `dex` container for a real IdP
+  (Okta / Keycloak / Auth0); `oauth2-proxy` and the Caddy `forward_auth`
+  wiring carry over unchanged.
+  `TODO: needs_prod_decisions IdP choice + SSO migration`.
 
 ## Dashboards
 
