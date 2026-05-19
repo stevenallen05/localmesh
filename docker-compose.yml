@@ -34,6 +34,14 @@ services:
       DATABASE_URL: postgres://server@postgres:5432/app?sslmode=verify-full&sslrootcert=/run/server/trust.ca.crt&sslcert=/run/server/id.crt&sslkey=/run/server/id.key
       GRAFANA_API_URL: http://grafana:3000
       GRAFANA_API_TOKEN_FILE: /run/grafana/token
+      # JWKS / OIDC — DEX_JWKS_URL is the internal docker-network plaintext
+      # endpoint used to prime + refresh the in-memory key cache.
+      # DEX_ISSUER is the browser-facing URL Dex stamps into the `iss`
+      # claim (must match exactly). OIDC_AUDIENCE is what oauth2-proxy
+      # requested + Dex stamps into `aud`.
+      DEX_JWKS_URL: http://dex:5556/dex/keys
+      DEX_ISSUER:   https://dex.${PROJECT_NAME}.${LOCAL_DOMAIN}:8443/dex
+      OIDC_AUDIENCE: localmesh-dev
     volumes:
       - grafana-token:/run/grafana:ro
       # LocalMesh cert dir for the server workload — used both for inbound

@@ -50,21 +50,63 @@ async fn main() -> Result<(), BoxError> {
     // See server/src/tls.rs.
     let tls = server::tls::server_tls_config()?;
 
+    // JWKS — prime against Dex over the docker-network plaintext URL;
+    // background task refreshes every 15 min. iss/aud match what
+    // Dex stamps + what oauth2-proxy negotiated.
+    let dex_jwks_url = std::env::var("DEX_JWKS_URL")
+        .unwrap_or_else(|_| "http://dex:5556/dex/keys".to_string());
+    let dex_issuer = std::env::var("DEX_ISSUER").unwrap_or_else(|_| {
+        format!(
+            "https://dex.{}.{}:8443/dex",
+            std::env::var("PROJECT_NAME").unwrap_or_default(),
+            std::env::var("LOCAL_DOMAIN").unwrap_or_default(),
+        )
+    });
+    let oidc_aud =
+        std::env::var("OIDC_AUDIENCE").unwrap_or_else(|_| "localmesh-dev".to_string());
+
+    let jwks = Arc::new(server::auth::Jwks::new(&dex_issuer, &oidc_aud));
+    jwks.fetch_from(&dex_jwks_url)
+        .await
+        .map_err(|e| -> BoxError { format!("JWKS prime failed: {e}").into() })?;
+    tracing::info!(jwks_url = %dex_jwks_url, "JWKS primed");
+    let _jwks_refresher = jwks
+        .clone()
+        .spawn_refresher(dex_jwks_url.clone(), std::time::Duration::from_secs(15 * 60));
+
     Server::builder()
         .tls_config(tls)?
         .layer(TraceContextLayer)
         .layer(metrics_layer)
         .layer(ErrorLogLayer)
-        // Compose user_interceptor + peer_interceptor at each service entry
+        // Compose auth_interceptor + peer_interceptor at each service entry
         // point. Both insert into request extensions; handlers read them
         // for business logic without echoing PII onto OTel spans (the
-        // PII-at-ingress rule lives at the www edge).
-        .add_service(GreeterServer::with_interceptor(GreeterSvc::new(db), |req| {
-            identity::peer_interceptor(identity::user_interceptor(req)?)
-        }))
-        .add_service(CatalogServer::with_interceptor(CatalogSvc::new(grafana), |req| {
-            identity::peer_interceptor(identity::user_interceptor(req)?)
-        }))
+        // PII-at-ingress rule lives at the Caddy edge via enduser_attrs).
+        // JWKS instantiated above; primed once at startup, refreshed every
+        // 15 min by a background task. The Arc clone is cheap per request;
+        // the cache read is sync.
+        .add_service(GreeterServer::with_interceptor(
+            GreeterSvc::new(db),
+            {
+                let auth = identity::auth_interceptor(jwks.clone());
+                // `Status` is large but boxing it would break tonic's
+                // interceptor signature; same trade-off documented in
+                // identity::auth_interceptor.
+                #[allow(clippy::result_large_err)]
+                let f = move |req| identity::peer_interceptor(auth(req)?);
+                f
+            },
+        ))
+        .add_service(CatalogServer::with_interceptor(
+            CatalogSvc::new(grafana),
+            {
+                let auth = identity::auth_interceptor(jwks.clone());
+                #[allow(clippy::result_large_err)]
+                let f = move |req| identity::peer_interceptor(auth(req)?);
+                f
+            },
+        ))
         .serve(addr)
         .await?;
 
