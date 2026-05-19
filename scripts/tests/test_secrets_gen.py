@@ -251,7 +251,7 @@ def test_caddyfile_requires_auth_false_emits_ungated_template(tmp_path, monkeypa
     assert "span ingress" not in text
 
 
-def test_dex_yaml_generated_merges_base_plus_one_mock_connector_per_user(tmp_path, monkeypatch):
+def test_dex_yaml_generated_merges_base_plus_one_static_password_per_user(tmp_path, monkeypatch):
     """Reads dex.yaml + users.yaml, writes a merged dex.yaml.generated."""
     _seed(
         tmp_path,
@@ -267,10 +267,11 @@ def test_dex_yaml_generated_merges_base_plus_one_mock_connector_per_user(tmp_pat
         },
     )
     # dex.yaml lives in the plugin dir; dex's CLI takes only one config file,
-    # so secrets-gen.py merges base + connectors into dex.yaml.generated.
+    # so secrets-gen.py merges base + staticPasswords into dex.yaml.generated.
     (tmp_path / "service_catalog" / "auth" / "dex.yaml").write_text(
         'issuer: https://dex.demo.lvh.me:8443/dex\n'
         'storage:\n  type: memory\n'
+        'enablePasswordDB: true\n'
     )
     secrets = tmp_path / ".secrets"
     secrets.mkdir()
@@ -286,14 +287,16 @@ def test_dex_yaml_generated_merges_base_plus_one_mock_connector_per_user(tmp_pat
     # Base block preserved verbatim.
     assert "issuer: https://dex.demo.lvh.me:8443/dex" in generated
     assert "type: memory" in generated
-    # Connectors block appended below.
-    assert "type: mockCallback" in generated
-    assert "id: user-alice" in generated
+    assert "enablePasswordDB: true" in generated
+    # staticPasswords block appended below.
+    assert "staticPasswords:" in generated
+    assert "email: alice@example.invalid" in generated
     assert "userID: alice" in generated
-    assert 'email: alice@example.invalid' in generated
-    assert "id: user-bob" in generated
-    assert 'email: bob@example.invalid' in generated
-    assert generated.count("type: mockCallback") == 2
+    assert 'username: "Alice Example"' in generated
+    assert "email: bob@example.invalid" in generated
+    assert "userID: bob" in generated
+    # Shared bcrypt hash present (one per user).
+    assert generated.count(mod.DEV_PASSWORD_BCRYPT) == 2
 
 
 def test_dex_yaml_generated_skipped_when_auth_plugin_absent(tmp_path, monkeypatch):

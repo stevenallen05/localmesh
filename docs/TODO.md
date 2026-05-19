@@ -130,7 +130,7 @@ context-dependent.
   Server's JWKS cache TTL is 15 min (configurable). Prod IdP swap rotates
   keys on its own schedule; TTL should follow.
   `TODO: needs_prod_decisions JWKS cache TTL for prod IdP rotation`.
-- **Prod IdP swap.** Dex with mockCallback connectors is dev-only. Prod
+- **Prod IdP swap.** Dex with built-in local connector + staticPasswords is dev-only. Prod
   swaps the whole `auth/` plugin's `dex` container for a real IdP
   (Okta / Keycloak / Auth0); `oauth2-proxy` and the Caddy `forward_auth`
   wiring carry over unchanged.

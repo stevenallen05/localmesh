@@ -422,14 +422,25 @@ USERS_FILE = SECRETS / "users.yaml"
 DEX_GENERATED = AUTH_DIR / "dex.yaml.generated"
 
 
+# bcrypt(cost=10) hash of the dev password "dev". Every staticPasswords
+# entry shares this hash — dev UX, not a real credential. Regenerate via:
+#   docker run --rm httpd:2.4-alpine htpasswd -bnBC 10 "" dev | cut -d: -f2
+DEV_PASSWORD_BCRYPT = "$2y$10$N.b.upq/.fOOUGbkQ2uy8u7mCgjQJA6hUnedHSVy4zcL4c23Ug7R2"
+
+
 def write_dex_connectors():
-    """Emit Dex's full config — base from dex.yaml + one mockCallback per dev user.
+    """Emit Dex's full config — base from dex.yaml + one staticPasswords entry per dev user.
 
     Dex's CLI accepts exactly one config file, so we merge the hand-written
-    base (dex.yaml — issuer, storage, staticClients, etc.) with the generated
-    connectors block here and write a single dex.yaml.generated. Compose
-    bind-mounts only the merged file; dex.yaml is read by this script as
-    source, never by dex directly.
+    base (dex.yaml — issuer, storage, staticClients, enablePasswordDB) with
+    the generated staticPasswords block here and write a single
+    dex.yaml.generated. Compose bind-mounts only the merged file; dex.yaml
+    is read by this script as source, never by dex directly.
+
+    Uses Dex's built-in local connector (enablePasswordDB in dex.yaml).
+    mockCallback was the original choice but it's a no-config connector
+    that always returns Kilgore Trout — and its identity doesn't include
+    a preferred_username claim, which broke the www banner.
 
     No-op when the auth plugin isn't present (catalog without auth/), so
     this is safe to call unconditionally from main().
@@ -462,19 +473,14 @@ def write_dex_connectors():
         "",
         base.rstrip(),
         "",
-        "connectors:",
+        "staticPasswords:",
     ]
     for u in users:
-        uid = u["id"]
         out.extend([
-            f"  - type: mockCallback",
-            f"    id: user-{uid}",
-            f"    name: \"{u['name']}\"",
-            f"    config:",
-            f"      userInfo:",
-            f"        userID: {uid}",
-            f"        username: \"{u['name']}\"",
-            f"        email: {u['email']}",
+            f"  - email: {u['email']}",
+            f"    hash: '{DEV_PASSWORD_BCRYPT}'",
+            f"    username: \"{u['name']}\"",
+            f"    userID: {u['id']}",
         ])
     DEX_GENERATED.write_text("\n".join(out) + "\n")
 

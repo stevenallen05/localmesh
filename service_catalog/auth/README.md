@@ -2,7 +2,7 @@
 
 ## Overview
 
-Required ingress auth gate. Two containers: **oauth2-proxy** (auth-decision sidecar that Caddy hits via `forward_auth`) and **dex** (OIDC IdP with one `mockCallback` connector per dev user from `.secrets/users.yaml`). Together they replace the prior `auth_shim/` plugin and remove all auth responsibility from www.
+Required ingress auth gate. Two containers: **oauth2-proxy** (auth-decision sidecar that Caddy hits via `forward_auth`) and **dex** (OIDC IdP using its built-in local connector with one `staticPasswords:` entry per dev user from `.secrets/users.yaml`, all sharing the password `dev`). Together they replace the prior `auth_shim/` plugin and remove all auth responsibility from www.
 
 Identity (`module_name`, `owned_by`) and the service definitions (`container`, `port`, `requires_auth`) live in this plugin's `plugin.toml` per [`../../docs/engineering/rules/plugin-conventions.md`](../../docs/engineering/rules/plugin-conventions.md) §1 + §3 — they are not redeclared here. Both services declare `mesh.exempt: "true"` on their compose `labels:` blocks (the source of truth, parsed by `secrets-gen.py` — they sit outside the SPIFFE mesh because they front it).
 

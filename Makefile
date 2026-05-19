@@ -62,8 +62,8 @@ demo-auth: setup
 	docker compose up -d --build
 	@echo
 	@echo "==> Stack up. Open https://www.metrics-collector.lvh.me:8443"
-	@echo "    First visit will 302 to Dex with three mock-IdP tiles."
-	@echo "    Pick any (alice / bob / charlie) → land back at www logged in."
+	@echo "    First visit will 302 to Dex's built-in login form."
+	@echo "    Log in as alice@example.invalid (or bob/charlie) with password 'dev'."
 	@echo "==> Verify the JWT-derived row landed in postgres:"
 	@echo "    docker compose exec postgres psql -U postgres -c \\"
 	@echo "      'SELECT message, jwt_subject FROM hello_messages ORDER BY id DESC LIMIT 3'"
