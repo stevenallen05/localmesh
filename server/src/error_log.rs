@@ -3,8 +3,14 @@
 //! active span (set by `TraceContextLayer`) is entered and the
 //! `tracing-opentelemetry` bridge attaches `trace_id`/`span_id` to the event.
 
+use std::task::{Context, Poll};
+
+use http::HeaderMap;
+use opentelemetry::trace::TraceContextExt as _;
 use tonic::Code;
-use tracing::Level;
+use tower::{Layer, Service};
+use tracing::{error, warn, Level};
+use tracing_opentelemetry::OpenTelemetrySpanExt as _;
 
 /// gRPC code class → tracing level. Client errors (4xx-equivalent) and
 /// transient/load errors (UNAVAILABLE / DEADLINE_EXCEEDED / etc.) get
@@ -34,14 +40,6 @@ pub(crate) fn code_to_level(code: Code) -> Option<Level> {
         | Code::Unimplemented => Some(Level::ERROR),
     }
 }
-
-use std::task::{Context, Poll};
-
-use http::HeaderMap;
-use opentelemetry::trace::TraceContextExt as _;
-use tower::{Layer, Service};
-use tracing::{error, warn};
-use tracing_opentelemetry::OpenTelemetrySpanExt as _;
 
 #[derive(Clone, Default)]
 pub struct ErrorLogLayer;

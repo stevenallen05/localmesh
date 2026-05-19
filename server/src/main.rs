@@ -4,6 +4,7 @@ use std::sync::Arc;
 use opentelemetry::global;
 use tonic::transport::Server;
 
+use server::auth::Jwks;
 use server::db::Db;
 use server::error_log::ErrorLogLayer;
 use server::greeter::GreeterSvc;
@@ -12,6 +13,34 @@ use server::proto::hello::greeter_server::GreeterServer;
 use server::rpc_metrics::RpcMetricsLayer;
 use server::telemetry::{init_logging, init_meter, init_tracer, BoxError};
 use server::trace_context::TraceContextLayer;
+
+/// Build a primed JWKS cache from env vars and launch the background
+/// refresher (every 15 min). Returns the cache (shared with interceptors)
+/// and the refresher's `JoinHandle`. Caller binds the handle to a local
+/// so its `Drop` runs at process exit — dropping cancels the task.
+async fn jwks_from_env() -> Result<(Arc<Jwks>, tokio::task::JoinHandle<()>), BoxError> {
+    let url = std::env::var("DEX_JWKS_URL")
+        .unwrap_or_else(|_| "http://dex:5556/dex/keys".to_string());
+    let issuer = std::env::var("DEX_ISSUER").unwrap_or_else(|_| {
+        format!(
+            "https://dex.{}.{}:8443/dex",
+            std::env::var("PROJECT_NAME").unwrap_or_default(),
+            std::env::var("LOCAL_DOMAIN").unwrap_or_default(),
+        )
+    });
+    let audience = std::env::var("OIDC_AUDIENCE").unwrap_or_else(|_| "localmesh-dev".to_string());
+
+    let jwks = Arc::new(Jwks::new(&issuer, &audience));
+    jwks.fetch_from(&url)
+        .await
+        .map_err(|e| -> BoxError { format!("JWKS prime failed: {e}").into() })?;
+    tracing::info!(jwks_url = %url, "JWKS primed");
+
+    let handle = jwks
+        .clone()
+        .spawn_refresher(url, std::time::Duration::from_secs(15 * 60));
+    Ok((jwks, handle))
+}
 
 #[tokio::main]
 async fn main() -> Result<(), BoxError> {
@@ -45,29 +74,7 @@ async fn main() -> Result<(), BoxError> {
     // See server/src/tls.rs.
     let tls = server::tls::server_tls_config()?;
 
-    // JWKS — prime against Dex over the docker-network plaintext URL;
-    // background task refreshes every 15 min. iss/aud match what
-    // Dex stamps + what oauth2-proxy negotiated.
-    let dex_jwks_url = std::env::var("DEX_JWKS_URL")
-        .unwrap_or_else(|_| "http://dex:5556/dex/keys".to_string());
-    let dex_issuer = std::env::var("DEX_ISSUER").unwrap_or_else(|_| {
-        format!(
-            "https://dex.{}.{}:8443/dex",
-            std::env::var("PROJECT_NAME").unwrap_or_default(),
-            std::env::var("LOCAL_DOMAIN").unwrap_or_default(),
-        )
-    });
-    let oidc_aud =
-        std::env::var("OIDC_AUDIENCE").unwrap_or_else(|_| "localmesh-dev".to_string());
-
-    let jwks = Arc::new(server::auth::Jwks::new(&dex_issuer, &oidc_aud));
-    jwks.fetch_from(&dex_jwks_url)
-        .await
-        .map_err(|e| -> BoxError { format!("JWKS prime failed: {e}").into() })?;
-    tracing::info!(jwks_url = %dex_jwks_url, "JWKS primed");
-    let _jwks_refresher = jwks
-        .clone()
-        .spawn_refresher(dex_jwks_url.clone(), std::time::Duration::from_secs(15 * 60));
+    let (jwks, _jwks_refresher) = jwks_from_env().await?;
 
     Server::builder()
         .tls_config(tls)?
