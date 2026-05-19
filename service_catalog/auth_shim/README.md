@@ -6,7 +6,7 @@ Dev-only user picker source. Exposes `GET /users` on `http://auth-shim:8080/user
 
 Mesh-exempt (no certs minted). Reached over plaintext on the docker network. Replaced in prod by oauth2-proxy + a real OIDC IdP (Dex, Keycloak, etc.). `TODO: needs_prod_decisions oauth2-proxy + IdP at ingress`.
 
-Identity (`module_name`, `owned_by`, `mesh_exempt`) and the `auth-shim` service definition (`container`, `port`) live in this plugin's `plugin.toml` per [`../../docs/engineering/rules/plugin-conventions.md`](../../docs/engineering/rules/plugin-conventions.md) §1 + §3 — they are not redeclared here.
+Identity (`module_name`, `owned_by`) and the `auth-shim` service definition (`container`, `port`) live in this plugin's `plugin.toml` per [`../../docs/engineering/rules/plugin-conventions.md`](../../docs/engineering/rules/plugin-conventions.md) §1 + §3 — they are not redeclared here. The `mesh.exempt: "true"` compose label declares the plaintext-on-mesh status.
 
 ## Environment
 

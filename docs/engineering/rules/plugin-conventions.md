@@ -92,10 +92,12 @@ Worked example for the `database/` plugin lives at [`../../../service_catalog/da
 
 ## 3. Overlap with `plugin.toml`
 
-`plugin.toml` owns identity (`module_name`, `owned_by`, `mesh_exempt`), service definitions (`container`, `port`), and exposure (`expose_via_ingress`, `ingress`). `README.md` cites these values by reference (link to §1 above or to `plugin.toml` itself) and never redeclares them. Plugin-internal env vars derived from `plugin.toml` by `scripts/secrets-gen.py` do not appear in `README.md`'s Environment table:
+`plugin.toml` owns identity (`module_name`, `owned_by`), service definitions (`container`, `port`), and exposure (`expose_via_ingress`, `ingress`). `README.md` cites these values by reference (link to §1 above or to `plugin.toml` itself) and never redeclares them. Plugin-internal env vars derived from `plugin.toml` by `scripts/secrets-gen.py` do not appear in `README.md`'s Environment table:
 
-- From `[identity]`, keyed by **plugin slug**: `<PLUGIN>_MODULE_NAME`, `<PLUGIN>_OWNED_BY`, `<PLUGIN>_MESH_EXEMPT`.
+- From `[identity]`, keyed by **plugin slug**: `<PLUGIN>_MODULE_NAME`, `<PLUGIN>_OWNED_BY`.
 - From `[[services]]`, keyed by **container slug**: `<CONTAINER>_PORT`, `<CONTAINER>_EXPOSE_VIA_INGRESS`, `<CONTAINER>_INGRESS`.
+
+Mesh-exempt status (`mesh.exempt: "true"` compose label) is declared on each service's compose `labels:` block, not in `plugin.toml`. `secrets-gen.py` parses each plugin's `docker-compose.yml` to derive the per-container exempt set for cert-skip and Caddy upstream-scheme decisions.
 
 `README.md`'s Environment table is for env vars the **consumer app** sets, not values exported into the platform's `.env`.
 

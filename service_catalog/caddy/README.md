@@ -2,11 +2,11 @@
 
 ## Overview
 
-Required north-south ingress for the LocalMesh stack. Terminates browser HTTPS on port 8443; reverse-proxies to upstream services via mTLS (for mesh-participating workloads) or plaintext (for `mesh_exempt = true` plugins). Browser URL shape is `https://<container>.${PROJECT_NAME}.${LOCAL_DOMAIN}:8443`.
+Required north-south ingress for the LocalMesh stack. Terminates browser HTTPS on port 8443; reverse-proxies to upstream services via mTLS (for mesh-participating workloads) or plaintext (for services carrying `mesh.exempt: "true"` on their compose labels). Browser URL shape is `https://<container>.${PROJECT_NAME}.${LOCAL_DOMAIN}:8443`.
 
 The route table is auto-generated from every `[[services]]` entry across `project.toml` and `service_catalog/*/plugin.toml` whose `expose_via_ingress = true`. Re-run `make certs` to regenerate.
 
-Identity (`module_name`, `owned_by`, `mesh_exempt`) and service definitions (`container`, `port`, `expose_via_ingress`, `ingress`) live in this plugin's `plugin.toml` per [`../../docs/engineering/rules/plugin-conventions.md`](../../docs/engineering/rules/plugin-conventions.md) §1 + §3 — they are not redeclared here.
+Identity (`module_name`, `owned_by`) and service definitions (`container`, `port`, `expose_via_ingress`, `ingress`) live in this plugin's `plugin.toml` per [`../../docs/engineering/rules/plugin-conventions.md`](../../docs/engineering/rules/plugin-conventions.md) §1 + §3 — they are not redeclared here.
 
 ## Environment
 
