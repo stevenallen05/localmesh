@@ -1,7 +1,7 @@
 [identity]
 module_name = "logging"
 owned_by    = "sre@example.com"
-mesh_exempt = true               # Vector + Loki stay plaintext
 
+# Vector + Loki are mesh-exempt — declared on compose labels.
 # No [[services]] in scope — loki + vector are not user-facing.
 # When a Loki UI is added under Caddy, declare it here.
