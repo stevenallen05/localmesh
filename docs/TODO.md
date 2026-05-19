@@ -135,6 +135,49 @@ context-dependent.
   (Okta / Keycloak / Auth0); `oauth2-proxy` and the Caddy `forward_auth`
   wiring carry over unchanged.
   `TODO: needs_prod_decisions IdP choice + SSO migration`.
+- **ghostunnel sidecar dep manager.** Compose `depends_on` can't express
+  "www-outbound only ready when server-inbound is listening." K8s
+  readiness probes / init containers handle this natively; dev compose
+  papers over it. `TODO: needs_prod_decisions ghostunnel sidecar shape
+  needs richer dep manager`.
+- **Per-route SPIFFE allowlist.** Inbound `--allow-uri` is a flat,
+  explicit per-peer list today (`server-inbound` lists `spiffe://www.…`;
+  `www-inbound` lists `spiffe://caddy.…`). Prod policy is per-route in
+  the mesh runtime's AuthorizationPolicy.
+  `TODO: needs_prod_decisions per-route SPIFFE allowlist for
+  AuthorizationPolicy`.
+- **Phantom-token broker for claim narrowing.** Downstream services
+  trust forwarded gRPC metadata (`x-user-id` / `x-user-email` /
+  `x-user-name`) because the sidecar's `--allow-uri` gated the channel.
+  Phantom-token broker is the cryptographic-narrowing successor
+  (per-workload claim allowlist, opaque token + introspection).
+  `TODO: needs_prod_decisions phantom-token broker for cryptographic
+  claim narrowing`.
+- **katenary same-pod sidecar.** No native compose construct expresses
+  "second container in the same pod." Hand-patch the chart for now;
+  upstream feature request candidate. `TODO: needs_prod_decisions
+  katenary same-pod label for sidecars`.
+- **postgres sidecar.** Postgres protocol's STARTTLS negotiation isn't
+  transparent-proxyable through a generic TLS terminator. `TODO:
+  needs_prod_decisions postgres sidecar requires protocol-aware
+  proxying`.
+- **ghostunnel L4 per-peer identity.** ghostunnel is L4 for HTTP/2; it
+  can't inject `X-Forwarded-Client-Cert` headers onto the gRPC stream.
+  Server trusts the channel without per-peer SPIFFE URI in metadata.
+  The `mtls_peer_uri` field on the `WhoAmI` proto is permanently empty
+  for this reason. PROXY-protocol middleware or phantom-token broker
+  carries per-call workload identity.
+  `TODO: needs_prod_decisions L4 sidecar per-peer identity`.
+- **ghostunnel JSON metrics adapter.** Ghostunnel v1.7's `--status=ADDR`
+  endpoint serves a JSON array at `/_metrics`, not Prom text exposition
+  format. The three planned otel-collector scrape jobs would receive
+  bodies the Prom receiver can't parse — Chunk 3 of the sidecar omakase
+  plan was parked on this finding. A JSON-to-Prom adapter (small
+  Go/Python service per sidecar, or one consumer of `--metrics-url=`
+  pushes) closes the gap. Status bind today is `127.0.0.1:9090/9091`
+  (loopback only); a same-netns adapter can scrape it there, otherwise
+  flip to `0.0.0.0` binds. `TODO: needs_prod_decisions ghostunnel
+  metrics need JSON-to-Prom adapter`.
 
 ## Dashboards
 
