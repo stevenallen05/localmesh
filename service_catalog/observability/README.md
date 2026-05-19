@@ -26,9 +26,22 @@ depends_on:
 
 None plugin-specific. App-tier identity tuple is required per [`../../docs/engineering/rules/plugin-conventions.md`](../../docs/engineering/rules/plugin-conventions.md) — observability adds nothing on top.
 
+## Calling the Grafana API from another service
+
+Dev uses admin Basic Auth. There is no pre-seeded API token — Grafana doesn't have a native pre-seed mechanism, and the previous curl-bootstrap pattern was retired for being more ceremony than value. A consumer that needs to hit `/api/*` should set:
+
+```yaml
+environment:
+  GRAFANA_API_URL:        http://grafana:3000
+  GRAFANA_ADMIN_USER:     admin
+  GRAFANA_ADMIN_PASSWORD: admin
+```
+
+…and issue `Authorization: Basic <base64(admin:admin)>` on every request. The grafana service pins these via `GF_SECURITY_ADMIN_USER` / `GF_SECURITY_ADMIN_PASSWORD` so the dev contract is explicit in the compose file. In prod this swaps for a real IdP-issued credential — `TODO: needs_prod_decisions real IdP / SA token for Grafana API access`.
+
 ## k8s rendering
 
-None today. The bearer-token path is file-mounted from a named volume; no `katenary.v3/secrets` or `values-from` is wired in this iteration. The volume becomes a `Secret` mount once a real secrets backend lands.
+None today. App-tier services rendered via katenary; the Basic Auth env block above lands in their ConfigMap.
 
 ## Notes
 

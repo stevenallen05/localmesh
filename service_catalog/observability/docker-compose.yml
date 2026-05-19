@@ -375,6 +375,15 @@ services:
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+      # Pin admin creds explicitly. These are also Grafana's image
+      # defaults, but spelling them out lets readers see the dev
+      # contract without knowing the defaults, and makes a future
+      # swap a one-line change. Catalogue services that call the
+      # Grafana API use these via Basic Auth — see this plugin's
+      # README "Calling the Grafana API" section.
+      # TODO: needs_prod_decisions real IdP / SA token for API access
+      GF_SECURITY_ADMIN_USER:     admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
     configs:
       - source: grafana_vm_datasource
         target: /etc/grafana/provisioning/datasources/vm.yaml
