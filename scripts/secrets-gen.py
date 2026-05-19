@@ -6,13 +6,17 @@ then:
 
   1. Mints the LocalMesh CA at `.secrets/certs/ca.{crt,key}` (one-shot).
   2. Mints a bidirectional leaf cert per declared service at
-     `.secrets/certs/<container>/{trust.ca.crt, id.crt, id.key}` — skipped if
-     the plugin's `[identity].mesh_exempt = true`.
+     `.secrets/certs/<container>/{trust.ca.crt, id.crt, id.key}` — skipped
+     for services carrying `mesh.exempt: "true"` on their compose labels.
   3. Writes `.env` with UPCASE_SNAKECASE versions of every TOML key (in a
      managed section between `# >>> secrets-gen managed` markers).
   4. Generates `service_catalog/caddy/Caddyfile.generated` with one site
      block per service that has `expose_via_ingress = true` — mTLS upstream
      for mesh-participating services, plaintext for mesh-exempt ones.
+
+Mesh-exempt status is the compose label `mesh.exempt: "true"` declared
+in each plugin's `docker-compose.yml`, not a TOML field. This script
+parses each plugin's compose to derive the exempt set.
 
 See docs/superpowers/specs/2026-05-18-localmesh-service-mesh-design.md.
 
@@ -30,6 +34,8 @@ import pathlib
 import subprocess
 import sys
 import tomllib
+
+import yaml
 
 REPO = pathlib.Path(os.environ.get("REPO_ROOT", ".")).resolve()
 PROJECT_TOML = REPO / "project.toml"
@@ -63,25 +69,46 @@ def load_manifests() -> tuple[dict, list[tuple[str, dict]]]:
     return project, plugins
 
 
+def compose_exempts(plugin_slug: str) -> set[str]:
+    """Containers in plugin's docker-compose.yml carrying `mesh.exempt: "true"`."""
+    compose = CATALOG / plugin_slug / "docker-compose.yml"
+    if not compose.exists():
+        return set()
+    doc = yaml.safe_load(compose.read_text()) or {}
+    exempt: set[str] = set()
+    for svc_name, svc in (doc.get("services") or {}).items():
+        labels = (svc or {}).get("labels") or {}
+        # labels can also be a list of "key=value" strings; this project uses dicts.
+        if isinstance(labels, dict) and str(labels.get("mesh.exempt", "")).lower() == "true":
+            container_name = (svc or {}).get("container_name", svc_name)
+            exempt.add(container_name)
+    return exempt
+
+
 def services_iter(project: dict, plugins: list[tuple[str, dict]]):
-    """Yield (container, port, expose_via_ingress, mesh_exempt, ingress, owner_slug)."""
+    """Yield (container, port, expose_via_ingress, mesh_exempt, ingress, owner_slug).
+
+    mesh_exempt is derived from each plugin's docker-compose.yml labels
+    (`mesh.exempt: "true"`), not from plugin.toml. Project-level services
+    are never mesh-exempt (the app tier always joins the mesh).
+    """
     for svc in project.get("services", []):
         yield (
             svc["container"],
             svc["port"],
             svc.get("expose_via_ingress", False),
-            False,                                       # project-level services never mesh-exempt
+            False,
             svc.get("ingress", False),
             "project",
         )
     for slug, plugin in plugins:
-        exempt = plugin.get("identity", {}).get("mesh_exempt", False)
+        exempt_set = compose_exempts(slug)
         for svc in plugin.get("services", []):
             yield (
                 svc["container"],
                 svc["port"],
                 svc.get("expose_via_ingress", False),
-                exempt,
+                svc["container"] in exempt_set,
                 svc.get("ingress", False),
                 slug,
             )
@@ -193,8 +220,8 @@ def env_lines(project: dict, plugins: list[tuple[str, dict]]) -> list[str]:
         if isinstance(value, (str, int, float, bool)):
             lines.append(f"{upcase_snake(key)}={fmt_value(value)}")
 
-    # plugin.toml [identity] blocks → <PLUGIN>_<KEY>. The mesh_exempt flag
-    # lives here (per-plugin), not on individual services.
+    # plugin.toml [identity] blocks → <PLUGIN>_<KEY>. Mesh-exempt status
+    # is read from compose labels (see compose_exempts) — not a TOML field.
     for slug, plugin in plugins:
         ident = plugin.get("identity", {})
         prefix = upcase_snake(slug)
@@ -202,8 +229,7 @@ def env_lines(project: dict, plugins: list[tuple[str, dict]]) -> list[str]:
             if isinstance(value, (str, int, float, bool)):
                 lines.append(f"{prefix}_{upcase_snake(key)}={fmt_value(value)}")
 
-    # [[services]] entries → <CONTAINER>_<KEY>. mesh_exempt is plugin-level
-    # (above), not duplicated per-service.
+    # [[services]] entries → <CONTAINER>_<KEY>.
     for container, port, expose, _exempt, ingress, _owner in services_iter(project, plugins):
         prefix = upcase_snake(container)
         lines.append(f"{prefix}_PORT={port}")

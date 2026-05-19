@@ -20,8 +20,8 @@ def _load(monkeypatch, repo_root):
     return m
 
 
-def _seed(repo, project_toml, plugins):
-    """Create project.toml + service_catalog/<slug>/plugin.toml fixtures."""
+def _seed(repo, project_toml, plugins, composes=None):
+    """Create project.toml + per-plugin plugin.toml [+ docker-compose.yml]."""
     (repo / "project.toml").write_text(project_toml)
     catalog = repo / "service_catalog"
     catalog.mkdir()
@@ -29,6 +29,8 @@ def _seed(repo, project_toml, plugins):
         d = catalog / slug
         d.mkdir()
         (d / "plugin.toml").write_text(content)
+    for slug, content in (composes or {}).items():
+        (catalog / slug / "docker-compose.yml").write_text(content)
 
 
 def test_upcase_snake(tmp_path, monkeypatch):
@@ -87,7 +89,6 @@ def test_env_lines_strict_upcase_snakecase(tmp_path, monkeypatch):
                 '[identity]\n'
                 'module_name = "observability"\n'
                 'owned_by    = "sre@example.com"\n'
-                'mesh_exempt = true\n'
                 '\n'
                 '[[services]]\n'
                 'container          = "grafana"\n'
@@ -105,7 +106,8 @@ def test_env_lines_strict_upcase_snakecase(tmp_path, monkeypatch):
     assert "LOCAL_DOMAIN=lvh.me" in text
     assert "CADDY_MODULE_NAME=caddy" in text
     assert "CADDY_OWNED_BY=sre@example.com" in text
-    assert "OBS_MESH_EXEMPT=True" in text or "OBS_MESH_EXEMPT=true" in text
+    # mesh_exempt is not a TOML field — it lives in compose labels, not .env.
+    assert "MESH_EXEMPT" not in text
     assert "WWW_PORT=3443" in text
     assert "WWW_EXPOSE_VIA_INGRESS=true" in text
     assert "CADDY_PORT=8443" in text
@@ -160,8 +162,18 @@ def test_caddyfile_emits_route_for_exposed_services(tmp_path, monkeypatch):
                 '[[services]]\ncontainer = "caddy"\nport = 8443\ningress = true\n'
             ),
             "obs": (
-                '[identity]\nmodule_name = "observability"\nowned_by = "sre@example.com"\nmesh_exempt = true\n'
+                '[identity]\nmodule_name = "observability"\nowned_by = "sre@example.com"\n'
                 '[[services]]\ncontainer = "grafana"\nport = 3000\nexpose_via_ingress = true\n'
+            ),
+        },
+        composes={
+            # mesh-exempt declared on compose labels — the source of truth.
+            "obs": (
+                'services:\n'
+                '  grafana:\n'
+                '    image: grafana/grafana:12.4.3\n'
+                '    labels:\n'
+                '      mesh.exempt: "true"\n'
             ),
         },
     )
