@@ -42,12 +42,8 @@ async fn main() -> Result<(), BoxError> {
     let metrics_layer = RpcMetricsLayer::new(&global::meter("server.rpc"));
 
     // Layer order — first .layer() call is the outermost. TraceContextLayer
-    // must come first so a span is entered before any inner layer can emit
-    // events under it (the error-log layer attaches its WARN/ERROR
-    // emissions to the active span via the tracing-opentelemetry bridge).
-    // auth_interceptor reads forwarded x-user-* gRPC metadata and inserts
-    // User + ClaimsForDb extensions. Trust anchor is the sidecar's
-    // --allow-uri glob (server-inbound), not in-process verification.
+    // must come first so a span is entered before inner layers can attach
+    // events to it via the tracing-opentelemetry bridge.
     Server::builder()
         .layer(TraceContextLayer)
         .layer(metrics_layer)
@@ -59,13 +55,9 @@ async fn main() -> Result<(), BoxError> {
         .serve(addr)
         .await?;
 
-    // Drop the root span before shutting the OTel providers down so the
-    // close event reaches still-live exporters. Shutdown is idempotent,
-    // so order is cosmetic — but intentional. Meter shutdown returns
-    // `OTelSdkResult`, which doesn't impl `Into<BoxError>`; map it via
-    // `to_string()` since the error type is opaque to the caller.
     drop(_root);
     tracer_provider.shutdown()?;
+    // Meter shutdown's `OTelSdkResult` doesn't impl `Into<BoxError>`.
     meter_provider
         .shutdown()
         .map_err(|e| -> BoxError { e.to_string().into() })?;

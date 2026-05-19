@@ -2,15 +2,15 @@
 //!
 //! `User` comes from forwarded gRPC metadata. `www` sets `x-user-id`,
 //! `x-user-email`, `x-user-name` when calling `server`; the trust anchor
-//! is the ghostunnel sidecar's `--allow-uri` glob, which gates which
-//! workloads can reach this server. Server does not validate the JWT —
-//! that happens at the Caddy + oauth2-proxy ingress. PII-at-ingress rule
-//! holds: handlers read `User` for business logic but must not echo it
-//! onto OTel span attributes or indexed Loki labels.
+//! is the ghostunnel sidecar's `--allow-uri` allowlist, which gates
+//! which workloads can reach this server. Server does not validate the
+//! JWT — that happens at the Caddy + oauth2-proxy ingress. PII-at-ingress
+//! rule holds: handlers read `User` for business logic but must not echo
+//! it onto OTel span attributes or indexed Loki labels.
 //!
-//! `ClaimsForDb` carries the JWT's `iss` / `sub` for the hello_messages
-//! row author. Today's forwarded shape doesn't include these — handlers
-//! that need them fall back to (issuer="forwarded", subject=user_id).
+//! `ClaimsForDb` populates the hello_messages row author with
+//! (issuer="forwarded", subject=user_id) — the forwarded shape doesn't
+//! carry the upstream JWT's iss/sub separately.
 //!
 //! TODO: needs_prod_decisions phantom-token broker for cryptographic
 //! claim narrowing per workload SPIFFE URI.
@@ -32,12 +32,13 @@ pub struct ClaimsForDb {
 
 /// Tonic interceptor: reads forwarded user identity from gRPC metadata
 /// and inserts `User` + `ClaimsForDb` into request extensions. Trust
-/// anchor is upstream: the sidecar's `--allow-uri` glob policed who
-/// could reach this server in the first place.
+/// anchor is upstream: the sidecar's `--allow-uri` allowlist policed
+/// who could reach this server in the first place.
 ///
 /// Missing `x-user-id` is a contract violation — the upstream (www) is
 /// expected to always forward identity through to here. Reject rather
 /// than serve anonymous traffic.
+// `Status` is large; boxing it would break tonic's interceptor signature.
 #[allow(clippy::result_large_err)]
 pub fn auth_interceptor(mut req: Request<()>) -> Result<Request<()>, Status> {
     let id = req

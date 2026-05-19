@@ -77,9 +77,9 @@ impl Greeter for GreeterSvc {
         let name = if name.is_empty() { "world" } else { &name };
         let reply_message = format!("hello, {name}");
 
-        // Persist verified JWT-derived identity into business data.
-        // The PII-at-ingress rule constrains telemetry, not business data we
-        // choose to write — see DESIGN_DECISIONS row :56.
+        // Persist forwarded identity into business data. The PII-at-ingress
+        // rule constrains telemetry, not business data we choose to write —
+        // see DESIGN_DECISIONS row :56.
         self.db.record_hello_message(
             &reply_message,
             &claims_for_db.iss,
