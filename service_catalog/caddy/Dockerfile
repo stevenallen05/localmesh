@@ -27,10 +27,15 @@ COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 
 # Mirror upstream caddy:alpine's defaults so the rest of the project
 # (volumes, command, healthcheck) doesn't have to know it's a custom build.
+# Pre-chown /config + /data so the non-root caddy user can write its
+# autosave + storage-clean lock files (anonymous volumes inherit the
+# underlying directory's ownership at first mount).
 ENV XDG_CONFIG_HOME=/config XDG_DATA_HOME=/data
+RUN mkdir -p /config /data && chown caddy:caddy /config /data
 VOLUME /config /data
 EXPOSE 8443 2019
 WORKDIR /srv
+USER caddy
 
 ENTRYPOINT ["caddy"]
 CMD ["run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]

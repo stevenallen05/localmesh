@@ -210,6 +210,17 @@ def test_caddyfile_emits_gated_by_default(tmp_path, monkeypatch):
     text = "\n".join(mod.caddyfile_lines(project, plugins))
     # Gated default emits the forward_auth marker block.
     assert "forward_auth http://oauth2-proxy:4180" in text
+    # Global ordering directives for the custom + built-in OTel directives.
+    assert "order enduser_attrs before reverse_proxy" in text
+    assert "order tracing first" in text
+    # Site-level tracing directive (Caddy v2 rejects tracing as a global option).
+    assert "tracing {" in text
+    assert "span ingress" in text
+    # enduser_attrs directive with the three header→attribute mappings.
+    assert "enduser_attrs {" in text
+    assert "X-Forwarded-User enduser.id" in text
+    assert "X-Forwarded-Email enduser.email" in text
+    assert "X-Forwarded-Preferred-Username enduser.preferred_username" in text
 
 
 def test_caddyfile_requires_auth_false_emits_ungated_template(tmp_path, monkeypatch):
@@ -233,6 +244,11 @@ def test_caddyfile_requires_auth_false_emits_ungated_template(tmp_path, monkeypa
     text = "\n".join(mod.caddyfile_lines(project, plugins))
     assert "forward_auth" not in text
     assert "reverse_proxy https://www:3443" in text
+    # Ungated services don't carry per-site enduser_attrs or tracing blocks.
+    # Match the opening-brace form so the global `order` directives (which
+    # mention both directive names unconditionally) aren't false positives.
+    assert "enduser_attrs {" not in text
+    assert "span ingress" not in text
 
 
 def test_dex_yaml_generated_emits_one_mock_connector_per_user(tmp_path, monkeypatch):
