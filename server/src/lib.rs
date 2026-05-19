@@ -1,5 +1,6 @@
 // Library entry — keeps logic testable. `main.rs` is the thin binary.
 
+pub mod auth;
 pub mod catalog;
 pub mod db;
 pub mod error_log;
