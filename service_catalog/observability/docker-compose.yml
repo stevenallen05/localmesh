@@ -77,19 +77,16 @@ configs:
                   - source_labels: [__meta_docker_container_label_metrics_owned_by]
                     target_label: owned_by
                 metric_relabel_configs:
-                  # Three carry-forward rules from the prior cadvisor static
-                  # job. They only fire on cadvisor's per-container series
-                  # (where `container_label_*` source labels exist); for
-                  # non-cadvisor series these rules no-op naturally because
-                  # the source labels are absent.
+                  # Three rules scoped to cadvisor's per-container series.
+                  # Other targets' metrics no-op because the source labels
+                  # are absent.
                   #
                   # Rule 1 — project filter. Drops samples from containers
                   # outside this compose project (e.g. agentbox-* on the
                   # host daemon). The `|` empty alternative lets
                   # non-cadvisor series through (they don't carry
                   # container_label_com_docker_compose_project).
-                  # TODO: revisit the empty-alternative trick once
-                  # the docker_sd migration settles — see docs/TODO.md.
+                  # See docs/TODO.md "My thoughts" for the planned revisit.
                   - source_labels: [container_label_com_docker_compose_project]
                     regex: '${PROJECT_NAME}|'
                     action: keep
