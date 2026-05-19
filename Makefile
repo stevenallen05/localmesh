@@ -1,6 +1,6 @@
 # Begin ops team responsibility
 
-.PHONY: setup chart chart-lint certs caddy-image
+.PHONY: setup chart chart-lint certs caddy-image demo-auth
 
 CERTS_DIR       := .secrets/certs
 
@@ -45,6 +45,17 @@ certs:
 
 caddy-image:
 	docker build -t localmesh/caddy:dev service_catalog/caddy/
+
+demo-auth: setup
+	@echo "==> Bringing up the LocalMesh stack with auth at ingress"
+	docker compose up -d --build
+	@echo
+	@echo "==> Stack up. Open https://www.metrics-collector.lvh.me:8443"
+	@echo "    First visit will 302 to Dex with three mock-IdP tiles."
+	@echo "    Pick any (alice / bob / charlie) → land back at www logged in."
+	@echo "==> Verify the JWT-derived row landed in postgres:"
+	@echo "    docker compose exec postgres psql -U postgres -c \\"
+	@echo "      'SELECT message, jwt_subject FROM hello_messages ORDER BY id DESC LIMIT 3'"
 
 # End ops team responsibility
 
