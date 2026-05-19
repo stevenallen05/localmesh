@@ -1,8 +1,0 @@
-[identity]
-module_name = "auth_shim"
-owned_by    = "sre@example.com"
-
-[[services]]
-container          = "auth-shim"
-port               = 8080
-expose_via_ingress = false       # www's /auth/login fetches via docker DNS, not Caddy
