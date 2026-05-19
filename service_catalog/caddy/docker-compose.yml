@@ -25,7 +25,9 @@ services:
         target: /etc/grafana/dashboards/caddy/ingress.json
 
   caddy:
-    image: caddy:2.8-alpine
+    image: localmesh/caddy:dev
+    build:
+      context: .
     restart: unless-stopped
     ports:
       - "8443:8443"
@@ -37,6 +39,9 @@ services:
     environment:
       PROJECT_NAME: ${PROJECT_NAME}
       LOCAL_DOMAIN: ${LOCAL_DOMAIN}
+      OTEL_SERVICE_NAME: caddy
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:2019/config/"]
       interval: 10s

@@ -326,6 +326,13 @@ def _gated_block(upstream: str, exempt: bool) -> list[str]:
         ]
     )
     return [
+        # NEW: open a span per request via the built-in tracing module.
+        # OTLP target comes from OTEL_EXPORTER_OTLP_ENDPOINT env on
+        # the caddy container. The span is shared with the rest of the
+        # handler chain, so enduser_attrs (below) can stamp it.
+        f"  tracing {{",
+        f"    span ingress",
+        f"  }}",
         f"  handle /oauth2/* {{",
         f"    reverse_proxy http://oauth2-proxy:4180",
         f"  }}",
@@ -342,6 +349,12 @@ def _gated_block(upstream: str, exempt: bool) -> list[str]:
         f"      handle_response @error {{",
         f"        redir https://{{host}}/oauth2/sign_in?rd={{scheme}}://{{host}}{{http.request.orig_uri}} 302",
         f"      }}",
+        f"    }}",
+        # NEW: stamp enduser.* on the active OTel span from the trusted headers.
+        f"    enduser_attrs {{",
+        f"      X-Forwarded-User enduser.id",
+        f"      X-Forwarded-Email enduser.email",
+        f"      X-Forwarded-Preferred-Username enduser.preferred_username",
         f"    }}",
         *upstream_block,
         f"  }}",
@@ -361,6 +374,12 @@ def caddyfile_lines(project: dict, plugins: list[tuple[str, dict]]) -> list[str]
         "  # /run/caddy/id.{crt,key}). Disable Caddy's automatic cert",
         "  # acquisition so it doesn't issue its own and override ours.",
         "  auto_https disable_certs",
+        # NEW: Caddy v2 refuses non-standard directives without explicit
+        # ordering. `tracing` opens a span and must wrap everything;
+        # `enduser_attrs` (plugin/enduser_attrs/) reads that span and
+        # stamps attrs, so it must run before reverse_proxy hops upstream.
+        "  order tracing first",
+        "  order enduser_attrs before reverse_proxy",
         "  log {",
         "    output stdout",
         "    format json",

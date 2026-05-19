@@ -1,6 +1,6 @@
 # Begin ops team responsibility
 
-.PHONY: setup chart chart-lint certs
+.PHONY: setup chart chart-lint certs caddy-image
 
 CERTS_DIR       := .secrets/certs
 
@@ -42,6 +42,9 @@ certs:
 	@rm -rf $(CERTS_DIR)
 	@./scripts/secrets-gen.py
 	@./tools/step certificate install $(CERTS_DIR)/ca.crt
+
+caddy-image:
+	docker build -t localmesh/caddy:dev service_catalog/caddy/
 
 # End ops team responsibility
 
