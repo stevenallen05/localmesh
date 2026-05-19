@@ -14,4 +14,4 @@ The same infrastructure also solves user authentication for every team at once �
 
 You enable the mesh by adding one line to your compose file — the same way you added the observability module. Ops supports the first onboarding; after that you copy-paste the pattern for the next service. The specific product the mesh runs on is ops's choice to make, not yours: your interface stays compose, the same way it does today.
 
-Implementation: [`service_catalog/caddy/`](../service_catalog/caddy/) (north-south ingress + `make certs` orchestration), [`service_catalog/auth_shim/`](../service_catalog/auth_shim/) (dev user picker), *Service mesh — local model* + *User identity at ingress* rows in [`DESIGN_DECISIONS.md`](./stakeholder/DESIGN_DECISIONS.md) · Take-home scope: [`TODO.md`](./TODO.md).
+Implementation: [`service_catalog/caddy/`](../service_catalog/caddy/) (north-south ingress + `make certs` orchestration), [`service_catalog/auth/`](../service_catalog/auth/) (ingress auth gate — oauth2-proxy + dex), *Service mesh — local model* + *User identity at ingress* rows in [`DESIGN_DECISIONS.md`](./stakeholder/DESIGN_DECISIONS.md) · Take-home scope: [`TODO.md`](./TODO.md).

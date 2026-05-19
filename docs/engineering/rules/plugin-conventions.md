@@ -11,7 +11,7 @@ Long-form rationale: [`../../superpowers/specs/2026-05-18-localmesh-namespacing-
 Every service in this project — app-tier or catalog plugin — declares an **identity tuple** of three values: `service_name`, `module_name`, `owned_by`. The tuple already exists in the compose files; this rule binds it.
 
 - `service_name` — the OTel `service.name` for the running service. One per container role (`server`, `www`, `postgres`, `otel-collector`, ...). Matches whatever the OTel SDK reports.
-- `module_name` — the LocalMesh namespace axis. `app` for app-tier services. `<plugin-slug>` for catalog-plugin services, where the slug matches the `service_catalog/<plugin>/` directory name (`database`, `observability`, `logging`, `caddy`, `auth_shim`). The single value `app` is reserved for app-tier services. Plugin slugs cannot be `app`.
+- `module_name` — the LocalMesh namespace axis. `app` for app-tier services. `<plugin-slug>` for catalog-plugin services, where the slug matches the `service_catalog/<plugin>/` directory name (`database`, `observability`, `logging`, `caddy`, `auth`). The single value `app` is reserved for app-tier services. Plugin slugs cannot be `app`.
 - `owned_by` — contact email for ownership. App-tier uses `${TECH_LEAD_EMAIL}` (sourced from `.env`, mirroring `project.toml`'s `tech_lead_email`). Plugins use the platform team's email.
 
 Each value lives in two places. `plugin.toml` is now the source of truth for the per-plugin halves; the `.env` interpolation bridge written by `scripts/secrets-gen.py` is the working substitute for a proper compose-extension (tracked as the *Identity source consolidation* Open item in [`../../stakeholder/DESIGN_DECISIONS.md`](../../stakeholder/DESIGN_DECISIONS.md)). The two channels carrying identity:
