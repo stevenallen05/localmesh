@@ -34,6 +34,18 @@ configs:
               # team accountable for the data. Other catalogue includes set
               # their own values on scrape jobs they own — app code uses
               # OTEL_RESOURCE_ATTRIBUTES on the container instead.
+              - job_name: caddy
+                # Caddy's Prometheus endpoint on its admin API (:2019/metrics).
+                # Exposes caddy_http_request_duration_seconds_*,
+                # caddy_http_requests_in_flight, reverse_proxy_* etc.
+                # Enabled via the `metrics` global option in the generated
+                # Caddyfile (scripts/secrets-gen.py).
+                static_configs:
+                  - targets: ['caddy:2019']
+                    labels:
+                      module_name: caddy
+                      owned_by: sre@example.com
+                scrape_interval: 15s
               - job_name: node-exporter
                 # Host kernel metrics — dev-fidelity only. In prod, ops
                 # owns the equivalent collectors and this scrape job is

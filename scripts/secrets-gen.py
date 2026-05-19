@@ -369,7 +369,10 @@ def caddyfile_lines(project: dict, plugins: list[tuple[str, dict]]) -> list[str]
         f"# Re-run `make certs` to regenerate.",
         "",
         "{",
-        "  admin localhost:2019",
+        # Bind admin (which serves /metrics) to all interfaces so the
+        # otel-collector can scrape from inside the docker network. Host
+        # exposure is still locked down via compose `ports: 127.0.0.1:2019:2019`.
+        "  admin :2019",
         "  # We supply certs via the per-site `tls` directive (read from",
         "  # /run/caddy/id.{crt,key}). Disable Caddy's automatic cert",
         "  # acquisition so it doesn't issue its own and override ours.",
@@ -380,6 +383,9 @@ def caddyfile_lines(project: dict, plugins: list[tuple[str, dict]]) -> list[str]
         # stamps attrs, so it must run before reverse_proxy hops upstream.
         "  order tracing first",
         "  order enduser_attrs before reverse_proxy",
+        # Caddy auto-exposes Prometheus metrics at /metrics on the admin
+        # endpoint (caddy:2019), no opt-in required. The otel-collector's
+        # prometheus receiver scrapes them — see service_catalog/observability.
         "  log {",
         "    output stdout",
         "    format json",
