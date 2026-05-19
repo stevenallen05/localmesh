@@ -86,11 +86,15 @@ def compose_exempts(plugin_slug: str) -> set[str]:
 
 
 def services_iter(project: dict, plugins: list[tuple[str, dict]]):
-    """Yield (container, port, expose_via_ingress, mesh_exempt, ingress, owner_slug).
+    """Yield (container, port, expose_via_ingress, mesh_exempt, ingress, owner_slug, requires_auth).
 
     mesh_exempt is derived from each plugin's docker-compose.yml labels
     (`mesh.exempt: "true"`), not from plugin.toml. Project-level services
     are never mesh-exempt (the app tier always joins the mesh).
+
+    requires_auth defaults to True (default-deny at the ingress). Services
+    that explicitly opt out — the IdP itself, primarily — set
+    `requires_auth = false` in their `[[services]]` entry.
     """
     for svc in project.get("services", []):
         yield (
@@ -100,6 +104,7 @@ def services_iter(project: dict, plugins: list[tuple[str, dict]]):
             False,
             svc.get("ingress", False),
             "project",
+            svc.get("requires_auth", True),
         )
     for slug, plugin in plugins:
         exempt_set = compose_exempts(slug)
@@ -111,6 +116,7 @@ def services_iter(project: dict, plugins: list[tuple[str, dict]]):
                 svc["container"] in exempt_set,
                 svc.get("ingress", False),
                 slug,
+                svc.get("requires_auth", True),
             )
 
 
@@ -192,7 +198,7 @@ def mint_certs(project: dict, plugins: list[tuple[str, dict]]):
     ensure_ca()
     pname = project["project_name"]
     ldom = project["local_domain"]
-    for container, _port, _expose, exempt, ingress, _owner in services_iter(project, plugins):
+    for container, _port, _expose, exempt, ingress, _owner, _requires_auth in services_iter(project, plugins):
         if exempt:
             continue
         issue(container, pname, ldom, ingress)
@@ -230,7 +236,7 @@ def env_lines(project: dict, plugins: list[tuple[str, dict]]) -> list[str]:
                 lines.append(f"{prefix}_{upcase_snake(key)}={fmt_value(value)}")
 
     # [[services]] entries → <CONTAINER>_<KEY>.
-    for container, port, expose, _exempt, ingress, _owner in services_iter(project, plugins):
+    for container, port, expose, _exempt, ingress, _owner, _requires_auth in services_iter(project, plugins):
         prefix = upcase_snake(container)
         lines.append(f"{prefix}_PORT={port}")
         lines.append(f"{prefix}_EXPOSE_VIA_INGRESS={'true' if expose else 'false'}")
@@ -259,6 +265,58 @@ def write_env(project: dict, plugins: list[tuple[str, dict]]):
 # ---------------------------------------------------------------------------
 # Caddyfile generation
 
+def _ungated_block(upstream: str, exempt: bool) -> list[str]:
+    """Caddy site-block body for services that opt out of ingress auth."""
+    if exempt:
+        return [f"  reverse_proxy {upstream}"]
+    return [
+        f"  reverse_proxy {upstream} {{",
+        f"    transport http {{",
+        f"      tls",
+        f"      tls_trust_pool file /run/caddy/trust.ca.crt",
+        f"      tls_client_auth /run/caddy/id.crt /run/caddy/id.key",
+        f"    }}",
+        f"  }}",
+    ]
+
+
+def _gated_block(upstream: str, exempt: bool) -> list[str]:
+    """Caddy site-block body with forward_auth → oauth2-proxy."""
+    upstream_block = (
+        [f"    reverse_proxy {upstream}"] if exempt
+        else [
+            f"    reverse_proxy {upstream} {{",
+            f"      transport http {{",
+            f"        tls",
+            f"        tls_trust_pool file /run/caddy/trust.ca.crt",
+            f"        tls_client_auth /run/caddy/id.crt /run/caddy/id.key",
+            f"      }}",
+            f"    }}",
+        ]
+    )
+    return [
+        f"  handle /oauth2/* {{",
+        f"    reverse_proxy http://oauth2-proxy:4180",
+        f"  }}",
+        f"  handle {{",
+        f"    forward_auth http://oauth2-proxy:4180 {{",
+        f"      uri /oauth2/auth",
+        f"      copy_headers {{",
+        f"        X-Auth-Request-User>X-Forwarded-User",
+        f"        X-Auth-Request-Email>X-Forwarded-Email",
+        f"        X-Auth-Request-Preferred-Username>X-Forwarded-Preferred-Username",
+        f"        X-Auth-Request-Access-Token>Authorization",
+        f"      }}",
+        f"      @error status 401",
+        f"      handle_response @error {{",
+        f"        redir https://{{host}}/oauth2/sign_in?rd={{scheme}}://{{host}}{{http.request.orig_uri}} 302",
+        f"      }}",
+        f"    }}",
+        *upstream_block,
+        f"  }}",
+    ]
+
+
 def caddyfile_lines(project: dict, plugins: list[tuple[str, dict]]) -> list[str]:
     pname = project["project_name"]
     ldom = project["local_domain"]
@@ -279,7 +337,7 @@ def caddyfile_lines(project: dict, plugins: list[tuple[str, dict]]) -> list[str]
         "}",
         "",
     ]
-    for container, port, expose, exempt, ingress, _owner in services_iter(project, plugins):
+    for container, port, expose, exempt, ingress, _owner, requires_auth in services_iter(project, plugins):
         if not expose or ingress:
             continue
         host = f"{container}.{pname}.{ldom}"
@@ -287,16 +345,10 @@ def caddyfile_lines(project: dict, plugins: list[tuple[str, dict]]) -> list[str]
         upstream = f"{upstream_scheme}://{container}:{port}"
         lines.append(f"{host}:8443 {{")
         lines.append(f"  tls /run/caddy/id.crt /run/caddy/id.key")
-        if exempt:
-            lines.append(f"  reverse_proxy {upstream}")
+        if requires_auth:
+            lines.extend(_gated_block(upstream, exempt))
         else:
-            lines.append(f"  reverse_proxy {upstream} {{")
-            lines.append(f"    transport http {{")
-            lines.append(f"      tls")
-            lines.append(f"      tls_trust_pool file /run/caddy/trust.ca.crt")
-            lines.append(f"      tls_client_auth /run/caddy/id.crt /run/caddy/id.key")
-            lines.append(f"    }}")
-            lines.append(f"  }}")
+            lines.extend(_ungated_block(upstream, exempt))
         lines.append(f"  log {{")
         lines.append(f"    output stdout")
         lines.append(f"    format json")

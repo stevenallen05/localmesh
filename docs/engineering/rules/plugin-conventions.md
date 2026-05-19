@@ -92,7 +92,7 @@ Worked example for the `database/` plugin lives at [`../../../service_catalog/da
 
 ## 3. Overlap with `plugin.toml`
 
-`plugin.toml` owns identity (`module_name`, `owned_by`), service definitions (`container`, `port`), and exposure (`expose_via_ingress`, `ingress`). `README.md` cites these values by reference (link to §1 above or to `plugin.toml` itself) and never redeclares them. Plugin-internal env vars derived from `plugin.toml` by `scripts/secrets-gen.py` do not appear in `README.md`'s Environment table:
+`plugin.toml` owns identity (`module_name`, `owned_by`), service definitions (`container`, `port`), exposure (`expose_via_ingress`, `ingress`), and auth gating (`requires_auth`, default `true` — services that opt out of the ingress auth gate set `requires_auth = false`; the IdP itself is the canonical opt-out). `README.md` cites these values by reference (link to §1 above or to `plugin.toml` itself) and never redeclares them. Plugin-internal env vars derived from `plugin.toml` by `scripts/secrets-gen.py` do not appear in `README.md`'s Environment table:
 
 - From `[identity]`, keyed by **plugin slug**: `<PLUGIN>_MODULE_NAME`, `<PLUGIN>_OWNED_BY`.
 - From `[[services]]`, keyed by **container slug**: `<CONTAINER>_PORT`, `<CONTAINER>_EXPOSE_VIA_INGRESS`, `<CONTAINER>_INGRESS`.

@@ -188,3 +188,48 @@ def test_caddyfile_emits_route_for_exposed_services(tmp_path, monkeypatch):
     # Mesh-participating www: mTLS upstream
     assert "reverse_proxy https://www:3443" in text
     assert "tls_client_auth /run/caddy/id.crt /run/caddy/id.key" in text
+
+
+def test_caddyfile_emits_gated_by_default(tmp_path, monkeypatch):
+    """Services without `requires_auth` explicitly set get the gated template."""
+    _seed(
+        tmp_path,
+        project_toml=(
+            'project_name = "demo"\nlocal_domain = "lvh.me"\n\n'
+            '[[services]]\ncontainer = "www"\nport = 3443\nexpose_via_ingress = true\n'
+        ),
+        plugins={
+            "caddy": (
+                '[identity]\nmodule_name = "caddy"\nowned_by = "sre@example.com"\n'
+                '[[services]]\ncontainer = "caddy"\nport = 8443\ningress = true\n'
+            ),
+        },
+    )
+    mod = _load(monkeypatch, tmp_path)
+    project, plugins = mod.load_manifests()
+    text = "\n".join(mod.caddyfile_lines(project, plugins))
+    # Gated default emits the forward_auth marker block.
+    assert "forward_auth http://oauth2-proxy:4180" in text
+
+
+def test_caddyfile_requires_auth_false_emits_ungated_template(tmp_path, monkeypatch):
+    """Explicit `requires_auth = false` opts out of the forward_auth block."""
+    _seed(
+        tmp_path,
+        project_toml=(
+            'project_name = "demo"\nlocal_domain = "lvh.me"\n\n'
+            '[[services]]\ncontainer = "www"\nport = 3443\nexpose_via_ingress = true\n'
+            'requires_auth = false\n'
+        ),
+        plugins={
+            "caddy": (
+                '[identity]\nmodule_name = "caddy"\nowned_by = "sre@example.com"\n'
+                '[[services]]\ncontainer = "caddy"\nport = 8443\ningress = true\n'
+            ),
+        },
+    )
+    mod = _load(monkeypatch, tmp_path)
+    project, plugins = mod.load_manifests()
+    text = "\n".join(mod.caddyfile_lines(project, plugins))
+    assert "forward_auth" not in text
+    assert "reverse_proxy https://www:3443" in text
