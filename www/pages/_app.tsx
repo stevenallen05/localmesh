@@ -1,27 +1,21 @@
-// LocalMesh top-of-page banner: shows the logged-in user (read via
-// /api/whoami, which exposes oauth2-proxy's X-Forwarded-* headers
-// for display only) and a sign-out link to oauth2-proxy.
-//
-// www is identity-free — no cookies, no env fallback, no header
-// parsing. The actual identity lives in the JWT proxied to server.
+// LocalMesh top-of-page banner: shows the logged-in user, read from
+// oauth2-proxy's X-Forwarded-* headers on the initial server-render
+// pass. www is identity-free — no cookies, no env fallback, no
+// client-side fetch. The actual identity lives in the JWT proxied
+// to server.
 
-import type { AppProps } from 'next/app';
-import { useEffect, useState } from 'react';
+import type { AppContext, AppProps } from 'next/app';
+import App from 'next/app';
 
-function UserBanner() {
-  const [name,  setName]  = useState<string>('—');
-  const [email, setEmail] = useState<string>('');
+// Node lowercases header names. Each header is string | string[] | undefined;
+// multi-value (string[]) is rare for these headers but possible — pick first.
+function pick(v: string | string[] | undefined): string {
+  return Array.isArray(v) ? v[0] ?? '' : v ?? '';
+}
 
-  useEffect(() => {
-    fetch('/api/whoami')
-      .then(r => r.json())
-      .then(({ name, email }) => {
-        setName(name || 'Authenticated user');
-        setEmail(email || '');
-      })
-      .catch(() => { /* unauthenticated request can't reach here post-cutover */ });
-  }, []);
+type BannerProps = { name: string; email: string };
 
+function UserBanner({ name, email }: BannerProps) {
   return (
     <div
       style={{
@@ -36,7 +30,7 @@ function UserBanner() {
       }}
     >
       <span>
-        Logged in as: <strong>{name}</strong>
+        Logged in as: <strong>{name || 'Authenticated user'}</strong>
         {email && <span style={{ color: '#666' }}> &lt;{email}&gt;</span>}
       </span>
       <a href="/oauth2/sign_out?rd=/">[Sign out]</a>
@@ -44,11 +38,26 @@ function UserBanner() {
   );
 }
 
-export default function App({ Component, pageProps }: AppProps) {
+type MyAppProps = AppProps & BannerProps;
+
+export default function MyApp({ Component, pageProps, name, email }: MyAppProps) {
   return (
     <>
-      <UserBanner />
+      <UserBanner name={name} email={email} />
       <Component {...pageProps} />
     </>
   );
 }
+
+// ctx.ctx.req is only set on the server pass (initial page load via Caddy).
+// On client-side navigations there is no req — the SSR-computed value is
+// reused, which is fine because the logged-in identity is session-stable.
+MyApp.getInitialProps = async (appCtx: AppContext) => {
+  const appProps = await App.getInitialProps(appCtx);
+  const h = appCtx.ctx.req?.headers ?? {};
+  return {
+    ...appProps,
+    name:  pick(h['x-forwarded-preferred-username']),
+    email: pick(h['x-forwarded-email']),
+  };
+};
