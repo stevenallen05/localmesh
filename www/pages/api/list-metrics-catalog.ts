@@ -2,10 +2,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import path from 'path';
-import { trace } from '@opentelemetry/api';
 import { logger } from '../../lib/logger';
 import { meshChannelCredentials } from '../../lib/grpc-credentials';
-import { getUser, userMetadata } from '../../lib/identity';
+import { forwardAuth } from '../../lib/grpc-auth';
 
 const PROTO_PATH = path.resolve(process.cwd(), 'proto/metrics.proto');
 
@@ -26,15 +25,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // PII-at-ingress: see lib/identity.ts header.
-  const user = getUser(req);
-  trace.getActiveSpan()?.setAttributes({
-    'enduser.id':    user.id,
-    'enduser.email': user.email,
-    'user.id':       user.id,
-    'user.email':    user.email,
-  });
-  const md = userMetadata(user);
+  // No identity stamping in www — OTel enduser.* lands at the Caddy
+  // ingress via the enduser_attrs plugin. Auth flows through as the
+  // opaque Authorization header forwarded to server.
+  const md = forwardAuth(req);
 
   const target = process.env.SERVER_ADDR ?? 'server:50051';
   const client = new CatalogCtor(target, meshChannelCredentials());

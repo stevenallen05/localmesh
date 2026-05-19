@@ -1,31 +1,25 @@
-// LocalMesh top-of-page banner: shows the logged-in dev user (from the
-// `lm.user.*` cookies set by /auth/login) and a switcher link.
+// LocalMesh top-of-page banner: shows the logged-in user (read via
+// /api/whoami, which exposes oauth2-proxy's X-Forwarded-* headers
+// for display only) and a sign-out link to oauth2-proxy.
 //
-// Identity ends here for the UI side; the server-side `getUser(req)`
-// helper in www/lib/identity.ts is what actually threads user info into
-// the API routes and downstream gRPC metadata.
+// www is identity-free — no cookies, no env fallback, no header
+// parsing. The actual identity lives in the JWT proxied to server.
 
 import type { AppProps } from 'next/app';
 import { useEffect, useState } from 'react';
 
-function decodeCookie(raw: string, key: string): string | undefined {
-  const m = raw.split(';').map(s => s.trim()).find(s => s.startsWith(`${key}=`));
-  if (!m) return undefined;
-  try {
-    return decodeURIComponent(m.slice(key.length + 1));
-  } catch {
-    return undefined;
-  }
-}
-
 function UserBanner() {
-  const [name, setName] = useState<string>('—');
+  const [name,  setName]  = useState<string>('—');
   const [email, setEmail] = useState<string>('');
 
   useEffect(() => {
-    const raw = document.cookie;
-    setName(decodeCookie(raw, 'lm.user.name') ?? 'Dev User');
-    setEmail(decodeCookie(raw, 'lm.user.email') ?? '');
+    fetch('/api/whoami')
+      .then(r => r.json())
+      .then(({ name, email }) => {
+        setName(name || 'Authenticated user');
+        setEmail(email || '');
+      })
+      .catch(() => { /* unauthenticated request can't reach here post-cutover */ });
   }, []);
 
   return (
@@ -45,7 +39,7 @@ function UserBanner() {
         Logged in as: <strong>{name}</strong>
         {email && <span style={{ color: '#666' }}> &lt;{email}&gt;</span>}
       </span>
-      <a href="/auth/login">[Switch user]</a>
+      <a href="/oauth2/sign_out?rd=/">[Sign out]</a>
     </div>
   );
 }
