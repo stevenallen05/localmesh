@@ -72,7 +72,7 @@ services:
 include:
   - repo:/mesh/baseline.yaml
   - repo:/observability/baseline.yaml
-  - repo:/security/baseline.yaml
+  - repo:/compliance/baseline.yaml
   # ...whatever this org requires
 ```
 
