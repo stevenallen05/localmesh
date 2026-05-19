@@ -107,7 +107,7 @@ services:
         condition: service_started
     healthcheck:
       # Plaintext loopback probe — TLS termination is in the sidecar now.
-      test: ["CMD", "wget", "-qO-", "http://localhost:3444/"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3444/"]
       interval: 10s
       timeout: 3s
       retries: 5
