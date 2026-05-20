@@ -2,7 +2,7 @@ type: Dataplane
 mesh: default
 name: ingress
 networking:
-  address: ingress
+  address: 0.0.0.0
   gateway:
     type: BUILTIN
     tags:

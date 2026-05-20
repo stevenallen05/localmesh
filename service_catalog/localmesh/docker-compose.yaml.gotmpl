@@ -1,7 +1,6 @@
 services:
   kuma-cp:
     image: docker.io/kumahq/kuma-cp:2.9.0
-    command: ["run"]
     environment:
       KUMA_MODE: standalone
       KUMA_ENVIRONMENT: universal
@@ -10,39 +9,9 @@ services:
       KUMA_API_SERVER_HTTP_PORT: "5681"
       KUMA_DP_SERVER_PORT: "5678"
       KUMA_DP_SERVER_AUTH_TYPE: none
-      # DP-server TLS cert minted from project root CA (mounted at /certs).
-      KUMA_DP_SERVER_TLS_CERT_FILE: /certs/kuma-cp.pem
-      KUMA_DP_SERVER_TLS_KEY_FILE: /certs/kuma-cp-key.pem
+      # DP-server TLS: no dedicated disable flag in Kuma 2.9. Leaving
+      # KUMA_DP_SERVER_TLS_CERT_FILE / _KEY_FILE (and the general.* fallbacks)
+      # unset causes kuma-cp to serve the DP-server over plain gRPC.
     expose:
       - "5678"
       - "5681"
-    volumes:
-      - ../../.localmesh/secrets/kuma-cp:/certs:ro
-  ingress:
-    image: docker.io/kumahq/kuma-dp:2.9.0
-    command:
-      - run
-      - --cp-address=https://kuma-cp:5678
-      - --ca-cert-file=/certs/rootCA.pem
-      - --dataplane-file=/bootstrap/ingress.dataplane.yaml
-    volumes:
-      - ./bootstrap/ingress.dataplane.yaml:/bootstrap/ingress.dataplane.yaml:ro
-      - ../../.localmesh/secrets/root_ca/rootCA.pem:/certs/rootCA.pem:ro
-    depends_on:
-      - kuma-cp
-    expose:
-      - "8443"
-  egress:
-    image: docker.io/kumahq/kuma-dp:2.9.0
-    command:
-      - run
-      - --cp-address=https://kuma-cp:5678
-      - --ca-cert-file=/certs/rootCA.pem
-      - --dataplane-file=/bootstrap/egress.dataplane.yaml
-    volumes:
-      - ./bootstrap/egress.dataplane.yaml:/bootstrap/egress.dataplane.yaml:ro
-      - ../../.localmesh/secrets/root_ca/rootCA.pem:/certs/rootCA.pem:ro
-    depends_on:
-      - kuma-cp
-    expose:
-      - "15001"
