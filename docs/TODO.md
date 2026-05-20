@@ -43,12 +43,13 @@ matching `__name__=~"container_.+"` instead of the empty-string trick).
   so additions don't drift.
 - **Identity source consolidation.** `plugin.toml` is now the source of
   truth for the per-plugin halves of the identity tuple (`module_name`,
-  `owned_by`); `scripts/secrets-gen.py` writes them into `.env`'s
-  managed section as UPCASE_SNAKECASE for compose interpolation. The
-  working bridge is the `.env` write; the proper replacement (compose
-  overlay generator at build time, or a real compose extension once
-  compose grows one) is `TODO: needs_prod_decisions plugin.toml →
-  compose interpolation`. Tracked in DESIGN_DECISIONS Open.
+  `owned_by`); `localmesh build` (`internal/envwriter`) writes them
+  into `.env`'s managed section as UPCASE_SNAKECASE for compose
+  interpolation. The working bridge is the `.env` write; the proper
+  replacement (compose overlay generator at build time, or a real
+  compose extension once compose grows one) is `TODO:
+  needs_prod_decisions plugin.toml → compose interpolation`. Tracked in
+  DESIGN_DECISIONS Open.
 - **Plugin-conventions linter.** Identity tuple binding + `README.md`
   template compliance ship as documentation today. Land a v0+1 linter
   that verifies every plugin's identity labels match its directory slug,
@@ -128,9 +129,6 @@ context-dependent.
 - **`/etc/hosts` seeding.** `make check-hosts` enforces required entries
   but doesn't write them. Real DNS in prod; a privileged-init script /
   mise hook / devcontainer feature for dev is the in-between.
-- **`tools/step` vendoring.** Single binary committed to the repo today.
-  Replace with bootstrap script (mise / nix / asdf) or a fetch-by-
-  checksum step in `make setup`.
 - **Caddy wildcard cert.** `*.${PROJECT_NAME}.${LOCAL_DOMAIN}` on the
   ingress cert. Prod uses per-host certs via cert-manager IngressRoute.
 - **postgres-exporter strict perm wrapper.** Both postgres and
@@ -226,17 +224,12 @@ Items deferred from the 2026-05-20 localmesh Go CLI delivery. All
 flagged inline as `TODO: needs_prod_decisions <≤10 words>` at the
 relevant call site so they're greppable.
 
-- **Port Caddyfile + dex.yaml generators to Go CLI.**
-  `scripts/secrets-gen.py` is retained as a transitional helper for
-  `Caddyfile.generated` (per-`[[services]]` site blocks) +
-  `dex.yaml.generated` (`staticPasswords:` + per-client config). The Go
-  CLI already owns identity + service shape from `plugin.toml`; both
-  writers are the next port.
-  `TODO: needs_prod_decisions port Caddyfile + dex.yaml generators to Go CLI`.
-- **Port `.env` writer to Go CLI.** Managed-section emission
-  (per-plugin identity tuple as UPCASE_SNAKECASE for compose
-  interpolation) still runs in Python. Move it to Go to retire the
-  Python tail. `TODO: needs_prod_decisions port .env writer to Go CLI`.
+- **Caddy + dex generator end-of-life.** `scripts/secrets-gen.py` is
+  retained only for `Caddyfile.generated` + `dex.yaml.generated`. Both
+  retire with the Caddy→Envoy migration (separate workstream — Envoy
+  ingress + a real IdP swap), so a Go port would throw away work.
+  Delete the script when that migration lands.
+  `TODO: needs_prod_decisions Caddyfile + dex.yaml generators sunset with Caddy→Envoy migration`.
 - **mkcert via go module.** mkcert v1.4.4 vendored as a binary at
   `localmesh_src/tools/mkcert` today (subprocess invocation from
   `internal/ca`). Importing mkcert as a Go module would remove the
@@ -268,16 +261,12 @@ relevant call site so they're greppable.
   yet ported. Cert minting for exempt containers is wasted work today
   but harmless. `TODO: needs_prod_decisions mesh.exempt detection from
   compose labels`.
-- **`tools/step` cleanup.** mkcert subsumes step for CA install + leaf
-  minting; the vendored `tools/step` binary is now dead weight. Delete
-  in a follow-up sweep. `TODO: needs_prod_decisions delete unused
-  tools/step`.
 - **`scripts/tests/test_secrets_gen.py` rename.** File trimmed (cert
-  tests removed; env/Caddy/dex tests stay) rather than deleted because
-  the Python helper still owns those three outputs. Rename to reflect
-  the transitional scope once the helper is retired (per port-to-Go
-  TODOs above). `TODO: needs_prod_decisions rename test file for
-  transitional helper`.
+  + env tests removed; Caddy/dex tests stay) rather than deleted
+  because the Python helper still owns those two outputs. Rename to
+  reflect the transitional scope once the helper retires alongside the
+  Caddy→Envoy migration. `TODO: needs_prod_decisions rename test file
+  for transitional helper`.
 - **Long-form volume rewrite in render.** `internal/render/rewrite.go`
   rewrites relative paths for `build.context`, short-form volumes,
   `configs.file`, `secrets.file`. Long-form `volumes:` with `source:`
