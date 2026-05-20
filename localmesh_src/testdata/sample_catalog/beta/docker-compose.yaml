@@ -1,0 +1,7 @@
+services:
+  beta-svc:
+    image: beta:dev
+    labels:
+      metrics.service_name: beta-svc
+      metrics.module_name: beta
+      metrics.owned_by: beta@example.invalid

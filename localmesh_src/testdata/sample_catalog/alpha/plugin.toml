@@ -1,0 +1,8 @@
+[identity]
+module_name = "alpha"
+owned_by    = "alpha@example.invalid"
+
+[[services]]
+container          = "alpha-svc"
+port               = 8080
+expose_via_ingress = false
