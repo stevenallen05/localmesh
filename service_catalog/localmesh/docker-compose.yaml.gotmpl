@@ -1,6 +1,7 @@
 services:
   kuma-cp:
     image: docker.io/kumahq/kuma-cp:2.9.0
+    command: ["run"]
     environment:
       KUMA_MODE: standalone
       KUMA_ENVIRONMENT: universal
