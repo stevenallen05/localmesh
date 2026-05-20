@@ -2,12 +2,10 @@
 module_name = "mesh"
 owned_by    = "sre@example.com"
 
-# envoy-omakase. Replaces the prior caddy (north-south ingress + OIDC),
-# ghostunnel (east-west mTLS sidecars), and oauth2-proxy (login flow)
-# trio with one Envoy fleet across three roles: ingress, egress,
-# per-workload sidecar. Per-workload sidecars are minted by the bundling CLI from
-# templates/workload-sidecar.envoy.yaml.gotmpl. They do not appear as
-# [[services]] entries here.
+# envoy-omakase. One Envoy fleet across three roles: ingress, egress,
+# per-workload sidecar. Per-workload sidecars are minted by the
+# bundling CLI from templates/workload-sidecar.envoy.yaml.gotmpl. They
+# do not appear as [[services]] entries here.
 
 [[services]]
 container          = "ingress-mesh"

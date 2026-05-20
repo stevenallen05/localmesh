@@ -1,6 +1,6 @@
 # LocalMesh ingress auth plugin. Dex is the dev OIDC IdP; the ingress
 # envoy (mesh plugin) is the OIDC client and drives the dance via its
-# envoy.filters.http.oauth2 + jwt_authn filters. oauth2-proxy is retired.
+# envoy.filters.http.oauth2 + jwt_authn filters.
 #
 # Dex's config lives in .localmesh/dex.yaml, copied from dex.yaml.sample
 # on first run (see Makefile's certs target). The dev edits the local

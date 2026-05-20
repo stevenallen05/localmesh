@@ -2,7 +2,7 @@
 
 > **LocalMesh** is a deployment pattern I designed for this take-home and am bootstrapping through a small Rust + Next.js metrics service.
 
-The take-home asked for a metrics monitoring system. The artifact here is two things at once: the metrics service itself, and the early shape of LocalMesh — the pattern I built the service inside of. The top-level `docker-compose.yml` `include:`s a few LocalMesh plugins from a stub catalogue: observability, logging, caddy (north-south ingress), auth (ingress auth gate) — required — plus database — optional. The helm chart is generated from compose, not hand-maintained. Everything past this point describes LocalMesh as the pattern intends to work; the repo is the first implementation against it.
+The take-home asked for a metrics monitoring system. The artifact here is two things at once: the metrics service itself, and the early shape of LocalMesh — the pattern I built the service inside of. The top-level `docker-compose.yml` `include:`s a few LocalMesh plugins from a stub catalogue: observability, logging, mesh (envoy ingress + per-workload sidecar + egress), auth (dex IdP) — required — plus database — optional. The helm chart is generated from compose, not hand-maintained. Everything past this point describes LocalMesh as the pattern intends to work; the repo is the first implementation against it.
 
 ## TL;DR
 
@@ -208,7 +208,7 @@ docker compose up -d --build
 
 ## What to look at
 
-**Grafana** at `localhost:3001` (admin / admin), four provisioned dashboards:
+**Grafana** at `localhost:3001` (admin / admin), three provisioned dashboards:
 
 - **Lightweight APM for OpenTelemetry** (`/d/apm`) — community dashboard
   [22784](https://grafana.com/grafana/dashboards/22784) by Cyrille Le
@@ -229,11 +229,6 @@ docker compose up -d --build
   stripped (we don't run on k8s in dev). Adds one custom **top-N slow queries**
   table panel sourced from `pg_stat_statements` — no community dashboard
   surveyed had a slow-query panel matching our exporter's metric names.
-- **Ingress** (`/d/localmesh-ingress`) — request rates by HTTP status,
-  p50/p95 ingress latency, upstream health. Sourced from Caddy access
-  logs (Loki). Custom — no upstream community dashboard fits the
-  Caddy-as-mesh-ingress shape.
-
 **www** at `localhost:3000` — three demo buttons (`PrintPostgresStats`,
 `ListGrafanaDatasources`, `TestRPC`) that exercise the trace path
 end-to-end (Next.js → tonic → Rust → postgres). Each click produces a

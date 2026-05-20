@@ -2,7 +2,7 @@
 
 ## Overview
 
-Dev OIDC IdP. One container: **dex** (built-in password DB, three pre-seeded users — alice / bob / charlie, all sharing password `dev`). The ingress envoy (mesh plugin) is the OIDC client; its `envoy.filters.http.oauth2` filter drives the dance and `envoy.filters.http.jwt_authn` validates the bearer on every subsequent request. oauth2-proxy is retired — the filter chain replaces it.
+Dev OIDC IdP. One container: **dex** (built-in password DB, three pre-seeded users — alice / bob / charlie, all sharing password `dev`). The ingress envoy (mesh plugin) is the OIDC client; its `envoy.filters.http.oauth2` filter drives the dance and `envoy.filters.http.jwt_authn` validates the bearer on every subsequent request.
 
 Dex's config lives in `.localmesh/dex.yaml`, copied from `dex.yaml.sample` by `make certs` on first run. The dev edits the local copy to add/remove `staticPasswords`. `make certs` never overwrites an existing `.localmesh/dex.yaml`.
 

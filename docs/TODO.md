@@ -82,154 +82,166 @@ matching `__name__=~"container_.+"` instead of the empty-string trick).
   precedent for privileged-socket access. Prod uses
   `kubernetes_sd_configs` reading pod labels — no socket. `TODO:
   needs_prod_decisions docker socket scope`.
-- **TLS scrape config for mTLS-terminated emitters.** Once the
-  ghostunnel JSON-to-Prom adapter lands and the sidecar's `/_metrics`
-  endpoint becomes scrapable, the scrape will need TLS config to honor
-  the mTLS-terminated status port. Either label-derivable (scheme +
-  job-level tls_config) or sidecar-fronted with HTTP. `TODO:
-  needs_prod_decisions TLS scrape for mTLS-terminated emitters`.
 - **localmesh integration for `prometheus.io/*` labels.** Labels are
-  hand-added to caddy / cadvisor / node-exporter compose today. The
-  paused localmesh CLI spec will gain `[[exports.metrics]]` in
-  `plugin.toml`; localmesh will write the labels into
-  `localmesh.compose.yaml`'s overlay block. Hand-added labels migrate
-  to declarations at that point. `TODO: needs_prod_decisions localmesh
-  emits prometheus.io/* labels`.
+  hand-added to cadvisor / node-exporter compose today (envoy roles
+  already carry them, emitted by the mesh plugin's template). A future
+  localmesh CLI pass will gain `[[exports.metrics]]` in `plugin.toml`;
+  localmesh will write the labels into `localmesh.compose.yaml`'s
+  overlay block. Hand-added labels migrate to declarations at that
+  point. `TODO: needs_prod_decisions localmesh emits prometheus.io/*
+  labels`.
 
 ## LocalMesh follow-ups
 
-Items deferred from the 2026-05-18 service-mesh delivery — all flagged
-inline as `TODO: needs_prod_decisions <≤10 words>` at the relevant call
-site so they're greppable. Listed here for visibility; resolution is
-context-dependent.
+Items deferred from the service-mesh and envoy-migration deliveries —
+all flagged inline as `TODO: needs_prod_decisions <≤10 words>` at the
+relevant call site so they're greppable. Listed here for visibility;
+resolution is context-dependent.
 
-- **PII enforcement, downstream layer.** The setAttributes-call-site
-  enforcement closes in T9 (no remaining sites in www
-  post-ingress-auth-revamp). Per-data-class regex scrubbing at Vector /
-  Tempo / Loki is still SRE's choice when real PII contracts settle.
+- **PII enforcement, downstream layer.** No `setAttributes('enduser.*')`
+  call sites exist downstream of the ingress envoy. Per-data-class regex
+  scrubbing at Vector / Tempo / Loki is still SRE's choice when real PII
+  contracts settle.
 - **Default-deny mesh policy.** No `AuthorizationPolicy` enforcement in
-  dev. The `mesh.exempt: "true"` compose label is the CEL predicate the
-  policy generator will read in prod to write carve-outs. Picking the
-  prod mesh runtime (Istio / Linkerd / Cilium) is the upstream
-  decision; default-deny lands when that lands.
-- **Cert lifespan + SVID rotation.** Dev certs have 10-year lifetimes;
-  prod uses short-lived SPIRE-issued SVIDs (~1h) with automatic
-  rotation. Whichever cert-delivery mechanism prod picks (cert-manager
-  vs SPIRE Workload API vs Vault PKI) sets the rotation cadence.
-- **CA key handling.** Dev's `.localmesh/secrets/root_ca/rootCA-key.pem` lives on the host
-  filesystem. Prod never has CA key in any workload pod; it's locked in
-  the chosen issuer (SPIRE / Vault / cert-manager backend).
-- **Strict EKU per role.** `plugin.toml`'s `[[certs]]` entries don't carry
-  `client`/`server` bools today — every cert is bidirectional. A
-  step-cli template enforcing per-role EKU is straightforward but
-  depends on whether prod's issuer respects the same axis.
+  dev. Foundation-tier RBAC is allow-all-internal. The `mesh.exempt:
+  "true"` compose label is the CEL predicate the policy generator will
+  read in prod to write carve-outs. Picking the prod mesh runtime
+  (Istio / Linkerd / Cilium) is the upstream decision; default-deny
+  lands when that lands.
+- **Per-caller RBAC via cert-as-policy (row 14).** Workload's cert
+  encodes its allowed destinations; sidecar reads cert and writes the
+  RBAC config the listener consumes. JSON sidecar file
+  (`id.policy.json`) is the dev shape; prod migration swaps the loader,
+  not the policy semantics. `TODO: needs_prod_decisions per-caller RBAC
+  via cert-as-policy`.
+- **Cert lifespan + SVID rotation.** Dev leaf certs have 7-day
+  lifetimes; prod uses short-lived SPIRE-issued SVIDs (~1h) with
+  automatic rotation. Whichever cert-delivery mechanism prod picks
+  (cert-manager vs SPIRE Workload API vs Vault PKI) sets the rotation
+  cadence.
+- **CA key handling.** Dev's `.localmesh/secrets/root_ca/rootCA-key.pem`
+  lives on the host filesystem. Prod never has CA key in any workload
+  pod; it's locked in the chosen issuer (SPIRE / Vault / cert-manager
+  backend).
+- **Strict EKU per role.** `plugin.toml`'s `[[services]]` entries don't
+  carry `client`/`server` bools today — every cert is bidirectional. An
+  EKU-per-role minter is straightforward but depends on whether prod's
+  issuer respects the same axis.
 - **IP SAN list tightening.** Dev IP SAN list is over-permissive (RFC1918
   / docker-bridge / loopback-IPv6 / `0.0.0.0`). Prod uses DNS-based
   identity exclusively; cert-manager SVIDs carry no IP SANs.
 - **`/etc/hosts` seeding.** `make check-hosts` enforces required entries
   but doesn't write them. Real DNS in prod; a privileged-init script /
   mise hook / devcontainer feature for dev is the in-between.
-- **Caddy wildcard cert.** `*.${PROJECT_NAME}.${LOCAL_DOMAIN}` on the
-  ingress cert. Prod uses per-host certs via cert-manager IngressRoute.
+- **Ingress wildcard cert.** `*.${PROJECT_NAME}.${LOCAL_DOMAIN}` on the
+  ingress envoy cert. Prod uses per-host certs via cert-manager
+  IngressRoute.
 - **postgres-exporter strict perm wrapper.** Both postgres and
   postgres-exporter wrap their image entrypoints to copy bind-mounted
   certs into a postgres/nobody-owned location with `0600` .key.
   Goes away when cert delivery is sidecar / SVID-based.
 - **`plugin.toml` schema growth.** Today's schema is `[identity]` +
-  `[[services]]`. Future sections (`[allows]` for default-deny, compliance
-  flags per `project.toml` shape, katenary chart selection) land as
-  the upstream features land.
+  `[[services]]` (with `scheme` + `requires_auth`). Future sections
+  (`[[externals]]` for declared egress allowlist, `[allows]` for
+  default-deny, compliance flags per `project.toml` shape, katenary
+  chart selection) land as the upstream features land.
 - **plugin.toml → compose interpolation.** `.env`'s managed section is
   the dev bridge today. Replace with a build-step compose overlay
   generator (or a real compose extension if compose grows one).
-- **multi-workload postgres roles.** `pg_hba.conf` binds each cert CN to
-  one role today. `pg_ident.conf` cert-map for multi-workload aliasing
-  is `TODO: needs_prod_decisions pg_hba cert-map for multi-workload roles`.
+- **multi-workload postgres roles.** `pg_hba.conf` binds each cert CN
+  to one role today. `pg_ident.conf` cert-map for multi-workload
+  aliasing is `TODO: needs_prod_decisions pg_hba cert-map for
+  multi-workload roles`.
 - **gRPC client-side instrumentation in Node.** The www → server gRPC
   call still lacks `@opentelemetry/instrumentation-grpc`. Pre-existing
   gap; carries over from the logging delivery.
-- **xcaddy build provenance.** `service_catalog/caddy/Dockerfile` pins
-  `xcaddy` + the local `enduser_attrs` plugin via build args. Prod needs
-  pinned-SHA xcaddy + plugin checksum verification + signed image.
-  `TODO: needs_prod_decisions caddy xcaddy build provenance + image signing`.
-- **Dex JWKS key rotation strategy.** Dev uses long-lived in-memory keys.
-  Server's JWKS cache TTL is 15 min (configurable). Prod IdP swap rotates
-  keys on its own schedule; TTL should follow.
+- **Dex JWKS key rotation strategy.** Dev uses long-lived in-memory
+  keys. Server's JWKS cache TTL is 15 min (configurable). Prod IdP swap
+  rotates keys on its own schedule; TTL should follow.
   `TODO: needs_prod_decisions JWKS cache TTL for prod IdP rotation`.
-- **Prod IdP swap.** Dex with built-in local connector + staticPasswords is dev-only. Prod
-  swaps the whole `auth/` plugin's `dex` container for a real IdP
-  (Okta / Keycloak / Auth0); `oauth2-proxy` and the Caddy `forward_auth`
-  wiring carry over unchanged.
+- **Prod IdP swap.** Dex with built-in local connector + staticPasswords
+  is dev-only. Prod swaps the whole `auth/` plugin's `dex` container
+  for a real IdP (Okta / Keycloak / Auth0); the envoy `oauth2` filter +
+  `jwt_authn` wiring carries over unchanged.
   `TODO: needs_prod_decisions IdP choice + SSO migration`.
-- **ghostunnel sidecar dep manager.** Compose `depends_on` can't express
-  "www-outbound only ready when server-inbound is listening." K8s
-  readiness probes / init containers handle this natively; dev compose
-  papers over it. `TODO: needs_prod_decisions ghostunnel sidecar shape
-  needs richer dep manager`.
-- **Per-route SPIFFE allowlist.** Inbound `--allow-uri` is a flat,
-  explicit per-peer list today (`server-inbound` lists `spiffe://www.…`;
-  `www-inbound` lists `spiffe://caddy.…`). Prod policy is per-route in
-  the mesh runtime's AuthorizationPolicy.
-  `TODO: needs_prod_decisions per-route SPIFFE allowlist for
-  AuthorizationPolicy`.
-- **Phantom-token broker for claim narrowing.** Downstream services
-  trust forwarded gRPC metadata (`x-user-id` / `x-user-email` /
-  `x-user-name`) because the sidecar's `--allow-uri` gated the channel.
-  Phantom-token broker is the cryptographic-narrowing successor
-  (per-workload claim allowlist, opaque token + introspection). In the
-  envoy-omakase MVP, JWT validation and claim extraction land once at
-  the ingress envoy. Claims become headers downstream sidecars read.
-  user_id stamps onto the trace as an attribute, not into log fields.
-  Loki lines carry the JWT key ID (`jwt_kid`) for forensic pivoting
-  without indexing user identity.
-  `TODO: needs_prod_decisions phantom-token broker for cryptographic
-  claim narrowing`.
-- **Per-callee outlier detection.** Three-strikes ejection of an
-  upstream host runs on the caller's sidecar, scoped per cluster.
-  Per-callee opt-in tuning needs the bundling CLI to join
+- **Ingress `depends_on` dex healthy at boot.** Today the ingress envoy
+  holds on `depends_on: dex condition: service_healthy`. Production "no
+  auth = no traffic" needs a richer readiness/circuit shape; revisit
+  when dex's healthcheck contract firms. `TODO: needs_prod_decisions
+  ingress depends_on dex healthy at boot`.
+- **Sidecar lifecycle binding to workload.** Compose `depends_on` orders
+  startup but doesn't bind sidecar lifetime to workload lifetime. Prod
+  uses pod-readiness probes; dev compose papers over it via `restart:
+  unless-stopped`. `TODO: needs_prod_decisions sidecar lifecycle binding
+  to workload`.
+- **iptables init container vs eBPF (Cilium-style) for prod.** The
+  per-workload init container does `apk add iptables && /init.sh` under
+  `cap_add: ["NET_ADMIN"]`. Pattern matches Istio/Linkerd today; eBPF
+  lands when the prod runtime picks it. `TODO: needs_prod_decisions
+  iptables init container vs eBPF (Cilium-style) for prod`.
+- **Multi-arch iptables-init image.** alpine:3.20 + apk covers
+  linux-amd64. arm64 needs verification. `TODO: needs_prod_decisions
+  multi-arch iptables-init image`.
+- **Envoy admin locked down in prod.** Admin listener on `:15000` is
+  bound openly in dev for DX. SRE policy in prod. `TODO:
+  needs_prod_decisions envoy admin locked down in prod`.
+- **Grafana auth via envoy in prod.** Dashboards are browsed openly in
+  dev (`requires_auth = false` on observability/'s grafana service).
+  Prod requires JWT gate or per-team SSO. `TODO: needs_prod_decisions
+  grafana auth via envoy in prod`.
+- **Declared egress allowlist via plugin.toml `[[externals]]` (row
+  13).** Uniform allowlist v0 is the placeholder. Apps declare what
+  they reach outside the mesh in `plugin.toml`; the egress envoy reads
+  the declarations to build the cluster + origination map. `TODO:
+  needs_prod_decisions declared egress allowlist via plugin.toml
+  [[externals]]`.
+- **Outlier detection (row 3).** Three-strikes ejection per cluster
+  with default thresholds. Per-callee tuning needs the CLI to join
   caller↔callee at template time so the callee's labels flow into the
-  caller's outlier config. A single default applies uniformly until the
-  join is in place.
-  `TODO: needs_prod_decisions per-callee outlier detection needs CLI
-  caller-callee join`.
+  caller's outlier config. `TODO: needs_prod_decisions per-callee
+  outlier detection needs CLI caller-callee join`.
+- **Retry / timeout schemas (rows 8–9).** Default 30s timeout, no
+  retries on non-idempotent routes. Per-route override via `plugin.toml`
+  schema additions when needed. `TODO: needs_prod_decisions retry /
+  timeout schemas`.
+- **Scope linter (row 10).** `plugin.toml [[services]].scope = internal
+  | external` + linter requires declaration. The bind address branches
+  follow. `TODO: needs_prod_decisions scope linter`.
+- **Header stripping on egress (row 11).** `authorization`, `cookie`,
+  `x-user-*`, `x-internal-*` stripped on egress by default; per-dest
+  override map. `TODO: needs_prod_decisions header stripping on
+  egress`.
+- **Claim-aware downstream (row 12).** JWT claim → header at ingress
+  only; downstream sidecars strip externally-sourced `x-user-*` on
+  outbound so the ingress is the only entry point. `TODO:
+  needs_prod_decisions claim-aware downstream`.
+- **Claim-filter at workload (row 15).** Workload's cert encodes which
+  user claims it may see; sidecar strips the rest. Pairs with row 14.
+  `TODO: needs_prod_decisions claim-filter at workload`.
+- **`MESH_*_{HOST,PORT,URL}` auto-emission.** CLI emits connection-
+  string env vars per consumer's resolved `depends_on`. Defer until the
+  app-side adoption pattern settles. `TODO: needs_prod_decisions
+  MESH_*_{HOST,PORT,URL} auto-emission`.
+- **Formalize app-loopback port discovery.** Apps bind plaintext on
+  loopback (e.g. server :50052, www :3444). Today the ports are
+  convention; a `plugin.toml [[services]].app_port` declaration plus a
+  linter would harden the contract. `TODO: needs_prod_decisions
+  app-loopback port discovery (convention vs declaration)`.
 - **katenary same-pod sidecar.** No native compose construct expresses
   "second container in the same pod." Hand-patch the chart for now;
   upstream feature request candidate. `TODO: needs_prod_decisions
   katenary same-pod label for sidecars`.
 - **postgres sidecar.** Postgres protocol's STARTTLS negotiation isn't
-  transparent-proxyable through a generic TLS terminator. `TODO:
-  needs_prod_decisions postgres sidecar requires protocol-aware
-  proxying`.
-- **ghostunnel L4 per-peer identity.** ghostunnel is L4 for HTTP/2; it
-  can't inject `X-Forwarded-Client-Cert` headers onto the gRPC stream.
-  Server trusts the channel without per-peer SPIFFE URI in metadata.
-  The `mtls_peer_uri` field on the `WhoAmI` proto is permanently empty
-  for this reason. PROXY-protocol middleware or phantom-token broker
-  carries per-call workload identity.
-  `TODO: needs_prod_decisions L4 sidecar per-peer identity`.
-- **ghostunnel JSON metrics adapter.** Ghostunnel v1.7's `--status=ADDR`
-  endpoint serves a JSON array at `/_metrics`, not Prom text exposition
-  format. The three planned otel-collector scrape jobs would receive
-  bodies the Prom receiver can't parse — Chunk 3 of the sidecar omakase
-  plan was parked on this finding. A JSON-to-Prom adapter (small
-  Go/Python service per sidecar, or one consumer of `--metrics-url=`
-  pushes) closes the gap. Status bind today is `127.0.0.1:9090/9091`
-  (loopback only); a same-netns adapter can scrape it there, otherwise
-  flip to `0.0.0.0` binds. `TODO: needs_prod_decisions ghostunnel
-  metrics need JSON-to-Prom adapter`.
+  transparent-proxyable through a generic TLS terminator. Postgres
+  stays mesh-exempt with native mTLS. `TODO: needs_prod_decisions
+  postgres sidecar requires protocol-aware proxying`.
 
 ## LocalMesh CLI follow-ups
 
-Items deferred from the 2026-05-20 localmesh Go CLI delivery. All
-flagged inline as `TODO: needs_prod_decisions <≤10 words>` at the
-relevant call site so they're greppable.
+Items deferred from the localmesh Go CLI delivery and the envoy
+migration. All flagged inline as `TODO: needs_prod_decisions <≤10
+words>` at the relevant call site so they're greppable.
 
-- **Caddy + dex generator end-of-life.** `scripts/secrets-gen.py` is
-  retained only for `Caddyfile.generated` + `dex.yaml.generated`. Both
-  retire with the Caddy→Envoy migration (separate workstream — Envoy
-  ingress + a real IdP swap), so a Go port would throw away work.
-  Delete the script when that migration lands.
-  `TODO: needs_prod_decisions Caddyfile + dex.yaml generators sunset with Caddy→Envoy migration`.
 - **mkcert via go module.** mkcert v1.4.4 vendored as a binary at
   `localmesh_src/tools/mkcert` today (subprocess invocation from
   `internal/ca`). Importing mkcert as a Go module would remove the
@@ -255,18 +267,13 @@ relevant call site so they're greppable.
   no-flag-needed path. `TODO: needs_prod_decisions .env move under
   .localmesh once config-loading tools improve`.
 - **mesh-exempt enforcement in `mtls mint`.** The Go CLI mints leaves
-  for every `[[services]]` entry uniformly. The old `secrets-gen.py`
-  read each plugin compose's `mesh.exempt: "true"` label to skip cert
-  minting for observability / auth containers; that carve-out is not
-  yet ported. Cert minting for exempt containers is wasted work today
-  but harmless. `TODO: needs_prod_decisions mesh.exempt detection from
-  compose labels`.
-- **`scripts/tests/test_secrets_gen.py` rename.** File trimmed (cert
-  + env tests removed; Caddy/dex tests stay) rather than deleted
-  because the Python helper still owns those two outputs. Rename to
-  reflect the transitional scope once the helper retires alongside the
-  Caddy→Envoy migration. `TODO: needs_prod_decisions rename test file
-  for transitional helper`.
+  for every `[[services]]` entry uniformly. The mesh-exempt label
+  carve-out (skip cert minting for observability / logging / dex /
+  postgres containers) is not yet ported into `mtls mint`. Cert minting
+  for exempt containers is wasted work today but harmless. The
+  `internal/mesh/edges` derivation already reads `mesh.exempt: "true"`;
+  share that with the cert path. `TODO: needs_prod_decisions
+  mesh.exempt detection from compose labels`.
 - **Long-form volume rewrite in render.** `internal/render/rewrite.go`
   rewrites relative paths for `build.context`, short-form volumes,
   `configs.file`, `secrets.file`. Long-form `volumes:` with `source:`
@@ -276,12 +283,17 @@ relevant call site so they're greppable.
 
 ## Dashboards
 
-The default-dashboard set ships four files:
+The default-dashboard set ships three files:
 
-- `service_catalog/caddy/ingress.json` — ingress request rates, response codes, upstream health
 - `service_catalog/database/postgres.json` — postgres health, query rates, pg_stat_statements
 - `service_catalog/observability/apm.json` — RED panels, traces waterfall, RPC server panels
 - `service_catalog/observability/cluster-health.json` — cadvisor container resource panels
+
+A mesh-ingress dashboard against envoy's native `:15090/stats/prometheus`
+surface + JSON access logs is `TODO: needs_prod_decisions ingress
+dashboard rewrite against envoy metrics`. APM already covers cross-
+service RPC RED via `tracing.http`, so the standalone ingress dashboard
+isn't on the critical path.
 
 ### Identity-pivot reconciliation
 

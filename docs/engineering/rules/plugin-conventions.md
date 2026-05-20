@@ -11,10 +11,10 @@ Long-form rationale: [`../../superpowers/specs/2026-05-18-localmesh-namespacing-
 Every service in this project — app-tier or catalog plugin — declares an **identity tuple** of three values: `service_name`, `module_name`, `owned_by`. The tuple already exists in the compose files; this rule binds it.
 
 - `service_name` — the OTel `service.name` for the running service. One per container role (`server`, `www`, `postgres`, `otel-collector`, ...). Matches whatever the OTel SDK reports.
-- `module_name` — the LocalMesh namespace axis. `app` for app-tier services. `<plugin-slug>` for catalog-plugin services, where the slug matches the `service_catalog/<plugin>/` directory name (`database`, `observability`, `logging`, `caddy`, `auth`). The single value `app` is reserved for app-tier services. Plugin slugs cannot be `app`.
+- `module_name` — the LocalMesh namespace axis. `app` for app-tier services. `<plugin-slug>` for catalog-plugin services, where the slug matches the `service_catalog/<plugin>/` directory name (`database`, `observability`, `logging`, `mesh`, `auth`). The single value `app` is reserved for app-tier services. Plugin slugs cannot be `app`.
 - `owned_by` — contact email for ownership. App-tier uses `${TECH_LEAD_EMAIL}` (sourced from `.env`, mirroring `project.toml`'s `tech_lead_email`). Plugins use the platform team's email.
 
-Each value lives in two places. `plugin.toml` is now the source of truth for the per-plugin halves; the `.env` interpolation bridge written by `scripts/secrets-gen.py` is the working substitute for a proper compose-extension (tracked as the *Identity source consolidation* Open item in [`../../stakeholder/DESIGN_DECISIONS.md`](../../stakeholder/DESIGN_DECISIONS.md)). The two channels carrying identity:
+Each value lives in two places. `plugin.toml` is now the source of truth for the per-plugin halves; the `.env` interpolation bridge written by `localmesh build` (`internal/envwriter`) is the working substitute for a proper compose-extension (tracked as the *Identity source consolidation* Open item in [`../../stakeholder/DESIGN_DECISIONS.md`](../../stakeholder/DESIGN_DECISIONS.md)). The two channels carrying identity:
 
 - `metrics.service_name` / `metrics.module_name` / `metrics.owned_by` docker labels — Vector reads these to enrich log events. See [`./logging-platform.md`](./logging-platform.md).
 - `service.name` (via `OTEL_SERVICE_NAME`) and `module_name` / `owned_by` (via `OTEL_RESOURCE_ATTRIBUTES`) — the OTel SDK reads these for traces and metrics.
@@ -92,12 +92,12 @@ Worked example for the `database/` plugin lives at [`../../../service_catalog/da
 
 ## 3. Overlap with `plugin.toml`
 
-`plugin.toml` owns identity (`module_name`, `owned_by`), service definitions (`container`, `port`), exposure (`expose_via_ingress`, `ingress`), and auth gating (`requires_auth`, default `true` — services that opt out of the ingress auth gate set `requires_auth = false`; the IdP itself is the canonical opt-out). `README.md` cites these values by reference (link to §1 above or to `plugin.toml` itself) and never redeclares them. Plugin-internal env vars derived from `plugin.toml` by `scripts/secrets-gen.py` do not appear in `README.md`'s Environment table:
+`plugin.toml` owns identity (`module_name`, `owned_by`), service definitions (`container`, `port`, `scheme`), exposure (`expose_via_ingress`, `ingress`), and auth gating (`requires_auth`, default `true` — services that opt out of the ingress auth gate set `requires_auth = false`; the IdP itself is the canonical opt-out). `README.md` cites these values by reference (link to §1 above or to `plugin.toml` itself) and never redeclares them. Plugin-internal env vars derived from `plugin.toml` by `localmesh build` do not appear in `README.md`'s Environment table:
 
 - From `[identity]`, keyed by **plugin slug**: `<PLUGIN>_MODULE_NAME`, `<PLUGIN>_OWNED_BY`.
 - From `[[services]]`, keyed by **container slug**: `<CONTAINER>_PORT`, `<CONTAINER>_EXPOSE_VIA_INGRESS`, `<CONTAINER>_INGRESS`.
 
-Mesh-exempt status (`mesh.exempt: "true"` compose label) is declared on each service's compose `labels:` block, not in `plugin.toml`. `secrets-gen.py` parses each plugin's `docker-compose.yml` to derive the per-container exempt set for cert-skip and Caddy upstream-scheme decisions.
+Mesh-exempt status (`mesh.exempt: "true"` compose label) is declared on each service's compose `labels:` block, not in `plugin.toml`. The localmesh CLI's `internal/mesh/` package parses each plugin's compose to derive the per-container exempt set, which drives cert-skip in `mtls mint` (TODO; see `docs/TODO.md`) and edge filtering in the envoy render path.
 
 `README.md`'s Environment table is for env vars the **consumer app** sets, not values exported into the platform's `.env`.
 

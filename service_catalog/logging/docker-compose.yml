@@ -212,9 +212,9 @@ configs:
             container_id: "{{ container_id }}"
           # trace_id / span_id from parse_envelope — addressable in LogQL
           # via `| trace_id="…"` without being indexed (spec AC 5).
-          # mTLS / HTTP structured fields previously sourced from caddy access
-          # logs; envoy now emits comparable fields but the access-log shape
-          # is not yet wired through Vector. Empty defaults survive Loki.
+          # mTLS / HTTP structured fields: envoy emits them in its JSON access
+          # logs, but the access-log shape is not yet wired through Vector.
+          # Empty defaults survive Loki.
           # TODO: needs_prod_decisions wire envoy access logs to structured_metadata
           structured_metadata:
             trace_id: "{{ trace_id }}"
