@@ -11,6 +11,8 @@ services:
   ingress-mesh:
     image: envoyproxy/envoy:v1.31-latest
     user: "0:0"  # TODO: needs_prod_decisions envoy non-root via build image uid match
+    entrypoint: ["envoy"]
+    command: ["-c", "/etc/envoy/envoy.yaml"]
     restart: unless-stopped
     # Caddy still owns 8443 until Chunk 5 retires it; coexist on 18443 till then.
     ports:
@@ -39,6 +41,8 @@ services:
   egress-mesh:
     image: envoyproxy/envoy:v1.31-latest
     user: "0:0"  # TODO: needs_prod_decisions envoy non-root via build image uid match
+    entrypoint: ["envoy"]
+    command: ["-c", "/etc/envoy/envoy.yaml"]
     restart: unless-stopped
     volumes:
       - ../../.localmesh/secrets/egress-mesh:/run/egress-mesh:ro
@@ -70,6 +74,8 @@ services:
   {{ $w.Name }}-mesh:
     image: envoyproxy/envoy:v1.31-latest
     user: "0:0"  # TODO: needs_prod_decisions envoy non-root via build image uid match
+    entrypoint: ["envoy"]
+    command: ["-c", "/etc/envoy/envoy.yaml"]
     network_mode: "service:{{ $w.Name }}"
     restart: unless-stopped
     volumes:

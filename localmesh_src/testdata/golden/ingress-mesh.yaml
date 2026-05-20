@@ -69,27 +69,7 @@ static_resources:
               - match: { prefix: "/workload/egress-mesh/" }
                 route: { cluster: egress-mesh_admin, prefix_rewrite: "/" }
           http_filters:
-          - name: envoy.filters.http.oauth2
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2
-              config:
-                token_endpoint:
-                  cluster: dex
-                  uri: ${DEX_ISSUER}/token
-                  timeout: 5s
-                authorization_endpoint: ${DEX_ISSUER}/auth
-                redirect_uri: "https://www.sample-mesh.lvh.me:8443/oauth2/callback"
-                redirect_path_matcher: { path: { exact: /oauth2/callback } }
-                signout_path: { path: { exact: /oauth2/signout } }
-                credentials:
-                  client_id: ${OIDC_CLIENT_ID}
-                  token_secret: { name: client-secret }
-                  hmac_secret:  { name: hmac-secret }
-                auth_scopes: [ openid, email, profile ]
-                # Skip auth on dex.*, envoy.*, grafana.*
-                pass_through_matcher:
-                - name: ":authority"
-                  string_match: { exact: "envoy.sample-mesh.lvh.me" }
+          # TODO Chunk 4: re-add envoy.filters.http.oauth2 with proper SDS or inline secret shape
           - name: envoy.filters.http.jwt_authn
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
@@ -239,11 +219,3 @@ static_resources:
         - endpoint:
             address:
               socket_address: { address: otel-collector, port_value: 4317 }
-
-  secrets:
-  - name: client-secret
-    generic_secret:
-      secret: { inline_string: "${OIDC_CLIENT_SECRET}" }
-  - name: hmac-secret
-    generic_secret:
-      secret: { inline_string: "${OAUTH2_HMAC_SECRET}" }
