@@ -25,3 +25,15 @@ services:
       - kuma-cp
     expose:
       - "8443"
+  egress:
+    image: docker.io/kumahq/kuma-dp:2.9.0
+    command:
+      - run
+      - --cp-address=grpc://kuma-cp:5678
+      - --dataplane-file=/bootstrap/egress.dataplane.yaml
+    volumes:
+      - ./bootstrap/egress.dataplane.yaml:/bootstrap/egress.dataplane.yaml:ro
+    depends_on:
+      - kuma-cp
+    expose:
+      - "15001"
