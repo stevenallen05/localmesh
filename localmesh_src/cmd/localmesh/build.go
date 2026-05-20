@@ -28,8 +28,8 @@ func newBuildCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			// .env first — dex.yaml seeding (still in scripts/secrets-gen.py
-			// for now) reads .env for substitution.
+			// .env first — dex.yaml seeding in the Makefile reads .env
+			// for $LOCALMESH_OIDC_CLIENT_SECRET substitution.
 			if err := envwriter.WriteManaged(repoRoot, proj, plugins); err != nil {
 				return err
 			}

@@ -30,16 +30,14 @@ chart-lint:
 	./tools/helm-v4.1.4-linux-amd64 lint chart
 
 # Bootstrap the LocalMesh dev environment.
-# Chains: Go CLI (CA + leaves + .env + compose) -> Python (secrets mint)
-# -> envsubst (dex.yaml seed) -> SDS files (oauth2 secrets).
-# TODO: needs_prod_decisions retire secrets-gen.py once Go CLI mints secrets
+# Chains: Go CLI (CA + leaves + .env + compose) -> envsubst (dex.yaml
+# seed) -> SDS files (oauth2 secrets).
 certs: untrust-ca
 	@rm -rf .localmesh/secrets
 	@go run ./localmesh_src/cmd/localmesh ca mint --force
 	@go run ./localmesh_src/cmd/localmesh ca install
 	@go run ./localmesh_src/cmd/localmesh mtls mint
 	@go run ./localmesh_src/cmd/localmesh build
-	@./scripts/secrets-gen.py
 	@$(MAKE) dex-config
 	@$(MAKE) oauth2-secrets
 

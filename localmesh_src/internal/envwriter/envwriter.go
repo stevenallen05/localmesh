@@ -7,10 +7,9 @@
 // re-render. Managed keys are emitted alphabetically for deterministic
 // byte-identical output on repeat runs.
 //
-// Mint-once-preserve: LOCALMESH_OIDC_CLIENT_SECRET (hex) and
-// OAUTH2_PROXY_COOKIE_SECRET (urlsafe-base64) are minted on first run
-// and preserved across re-renders by reading the existing .env (any
-// section — managed or unmanaged) before regeneration.
+// Mint-once-preserve: LOCALMESH_OIDC_CLIENT_SECRET (hex) is minted on
+// first run and preserved across re-renders by reading the existing
+// .env (any section — managed or unmanaged) before regeneration.
 //
 // TODO: needs_prod_decisions .env move under .localmesh once config-loading tools improve
 package envwriter
@@ -18,7 +17,6 @@ package envwriter
 import (
 	"bufio"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -110,12 +108,6 @@ func buildManaged(proj *manifest.Project, plugins []*manifest.Plugin, existing m
 		return nil, err
 	}
 	out["LOCALMESH_OIDC_CLIENT_SECRET"] = oidc
-
-	cookie, err := preserveOrMint(existing, "OAUTH2_PROXY_COOKIE_SECRET", func() (string, error) { return mintBase64(32) })
-	if err != nil {
-		return nil, err
-	}
-	out["OAUTH2_PROXY_COOKIE_SECRET"] = cookie
 
 	return out, nil
 }
@@ -226,14 +218,6 @@ func mintHex(nBytes int) (string, error) {
 		return "", fmt.Errorf("mintHex: %w", err)
 	}
 	return hex.EncodeToString(buf), nil
-}
-
-func mintBase64(nBytes int) (string, error) {
-	buf := make([]byte, nBytes)
-	if _, err := rand.Read(buf); err != nil {
-		return "", fmt.Errorf("mintBase64: %w", err)
-	}
-	return base64.RawURLEncoding.EncodeToString(buf), nil
 }
 
 func upcaseSnake(s string) string {

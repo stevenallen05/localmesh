@@ -46,8 +46,8 @@ func newMTLSMintCmd() *cobra.Command {
 
 // collectMeshContainers returns every container declared in project.toml
 // [[services]] (app tier) plus every plugin.toml [[services]] entry.
-// secrets-gen.py reads compose YAML for the mesh.exempt carve-out; for v0
-// we mint for every declared service and let the workload ignore the mount.
+// For v0 we mint for every declared service and let the workload ignore
+// the mount when it doesn't need mTLS.
 // TODO: needs_prod_decisions mesh.exempt enforcement once localmesh parses compose
 func collectMeshContainers(proj *manifest.Project, plugins []*manifest.Plugin) []string {
 	out := []string{}

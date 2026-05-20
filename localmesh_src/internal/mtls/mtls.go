@@ -25,8 +25,8 @@ import (
 // TODO: needs_prod_decisions 7-day dev leaf cert lifetime; prod uses SPIRE ~1h
 const LeafLifetime = 7 * 24 * time.Hour
 
-// IPSANs are the over-permissive dev set carried forward from secrets-gen.py.
-// Allows dev curls and library clients dialing by various IP forms.
+// IPSANs are the over-permissive dev set. Allows dev curls and library
+// clients dialing by various IP forms.
 // TODO: needs_prod_decisions IP SAN list tightening; prod uses DNS-only identity
 var IPSANs = []net.IP{
 	net.ParseIP("127.0.0.1"), net.ParseIP("::1"),

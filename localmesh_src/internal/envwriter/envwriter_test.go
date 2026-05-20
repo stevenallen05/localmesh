@@ -66,7 +66,6 @@ func TestWriteManaged(t *testing.T) {
 				"EDGE_INGRESS=true",
 				"DEX_EXPOSE_VIA_INGRESS=true",
 				"LOCALMESH_OIDC_CLIENT_SECRET=",
-				"OAUTH2_PROXY_COOKIE_SECRET=",
 				managedEnd,
 			},
 		},
@@ -141,9 +140,8 @@ func TestWriteManaged_mintOncePreserve(t *testing.T) {
 	}
 	first, _ := os.ReadFile(filepath.Join(repo, ".env"))
 	oidc1 := extractKey(t, string(first), "LOCALMESH_OIDC_CLIENT_SECRET")
-	cookie1 := extractKey(t, string(first), "OAUTH2_PROXY_COOKIE_SECRET")
-	if len(oidc1) < 32 || len(cookie1) < 32 {
-		t.Fatalf("minted secrets too short: oidc=%d cookie=%d", len(oidc1), len(cookie1))
+	if len(oidc1) < 32 {
+		t.Fatalf("minted secret too short: oidc=%d", len(oidc1))
 	}
 
 	if err := WriteManaged(repo, proj, plugins); err != nil {
@@ -152,9 +150,6 @@ func TestWriteManaged_mintOncePreserve(t *testing.T) {
 	second, _ := os.ReadFile(filepath.Join(repo, ".env"))
 	if got := extractKey(t, string(second), "LOCALMESH_OIDC_CLIENT_SECRET"); got != oidc1 {
 		t.Errorf("OIDC secret rotated unexpectedly: %q → %q", oidc1, got)
-	}
-	if got := extractKey(t, string(second), "OAUTH2_PROXY_COOKIE_SECRET"); got != cookie1 {
-		t.Errorf("cookie secret rotated unexpectedly: %q → %q", cookie1, got)
 	}
 }
 
