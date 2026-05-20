@@ -83,18 +83,163 @@ matching `__name__=~"container_.+"` instead of the empty-string trick).
   `kubernetes_sd_configs` reading pod labels — no socket. `TODO:
   needs_prod_decisions docker socket scope`.
 - **localmesh integration for `prometheus.io/*` labels.** Labels are
-  hand-added to cadvisor / node-exporter compose today. A future
+  hand-added to cadvisor / node-exporter compose today (envoy roles
+  already carry them, emitted by the mesh plugin's template). A future
   localmesh CLI pass will gain `[[exports.metrics]]` in `plugin.toml`;
   localmesh will write the labels into `localmesh.compose.yaml`'s
   overlay block. Hand-added labels migrate to declarations at that
   point. `TODO: needs_prod_decisions localmesh emits prometheus.io/*
   labels`.
 
+## LocalMesh follow-ups
+
+Items deferred from the service-mesh and envoy-migration deliveries —
+all flagged inline as `TODO: needs_prod_decisions <≤10 words>` at the
+relevant call site so they're greppable. Listed here for visibility;
+resolution is context-dependent.
+
+- **PII enforcement, downstream layer.** No `setAttributes('enduser.*')`
+  call sites exist downstream of the ingress envoy. Per-data-class regex
+  scrubbing at Vector / Tempo / Loki is still SRE's choice when real PII
+  contracts settle.
+- **Default-deny mesh policy.** No `AuthorizationPolicy` enforcement in
+  dev. Foundation-tier RBAC is allow-all-internal. Picking the prod
+  mesh runtime (Istio / Linkerd / Cilium) is the upstream decision;
+  default-deny lands when that lands.
+- **Per-caller RBAC via cert-as-policy (row 14).** Workload's cert
+  encodes its allowed destinations; sidecar reads cert and writes the
+  RBAC config the listener consumes. JSON sidecar file
+  (`id.policy.json`) is the dev shape; prod migration swaps the loader,
+  not the policy semantics. `TODO: needs_prod_decisions per-caller RBAC
+  via cert-as-policy`.
+- **Cert lifespan + SVID rotation.** Dev leaf certs have 7-day
+  lifetimes; prod uses short-lived SPIRE-issued SVIDs (~1h) with
+  automatic rotation. Whichever cert-delivery mechanism prod picks
+  (cert-manager vs SPIRE Workload API vs Vault PKI) sets the rotation
+  cadence.
+- **CA key handling.** Dev's `.localmesh/secrets/root_ca/rootCA-key.pem`
+  lives on the host filesystem. Prod never has CA key in any workload
+  pod; it's locked in the chosen issuer (SPIRE / Vault / cert-manager
+  backend).
+- **Strict EKU per role.** `plugin.toml`'s `[[services]]` entries don't
+  carry `client`/`server` bools today — every cert is bidirectional. An
+  EKU-per-role minter is straightforward but depends on whether prod's
+  issuer respects the same axis.
+- **IP SAN list tightening.** Dev IP SAN list is over-permissive (RFC1918
+  / docker-bridge / loopback-IPv6 / `0.0.0.0`). Prod uses DNS-based
+  identity exclusively; cert-manager SVIDs carry no IP SANs.
+- **`/etc/hosts` seeding.** `make check-hosts` enforces required entries
+  but doesn't write them. Real DNS in prod; a privileged-init script /
+  mise hook / devcontainer feature for dev is the in-between.
+- **Ingress wildcard cert.** `*.${PROJECT_NAME}.${LOCAL_DOMAIN}` on the
+  ingress envoy cert. Prod uses per-host certs via cert-manager
+  IngressRoute.
+- **postgres-exporter strict perm wrapper.** Both postgres and
+  postgres-exporter wrap their image entrypoints to copy bind-mounted
+  certs into a postgres/nobody-owned location with `0600` .key.
+  Goes away when cert delivery is sidecar / SVID-based.
+- **`plugin.toml` schema growth.** Today's schema is `[identity]` +
+  `[[services]]` (with `scheme` + `requires_auth`). Future sections
+  (`[[externals]]` for declared egress allowlist, `[allows]` for
+  default-deny, compliance flags per `project.toml` shape, katenary
+  chart selection) land as the upstream features land.
+- **plugin.toml → compose interpolation.** `.env`'s managed section is
+  the dev bridge today. Replace with a build-step compose overlay
+  generator (or a real compose extension if compose grows one).
+- **multi-workload postgres roles.** `pg_hba.conf` binds each cert CN
+  to one role today. `pg_ident.conf` cert-map for multi-workload
+  aliasing is `TODO: needs_prod_decisions pg_hba cert-map for
+  multi-workload roles`.
+- **gRPC client-side instrumentation in Node.** The www → server gRPC
+  call still lacks `@opentelemetry/instrumentation-grpc`. Pre-existing
+  gap; carries over from the logging delivery.
+- **Dex JWKS key rotation strategy.** Dev uses long-lived in-memory
+  keys. Server's JWKS cache TTL is 15 min (configurable). Prod IdP swap
+  rotates keys on its own schedule; TTL should follow.
+  `TODO: needs_prod_decisions JWKS cache TTL for prod IdP rotation`.
+- **Prod IdP swap.** Dex with built-in local connector + staticPasswords
+  is dev-only. Prod swaps the whole `auth/` plugin's `dex` container
+  for a real IdP (Okta / Keycloak / Auth0); the envoy `oauth2` filter +
+  `jwt_authn` wiring carries over unchanged.
+  `TODO: needs_prod_decisions IdP choice + SSO migration`.
+- **Ingress `depends_on` dex healthy at boot.** Today the ingress envoy
+  holds on `depends_on: dex condition: service_healthy`. Production "no
+  auth = no traffic" needs a richer readiness/circuit shape; revisit
+  when dex's healthcheck contract firms. `TODO: needs_prod_decisions
+  ingress depends_on dex healthy at boot`.
+- **Sidecar lifecycle binding to workload.** Compose `depends_on` orders
+  startup but doesn't bind sidecar lifetime to workload lifetime. Prod
+  uses pod-readiness probes; dev compose papers over it via `restart:
+  unless-stopped`. `TODO: needs_prod_decisions sidecar lifecycle binding
+  to workload`.
+- **iptables init container vs eBPF (Cilium-style) for prod.** The
+  per-workload init container does `apk add iptables && /init.sh` under
+  `cap_add: ["NET_ADMIN"]`. Pattern matches Istio/Linkerd today; eBPF
+  lands when the prod runtime picks it. `TODO: needs_prod_decisions
+  iptables init container vs eBPF (Cilium-style) for prod`.
+- **Multi-arch iptables-init image.** alpine:3.20 + apk covers
+  linux-amd64. arm64 needs verification. `TODO: needs_prod_decisions
+  multi-arch iptables-init image`.
+- **Envoy admin locked down in prod.** Admin listener on `:15000` is
+  bound openly in dev for DX. SRE policy in prod. `TODO:
+  needs_prod_decisions envoy admin locked down in prod`.
+- **Grafana auth via envoy in prod.** Dashboards are browsed openly in
+  dev (`requires_auth = false` on observability/'s grafana service).
+  Prod requires JWT gate or per-team SSO. `TODO: needs_prod_decisions
+  grafana auth via envoy in prod`.
+- **Declared egress allowlist via plugin.toml `[[externals]]` (row
+  13).** Uniform allowlist v0 is the placeholder. Apps declare what
+  they reach outside the mesh in `plugin.toml`; the egress envoy reads
+  the declarations to build the cluster + origination map. `TODO:
+  needs_prod_decisions declared egress allowlist via plugin.toml
+  [[externals]]`.
+- **Outlier detection (row 3).** Three-strikes ejection per cluster
+  with default thresholds. Per-callee tuning needs the CLI to join
+  caller↔callee at template time so the callee's labels flow into the
+  caller's outlier config. `TODO: needs_prod_decisions per-callee
+  outlier detection needs CLI caller-callee join`.
+- **Retry / timeout schemas (rows 8–9).** Default 30s timeout, no
+  retries on non-idempotent routes. Per-route override via `plugin.toml`
+  schema additions when needed. `TODO: needs_prod_decisions retry /
+  timeout schemas`.
+- **Scope linter (row 10).** `plugin.toml [[services]].scope = internal
+  | external` + linter requires declaration. The bind address branches
+  follow. `TODO: needs_prod_decisions scope linter`.
+- **Header stripping on egress (row 11).** `authorization`, `cookie`,
+  `x-user-*`, `x-internal-*` stripped on egress by default; per-dest
+  override map. `TODO: needs_prod_decisions header stripping on
+  egress`.
+- **Claim-aware downstream (row 12).** JWT claim → header at ingress
+  only; downstream sidecars strip externally-sourced `x-user-*` on
+  outbound so the ingress is the only entry point. `TODO:
+  needs_prod_decisions claim-aware downstream`.
+- **Claim-filter at workload (row 15).** Workload's cert encodes which
+  user claims it may see; sidecar strips the rest. Pairs with row 14.
+  `TODO: needs_prod_decisions claim-filter at workload`.
+- **`MESH_*_{HOST,PORT,URL}` auto-emission.** CLI emits connection-
+  string env vars per consumer's resolved `depends_on`. Defer until the
+  app-side adoption pattern settles. `TODO: needs_prod_decisions
+  MESH_*_{HOST,PORT,URL} auto-emission`.
+- **Formalize app-loopback port discovery.** Apps bind plaintext on
+  loopback (e.g. server :50052, www :3444). Today the ports are
+  convention; a `plugin.toml [[services]].app_port` declaration plus a
+  linter would harden the contract. `TODO: needs_prod_decisions
+  app-loopback port discovery (convention vs declaration)`.
+- **katenary same-pod sidecar.** No native compose construct expresses
+  "second container in the same pod." Hand-patch the chart for now;
+  upstream feature request candidate. `TODO: needs_prod_decisions
+  katenary same-pod label for sidecars`.
+- **postgres sidecar.** Postgres protocol's STARTTLS negotiation isn't
+  transparent-proxyable through a generic TLS terminator. Postgres
+  stays on native pg mTLS instead of a generic sidecar. `TODO:
+  needs_prod_decisions postgres sidecar requires protocol-aware
+  proxying`.
+
 ## LocalMesh CLI follow-ups
 
-Items deferred from the localmesh Go CLI delivery. All flagged inline as
-`TODO: needs_prod_decisions <≤10 words>` at the relevant call site so
-they're greppable.
+Items deferred from the localmesh Go CLI delivery and the envoy
+migration. All flagged inline as `TODO: needs_prod_decisions <≤10
+words>` at the relevant call site so they're greppable.
 
 - **mkcert via go module.** mkcert v1.4.4 vendored as a binary at
   `localmesh_src/tools/mkcert` today (subprocess invocation from
@@ -134,6 +279,12 @@ The default-dashboard set ships three files:
 - `service_catalog/database/postgres.json` — postgres health, query rates, pg_stat_statements
 - `service_catalog/observability/apm.json` — RED panels, traces waterfall, RPC server panels
 - `service_catalog/observability/cluster-health.json` — cadvisor container resource panels
+
+A mesh-ingress dashboard against envoy's native `:15090/stats/prometheus`
+surface + JSON access logs is `TODO: needs_prod_decisions ingress
+dashboard rewrite against envoy metrics`. APM already covers cross-
+service RPC RED via `tracing.http`, so the standalone ingress dashboard
+isn't on the critical path.
 
 ### Identity-pivot reconciliation
 
@@ -251,6 +402,20 @@ org picks.
   minted with the explicit list of allowed SPIFFE URIs embedded in
   the x509. Elaborate enforcement (per-method allowlists,
   time-bounded grants) is aspirational.
+
+- **App-tier cert as the access-policy carrier.** mTLS certs for the
+  `app` tier carry an "allowed to access" payload in x509 metadata.
+  The axes follow whatever the org cares about. Common axes are
+  destination URIs, OIDC claim names, data classes, billing buckets.
+  Sidecar reads the cert at startup. Cert rotation rotates policy.
+  Schema lives in step-ca's template, consuming code in the sidecar
+  bootstrap. Both are aspirational beyond the simplest URI-allowlist
+  axis. Envoy doesn't parse custom x509 OIDs natively. The MVP
+  delivery shape is a JSON-sidecar file (`id.policy.json`) that step-ca
+  emits alongside the cert. The envoy sidecar's init parses the file
+  once and writes RBAC config the listener consumes. Cert rotation
+  rotates both files together. Prod migration swaps the loader, not
+  the policy semantics — the RBAC contract downstream stays identical.
 
 - **Safety-net defaults.** Default timeouts, circuit breakers, and
   retry caps. Sensible defaults are the omakase move. They would

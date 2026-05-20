@@ -1,8 +1,15 @@
-# LocalMesh ingress auth plugin. Dex is the dev OIDC IdP.
+# LocalMesh ingress auth plugin. Dex is the dev OIDC IdP; the ingress
+# envoy (mesh plugin) is the OIDC client and drives the dance via its
+# envoy.filters.http.oauth2 + jwt_authn filters.
 #
 # Dex's config lives in .localmesh/dex.yaml, copied from dex.yaml.sample
 # on first run (see Makefile's certs target). The dev edits the local
 # copy to set staticPasswords.
+#
+# Dex sits outside the SPIFFE mesh (it fronts it). The ingress envoy
+# reaches it plaintext on the docker network.
+#
+# TODO: needs_prod_decisions swap dex for prod IdP via plugin replacement
 
 services:
   dex:

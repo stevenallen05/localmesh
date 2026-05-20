@@ -1,0 +1,69 @@
+{{/*
+Egress envoy: terminates mTLS from workload sidecars; applies uniform
+allowlist v0; originates outbound to internet hosts.
+
+Context: EgressCtx
+  .ProjectName, .LocalDomain, .OTelEndpoint
+
+TODO: needs_prod_decisions declared egress allowlist via plugin.toml [[externals]]
+*/}}
+admin:
+  address: { socket_address: { address: 0.0.0.0, port_value: 15000 } }
+
+node:
+  id: egress-mesh
+  cluster: egress-mesh
+
+{{ include "mesh.envoy.tracing" (dict "ServiceName" "egress-mesh" "Endpoint" .OTelEndpoint) }}
+
+static_resources:
+  listeners:
+  - name: egress
+    address: { socket_address: { address: 0.0.0.0, port_value: 15001 } }
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: egress
+          cluster: egress_passthrough
+      {{ include "mesh.envoy.mtls_downstream" (dict "CertDir" "/run/egress-mesh") | indent 6 | trim }}
+
+  - name: stats
+    address: { socket_address: { address: 0.0.0.0, port_value: 15090 } }
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: stats
+          codec_type: AUTO
+          route_config:
+            virtual_hosts:
+            - name: stats
+              domains: ["*"]
+              routes:
+              - match: { prefix: "/stats/prometheus" }
+                route: { cluster: admin_loopback }
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config: { "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router }
+
+  clusters:
+  - name: egress_passthrough
+    type: ORIGINAL_DST
+    lb_policy: CLUSTER_PROVIDED
+    connect_timeout: 5s
+
+  - name: admin_loopback
+    type: STATIC
+    connect_timeout: 0.250s
+    load_assignment:
+      cluster_name: admin_loopback
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address: { address: 127.0.0.1, port_value: 15000 }
+
+  {{ include "mesh.envoy.otel_cluster" (dict "Endpoint" .OTelEndpoint) | indent 2 }}

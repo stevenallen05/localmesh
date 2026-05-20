@@ -25,8 +25,16 @@ oauth2:
   skipApprovalScreen: true       # dev UX: skip the "Approve" click after login
 
 # Built-in password DB. Issues ID tokens whose `preferred_username` claim
-# is the staticPasswords[].username.
+# is the staticPasswords[].username — envoy's jwt_authn forwards that as
+# x-user-name to upstream workloads.
 enablePasswordDB: true
+
+staticClients:
+  - id:     localmesh-dev
+    name:   "LocalMesh"
+    secret: $LOCALMESH_OIDC_CLIENT_SECRET
+    redirectURIs:
+      - https://www.$PROJECT_NAME.$LOCAL_DOMAIN:18443/oauth2/callback
 
 staticPasswords:
   - email:    alice@example.invalid
