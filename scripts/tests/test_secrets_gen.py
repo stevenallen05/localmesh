@@ -1,8 +1,10 @@
 """Unit tests for secrets-gen.py.
 
-Cert minting has moved to the Go CLI (./localmesh_src/cmd/localmesh/);
-tests here cover what remains in this script — env-var name conversion,
-env-file managed-section roundtrip, Caddyfile generation, dex.yaml merge.
+Cert minting + `.env` writing have moved to the Go CLI
+(./localmesh_src/cmd/localmesh/); tests here cover only what remains in
+this script — Caddyfile generation, dex.yaml merge.
+
+TODO: needs_prod_decisions rename test file for transitional helper
 """
 import importlib.util
 import pathlib
@@ -30,97 +32,6 @@ def _seed(repo, project_toml, plugins, composes=None):
         (d / "plugin.toml").write_text(content)
     for slug, content in (composes or {}).items():
         (catalog / slug / "docker-compose.yml").write_text(content)
-
-
-def test_upcase_snake(tmp_path, monkeypatch):
-    mod = _load(monkeypatch, tmp_path)
-    assert mod.upcase_snake("project_name") == "PROJECT_NAME"
-    assert mod.upcase_snake("auth-shim") == "AUTH_SHIM"
-    assert mod.upcase_snake("Postgres-Exporter") == "POSTGRES_EXPORTER"
-
-
-def test_env_lines_strict_upcase_snakecase(tmp_path, monkeypatch):
-    _seed(
-        tmp_path,
-        project_toml=(
-            'project_name      = "demo"\n'
-            'tech_lead_email   = "x@y.z"\n'
-            'local_domain      = "lvh.me"\n'
-            '\n'
-            '[[services]]\n'
-            'container          = "www"\n'
-            'port               = 3443\n'
-            'expose_via_ingress = true\n'
-        ),
-        plugins={
-            "caddy": (
-                '[identity]\n'
-                'module_name = "caddy"\n'
-                'owned_by    = "sre@example.com"\n'
-                '\n'
-                '[[services]]\n'
-                'container = "caddy"\n'
-                'port      = 8443\n'
-                'ingress   = true\n'
-                'expose_via_ingress = false\n'
-            ),
-            "obs": (
-                '[identity]\n'
-                'module_name = "observability"\n'
-                'owned_by    = "sre@example.com"\n'
-                '\n'
-                '[[services]]\n'
-                'container          = "grafana"\n'
-                'port               = 3000\n'
-                'expose_via_ingress = true\n'
-            ),
-        },
-    )
-    mod = _load(monkeypatch, tmp_path)
-    project, plugins = mod.load_manifests()
-    out = mod.env_lines(project, plugins)
-    text = "\n".join(out)
-    assert "PROJECT_NAME=demo" in text
-    assert "TECH_LEAD_EMAIL=x@y.z" in text
-    assert "LOCAL_DOMAIN=lvh.me" in text
-    assert "CADDY_MODULE_NAME=caddy" in text
-    assert "CADDY_OWNED_BY=sre@example.com" in text
-    # mesh_exempt is not a TOML field — it lives in compose labels, not .env.
-    assert "MESH_EXEMPT" not in text
-    assert "WWW_PORT=3443" in text
-    assert "WWW_EXPOSE_VIA_INGRESS=true" in text
-    assert "CADDY_PORT=8443" in text
-    assert "CADDY_INGRESS=true" in text
-    assert "GRAFANA_PORT=3000" in text
-    assert "GRAFANA_EXPOSE_VIA_INGRESS=true" in text
-
-
-def test_env_managed_section_roundtrip(tmp_path, monkeypatch):
-    _seed(
-        tmp_path,
-        project_toml=(
-            'project_name = "demo"\n'
-            'local_domain = "lvh.me"\n'
-        ),
-        plugins={},
-    )
-    user_top = "# user file\nIMAGE_TAG=feat-x\n"
-    (tmp_path / ".env").write_text(user_top)
-
-    mod = _load(monkeypatch, tmp_path)
-    project, plugins = mod.load_manifests()
-    mod.write_env(project, plugins)
-    text = (tmp_path / ".env").read_text()
-    assert "# user file" in text
-    assert "IMAGE_TAG=feat-x" in text
-    assert "# >>> secrets-gen managed" in text
-    assert "PROJECT_NAME=demo" in text
-
-    # Second run preserves head + replaces managed section.
-    mod.write_env(project, plugins)
-    text2 = (tmp_path / ".env").read_text()
-    assert text2.count("# >>> secrets-gen managed") == 1
-    assert "IMAGE_TAG=feat-x" in text2
 
 
 def test_caddyfile_emits_route_for_exposed_services(tmp_path, monkeypatch):
@@ -293,42 +204,3 @@ def test_dex_yaml_generated_skipped_when_auth_plugin_absent(tmp_path, monkeypatc
     assert not (tmp_path / "service_catalog" / "auth" / "dex.yaml.generated").exists()
 
 
-def test_oidc_client_secret_minted_and_persisted(tmp_path, monkeypatch):
-    """First run mints LOCALMESH_OIDC_CLIENT_SECRET; second run preserves it."""
-    _seed(
-        tmp_path,
-        project_toml='project_name = "demo"\nlocal_domain = "lvh.me"\n',
-        plugins={},
-    )
-    mod = _load(monkeypatch, tmp_path)
-    project, plugins = mod.load_manifests()
-    mod.write_env(project, plugins)
-    text1 = (tmp_path / ".env").read_text()
-    assert "LOCALMESH_OIDC_CLIENT_SECRET=" in text1
-    secret_line_1 = [l for l in text1.splitlines() if l.startswith("LOCALMESH_OIDC_CLIENT_SECRET=")][0]
-    assert len(secret_line_1.split("=", 1)[1]) >= 32
-
-    mod.write_env(project, plugins)
-    text2 = (tmp_path / ".env").read_text()
-    secret_line_2 = [l for l in text2.splitlines() if l.startswith("LOCALMESH_OIDC_CLIENT_SECRET=")][0]
-    assert secret_line_1 == secret_line_2     # stable across runs
-
-
-def test_cookie_secret_minted_and_persisted(tmp_path, monkeypatch):
-    """OAUTH2_PROXY_COOKIE_SECRET minted once, preserved on re-run."""
-    _seed(
-        tmp_path,
-        project_toml='project_name = "demo"\nlocal_domain = "lvh.me"\n',
-        plugins={},
-    )
-    mod = _load(monkeypatch, tmp_path)
-    project, plugins = mod.load_manifests()
-    mod.write_env(project, plugins)
-    text1 = (tmp_path / ".env").read_text()
-    cookie_1 = [l for l in text1.splitlines() if l.startswith("OAUTH2_PROXY_COOKIE_SECRET=")][0]
-    assert len(cookie_1.split("=", 1)[1]) >= 32
-
-    mod.write_env(project, plugins)
-    text2 = (tmp_path / ".env").read_text()
-    cookie_2 = [l for l in text2.splitlines() if l.startswith("OAUTH2_PROXY_COOKIE_SECRET=")][0]
-    assert cookie_1 == cookie_2

@@ -27,9 +27,8 @@ chart-lint:
 	./tools/helm-v4.1.4-linux-amd64 lint chart
 
 # Bootstrap the LocalMesh dev environment.
-# Chains: Go CLI (CA + leaves + compose) -> Python (env + Caddy + dex).
-# TODO: needs_prod_decisions port Caddyfile + dex.yaml generators to Go CLI
-# TODO: needs_prod_decisions port .env writer to Go CLI
+# Chains: Go CLI (CA + leaves + .env + compose) -> Python (Caddy + dex).
+# TODO: needs_prod_decisions Caddyfile + dex.yaml generators sunset with Caddy→Envoy migration
 certs: untrust-ca
 	@rm -rf .localmesh/secrets
 	@go run ./localmesh_src/cmd/localmesh ca mint --force

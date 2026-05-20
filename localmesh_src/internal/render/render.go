@@ -23,6 +23,12 @@ func Run(projectFile, catalogRoot, outputPath string) error {
 	if err != nil {
 		return err
 	}
+	return RunWith(proj, plugins, catalogRoot, outputPath)
+}
+
+// RunWith is Run with already-loaded manifests. Lets callers (the build
+// verb) load once and pass the same structs to both render + envwriter.
+func RunWith(proj *manifest.Project, plugins []*manifest.Plugin, catalogRoot, outputPath string) error {
 	env := envMap()
 	outputDir := filepath.Dir(outputPath)
 	rendered := make([]*yaml.Node, 0, len(plugins))

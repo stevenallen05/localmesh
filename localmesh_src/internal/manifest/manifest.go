@@ -18,12 +18,13 @@ var ErrMalformed = errors.New("manifest malformed")
 
 // Project is the typed project.toml schema for templates.
 type Project struct {
-	Name        string    `toml:"project_name"`
-	Namespace   string    `toml:"project_namespace"`
-	TechLead    string    `toml:"tech_lead_email"`
-	LocalDomain string    `toml:"local_domain"`
-	Plugins     []string  `toml:"plugins"`
-	Services    []Service `toml:"services"` // app-tier services minted alongside plugins
+	Name           string    `toml:"project_name"`
+	Namespace      string    `toml:"project_namespace"`
+	TechLead       string    `toml:"tech_lead_email"`
+	ExternalDomain string    `toml:"external_domain"`
+	LocalDomain    string    `toml:"local_domain"`
+	Plugins        []string  `toml:"plugins"`
+	Services       []Service `toml:"services"` // app-tier services minted alongside plugins
 	// (compliance + legal + billing + vendors omitted —
 	// templates don't need them today; add when a use surfaces.)
 }
