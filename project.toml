@@ -28,6 +28,7 @@ container          = "www"
 port               = 3443
 scheme             = "https"
 expose_via_ingress = true                          # https://www.${PROJECT_NAME}.${LOCAL_DOMAIN}:8443 → www:3443
+depends            = ["server"]                    # outbound mesh peer — www dials server:50051
 
 [[services]]
 container          = "server"

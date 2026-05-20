@@ -107,10 +107,6 @@ services:
       timeout: 3s
       retries: 5
     labels:
-      # Mesh-exempt: postgres uses native pg STARTTLS (sslmode=verify-full),
-      # not a generic L4/L7 mTLS terminator. The mesh sidecar would re-wrap
-      # an already-TLS connection. See chart/Plan notes.
-      mesh.exempt: "true"
       metrics.service_name: postgres
       metrics.module_name: database
       metrics.owned_by: sre@example.com
@@ -167,10 +163,6 @@ services:
       # depends_on target → katenary needs a port for the init-container probe
       katenary.v3/ports: |-
         - 9187
-      # Mesh-exempt: postgres-exporter dials postgres with native pg mTLS
-      # (sslmode=verify-full); same reasoning as postgres above. The sidecar
-      # would have nothing useful to do.
-      mesh.exempt: "true"
       # Project-wide convention: cadvisor metric_relabel_configs stamps this
       # value as the `service` label on container resource metrics, so the
       # exporter's cpu/mem/etc. roll up under the same `service=postgres` lens

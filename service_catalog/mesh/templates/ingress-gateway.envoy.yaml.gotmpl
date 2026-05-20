@@ -178,7 +178,7 @@ static_resources:
         - endpoint:
             address:
               socket_address: { address: {{ $r.Cluster }}, port_value: {{ $r.Port }} }
-    {{ if not $r.RequiresAuth }}{{/* dex, grafana — mesh-exempt, plaintext or self-TLS, no mesh mTLS */}}{{ else }}
+    {{ if not $r.RequiresAuth }}{{/* dex, grafana — plaintext or self-TLS, no mesh mTLS */}}{{ else }}
     {{ include "mesh.envoy.mtls_upstream" (dict "CertDir" "/run/ingress-mesh") | indent 4 }}
     {{ end }}
   {{- end }}

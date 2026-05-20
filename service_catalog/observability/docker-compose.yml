@@ -297,7 +297,6 @@ services:
     labels:
       # Whole catalog module collapses to one row in service-glance.
       # See cadvisor metric_relabel_configs in this file.
-      mesh.exempt: "true"
       metrics.service_name: observability
       metrics.module_name: observability
       metrics.owned_by: sre@example.com
@@ -329,7 +328,6 @@ services:
       # the docker network). Katenary needs a port to generate the
       # depends_on readiness init-container; declare it here. See
       # https://repo.katenary.io/katenary/katenary/issues/182.
-      mesh.exempt: "true"
       prometheus.io/scrape: "true"
       prometheus.io/port:   "9100"
       katenary.v3/ports: |-
@@ -350,7 +348,6 @@ services:
       - /dev/disk/:/dev/disk:ro
     labels:
       # See node-exporter above — cadvisor serves the prometheus scrape on 8080.
-      mesh.exempt: "true"
       prometheus.io/scrape: "true"
       prometheus.io/port:   "8080"
       katenary.v3/ports: |-
@@ -376,7 +373,6 @@ services:
     volumes:
       - vm-data:/victoria-metrics-data
     labels:
-      mesh.exempt: "true"
       metrics.service_name: observability
       metrics.module_name: observability
       metrics.owned_by: sre@example.com
@@ -393,7 +389,6 @@ services:
     volumes:
       - tempo-data:/var/tempo
     labels:
-      mesh.exempt: "true"
       metrics.service_name: observability
       metrics.module_name: observability
       metrics.owned_by: sre@example.com
@@ -403,8 +398,8 @@ services:
   grafana:
     image: grafana/grafana:12.4.3
     container_name: grafana
-    # Grafana is `mesh.exempt: "true"` — no LocalMesh cert, plaintext on the
-    # compose network. Port 3001 is published unprotected to the host so dev
+    # No LocalMesh cert, plaintext on the compose network. Port 3001 is
+    # published unprotected to the host so dev
     # tools (browser, `gcx`) can reach the API without the mTLS-trust dance
     # the Caddy ingress requires. Browser users typically go through the
     # ingress (`https://grafana.${PROJECT_NAME}.${LOCAL_DOMAIN}`); `gcx`
@@ -441,7 +436,6 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
     labels:
-      mesh.exempt: "true"
       metrics.service_name: observability
       metrics.module_name: observability
       metrics.owned_by: sre@example.com

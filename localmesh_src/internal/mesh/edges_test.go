@@ -19,7 +19,7 @@ func TestDeriveEdges_FiltersExempt(t *testing.T) {
 			Labels:    map[string]string{},
 		},
 		"otel-collector": ComposeService{
-			Labels: map[string]string{"mesh.exempt": "true"},
+			Labels: map[string]string{},
 		},
 	}
 	edges, err := DeriveEdges(compose, reg)

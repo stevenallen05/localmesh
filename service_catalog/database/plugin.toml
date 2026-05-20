@@ -5,7 +5,7 @@ owned_by    = "sre@example.com"
 [[services]]
 container          = "postgres"
 port               = 5432
-scheme             = "tcp"        # mesh-exempt anyway; declared for validation
+scheme             = "tcp"
 expose_via_ingress = false        # east-west only
 
 [[services]]

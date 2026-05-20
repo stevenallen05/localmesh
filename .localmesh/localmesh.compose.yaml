@@ -541,7 +541,6 @@ services:
             - /dev/disk/:/dev/disk:ro
         labels:
             # See node-exporter above — cadvisor serves the prometheus scrape on 8080.
-            mesh.exempt: "true"
             prometheus.io/scrape: "true"
             prometheus.io/port: "8080"
             katenary.v3/ports: |-
@@ -593,7 +592,6 @@ services:
             timeout: 3s
             retries: 5
         labels:
-            mesh.exempt: "true"
             katenary.v3/ports: |-
                 - 5556
             metrics.service_name: dex
@@ -627,7 +625,7 @@ services:
     grafana:
         image: grafana/grafana:12.4.3
         container_name: grafana
-        # Grafana is `mesh.exempt: "true"` — no LocalMesh cert, plaintext on the
+        # No LocalMesh cert, plaintext on the
         # compose network. Port 3001 is published unprotected to the host so dev
         # tools (browser, `gcx`) can reach the API without the mTLS-trust dance
         # the Caddy ingress requires. Browser users typically go through the
@@ -667,7 +665,6 @@ services:
         volumes:
             - grafana-data:/var/lib/grafana
         labels:
-            mesh.exempt: "true"
             metrics.service_name: observability
             metrics.module_name: observability
             metrics.owned_by: sre@example.com
@@ -727,7 +724,6 @@ services:
         labels:
             # Internal-only port; katenary needs the explicit declaration to
             # generate the depends_on init-container in the helm chart.
-            mesh.exempt: "true"
             katenary.v3/ports: |-
                 - 3100
             metrics.service_name: logging
@@ -753,7 +749,6 @@ services:
             # the docker network). Katenary needs a port to generate the
             # depends_on readiness init-container; declare it here. See
             # https://repo.katenary.io/katenary/katenary/issues/182.
-            mesh.exempt: "true"
             prometheus.io/scrape: "true"
             prometheus.io/port: "9100"
             katenary.v3/ports: |-
@@ -776,7 +771,6 @@ services:
         labels:
             # Whole catalog module collapses to one row in service-glance.
             # See cadvisor metric_relabel_configs in this file.
-            mesh.exempt: "true"
             metrics.service_name: observability
             metrics.module_name: observability
             metrics.owned_by: sre@example.com
@@ -881,10 +875,6 @@ services:
             timeout: 3s
             retries: 5
         labels:
-            # Mesh-exempt: postgres uses native pg STARTTLS (sslmode=verify-full),
-            # not a generic L4/L7 mTLS terminator. The mesh sidecar would re-wrap
-            # an already-TLS connection. See chart/Plan notes.
-            mesh.exempt: "true"
             metrics.service_name: postgres
             metrics.module_name: database
             metrics.owned_by: sre@example.com
@@ -940,10 +930,6 @@ services:
             # depends_on target → katenary needs a port for the init-container probe
             katenary.v3/ports: |-
                 - 9187
-            # Mesh-exempt: postgres-exporter dials postgres with native pg mTLS
-            # (sslmode=verify-full); same reasoning as postgres above. The sidecar
-            # would have nothing useful to do.
-            mesh.exempt: "true"
             # Project-wide convention: cadvisor metric_relabel_configs stamps this
             # value as the `service` label on container resource metrics, so the
             # exporter's cpu/mem/etc. roll up under the same `service=postgres` lens
@@ -1006,7 +992,6 @@ services:
         volumes:
             - tempo-data:/var/tempo
         labels:
-            mesh.exempt: "true"
             metrics.service_name: observability
             metrics.module_name: observability
             metrics.owned_by: sre@example.com
@@ -1025,7 +1010,6 @@ services:
         volumes:
             - /var/run/docker.sock:/var/run/docker.sock:ro
         labels:
-            mesh.exempt: "true"
             metrics.service_name: logging
             metrics.module_name: logging
             metrics.owned_by: sre@example.com
@@ -1047,7 +1031,6 @@ services:
         volumes:
             - vm-data:/victoria-metrics-data
         labels:
-            mesh.exempt: "true"
             metrics.service_name: observability
             metrics.module_name: observability
             metrics.owned_by: sre@example.com

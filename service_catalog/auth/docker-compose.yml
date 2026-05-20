@@ -6,8 +6,8 @@
 # on first run (see Makefile's certs target). The dev edits the local
 # copy to set staticPasswords.
 #
-# Mesh-exempt: dex sits outside the SPIFFE mesh (it fronts it). The
-# ingress envoy reaches it plaintext on the docker network.
+# Dex sits outside the SPIFFE mesh (it fronts it). The ingress envoy
+# reaches it plaintext on the docker network.
 #
 # TODO: needs_prod_decisions swap dex for prod IdP via plugin replacement
 
@@ -35,7 +35,6 @@ services:
       timeout: 3s
       retries: 5
     labels:
-      mesh.exempt: "true"
       katenary.v3/ports: |-
         - 5556
       metrics.service_name: dex

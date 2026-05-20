@@ -42,12 +42,13 @@ type Identity struct {
 }
 
 type Service struct {
-	Container        string `toml:"container"`
-	Port             int    `toml:"port"`
-	Scheme           string `toml:"scheme"` // grpc | http | https | tcp — app's loopback bind protocol
-	ExposeViaIngress bool   `toml:"expose_via_ingress"`
-	Ingress          bool   `toml:"ingress"`
-	RequiresAuth     *bool  `toml:"requires_auth"` // pointer: default true unless explicit false
+	Container        string   `toml:"container"`
+	Port             int      `toml:"port"`
+	Scheme           string   `toml:"scheme"` // grpc | http | https | tcp — app's loopback bind protocol
+	ExposeViaIngress bool     `toml:"expose_via_ingress"`
+	Ingress          bool     `toml:"ingress"`
+	RequiresAuth     *bool    `toml:"requires_auth"` // pointer: default true unless explicit false
+	Depends          []string `toml:"depends"`       // outbound mesh peers (container names)
 }
 
 // validSchemes is the closed set of supported [[services]].scheme values.

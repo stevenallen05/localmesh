@@ -103,11 +103,9 @@ resolution is context-dependent.
   scrubbing at Vector / Tempo / Loki is still SRE's choice when real PII
   contracts settle.
 - **Default-deny mesh policy.** No `AuthorizationPolicy` enforcement in
-  dev. Foundation-tier RBAC is allow-all-internal. The `mesh.exempt:
-  "true"` compose label is the CEL predicate the policy generator will
-  read in prod to write carve-outs. Picking the prod mesh runtime
-  (Istio / Linkerd / Cilium) is the upstream decision; default-deny
-  lands when that lands.
+  dev. Foundation-tier RBAC is allow-all-internal. Picking the prod
+  mesh runtime (Istio / Linkerd / Cilium) is the upstream decision;
+  default-deny lands when that lands.
 - **Per-caller RBAC via cert-as-policy (row 14).** Workload's cert
   encodes its allowed destinations; sidecar reads cert and writes the
   RBAC config the listener consumes. JSON sidecar file
@@ -233,8 +231,9 @@ resolution is context-dependent.
   katenary same-pod label for sidecars`.
 - **postgres sidecar.** Postgres protocol's STARTTLS negotiation isn't
   transparent-proxyable through a generic TLS terminator. Postgres
-  stays mesh-exempt with native mTLS. `TODO: needs_prod_decisions
-  postgres sidecar requires protocol-aware proxying`.
+  stays on native pg mTLS instead of a generic sidecar. `TODO:
+  needs_prod_decisions postgres sidecar requires protocol-aware
+  proxying`.
 
 ## LocalMesh CLI follow-ups
 
@@ -266,14 +265,6 @@ words>` at the relevant call site so they're greppable.
   improve enough that the relocation doesn't break the
   no-flag-needed path. `TODO: needs_prod_decisions .env move under
   .localmesh once config-loading tools improve`.
-- **mesh-exempt enforcement in `mtls mint`.** The Go CLI mints leaves
-  for every `[[services]]` entry uniformly. The mesh-exempt label
-  carve-out (skip cert minting for observability / logging / dex /
-  postgres containers) is not yet ported into `mtls mint`. Cert minting
-  for exempt containers is wasted work today but harmless. The
-  `internal/mesh/edges` derivation already reads `mesh.exempt: "true"`;
-  share that with the cert path. `TODO: needs_prod_decisions
-  mesh.exempt detection from compose labels`.
 - **Long-form volume rewrite in render.** `internal/render/rewrite.go`
   rewrites relative paths for `build.context`, short-form volumes,
   `configs.file`, `secrets.file`. Long-form `volumes:` with `source:`

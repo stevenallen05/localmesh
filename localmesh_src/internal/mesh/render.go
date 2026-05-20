@@ -62,12 +62,13 @@ type Contexts struct {
 	Sidecars map[string]SidecarCtx // keyed by container name
 }
 
-// BuildContexts walks the catalog + compose merge to produce the per-role
-// template contexts. Returns ErrPortCollision (from DeriveEdges) if the
-// catalog has port collisions.
-func BuildContexts(proj *manifest.Project, plugins []*manifest.Plugin, compose ComposeAggregate) (*Contexts, error) {
+// BuildContexts walks the catalog to produce the per-role template
+// contexts. Returns ErrPortCollision (from DeriveEdges) if the catalog
+// has port collisions, or ErrUnknownDepends if any depends entry names
+// a container that isn't in the registry.
+func BuildContexts(proj *manifest.Project, plugins []*manifest.Plugin) (*Contexts, error) {
 	reg := BuildRegistry(proj, plugins)
-	edges, err := DeriveEdges(compose, reg)
+	edges, err := DeriveEdges(reg)
 	if err != nil {
 		return nil, fmt.Errorf("derive edges: %w", err)
 	}

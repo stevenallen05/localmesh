@@ -87,11 +87,6 @@ labels:
 `mesh.role` lets dashboards filter the envoy fleet by topology axis.
 `prometheus.io/*` drives observability's `docker_sd_configs` discovery.
 
-Consumer workloads opt **out** of the mesh by declaring `mesh.exempt:
-"true"` on their own service's compose `labels:` block. Today's
-exempt set: dex (IdP fronts itself), postgres (STARTTLS not
-transparent-proxyable), observability/*, logging/*.
-
 ## k8s rendering
 
 `None`. The dev envoy fleet swaps for the prod mesh runtime (Istio /
@@ -180,7 +175,6 @@ services:
       metrics.service_name: www
       metrics.module_name:  app
       metrics.owned_by:     ${TECH_LEAD_EMAIL}
-      # mesh.exempt: "true"   # uncomment to opt out of the mesh
 
   # The www-mesh-init + www-mesh sidecar pair is emitted by the mesh
   # plugin's template, not by the consumer. Shown here for reference:
