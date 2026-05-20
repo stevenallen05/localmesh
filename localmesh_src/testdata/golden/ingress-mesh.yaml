@@ -240,8 +240,10 @@ static_resources:
             address:
               socket_address: { address: otel-collector, port_value: 4317 }
 
-secrets:
-- name: client-secret
-  generic_secret: { secret: { inline_string: "${OIDC_CLIENT_SECRET}" } }
-- name: hmac-secret
-  generic_secret: { secret: { inline_string: "${OAUTH2_HMAC_SECRET}" } }
+  secrets:
+  - name: client-secret
+    generic_secret:
+      secret: { inline_string: "${OIDC_CLIENT_SECRET}" }
+  - name: hmac-secret
+    generic_secret:
+      secret: { inline_string: "${OAUTH2_HMAC_SECRET}" }

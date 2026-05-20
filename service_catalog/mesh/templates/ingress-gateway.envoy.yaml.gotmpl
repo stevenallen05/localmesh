@@ -186,8 +186,10 @@ static_resources:
 
   {{ include "mesh.envoy.otel_cluster" (dict "Endpoint" .OTelEndpoint) | indent 2 }}
 
-secrets:
-- name: client-secret
-  generic_secret: { secret: { inline_string: "${OIDC_CLIENT_SECRET}" } }
-- name: hmac-secret
-  generic_secret: { secret: { inline_string: "${OAUTH2_HMAC_SECRET}" } }
+  secrets:
+  - name: client-secret
+    generic_secret:
+      secret: { inline_string: "${OIDC_CLIENT_SECRET}" }
+  - name: hmac-secret
+    generic_secret:
+      secret: { inline_string: "${OAUTH2_HMAC_SECRET}" }
