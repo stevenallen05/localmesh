@@ -6,14 +6,22 @@ import (
 	"sort"
 )
 
-// ErrPortCollision indicates two registry services share a port,
+// ErrPortCollision indicates two non-exempt registry services share a port,
 // which makes iptables port-based redirection ambiguous from any caller
 // that depends on both.
-var ErrPortCollision = errors.New("port collision between services")
+var ErrPortCollision = errors.New("port collision between non-exempt services")
 
-// ErrUnknownDepends indicates a service's depends list names a container
-// that doesn't exist in the registry.
-var ErrUnknownDepends = errors.New("unknown depends target")
+// ComposeService is the subset of a parsed compose service entry the mesh
+// derivation needs. The full compose merge is the responsibility of
+// internal/render; this is the slim view edges.go consumes.
+type ComposeService struct {
+	DependsOn []string          // keys of depends_on (compose canonicalizes the map form)
+	Labels    map[string]string // top-level service labels
+}
+
+// ComposeAggregate is the post-merge view: every service across the project +
+// every included plugin, keyed by container name.
+type ComposeAggregate map[string]ComposeService
 
 // Edge represents one outbound mTLS edge from a workload to a peer.
 type Edge struct {
@@ -21,38 +29,50 @@ type Edge struct {
 	TargetPort int    // peer's [[services]] port
 }
 
-// DeriveEdges walks every registry service's Depends list, resolves each
-// target to a registry entry, and returns the per-source outbound edge
-// list. Targets that don't resolve are an error (typos in the manifest
-// surface here rather than silently dropping).
-func DeriveEdges(reg *Registry) (map[string][]Edge, error) {
-	if err := validatePortCollisions(reg); err != nil {
+// DeriveEdges walks each non-exempt service's compose depends_on, intersects
+// the targets with registry-known containers, drops mesh-exempt targets, and
+// returns the per-workload outbound edge list. Errors if any non-exempt
+// services share a port.
+//
+// Foreign deps (depends_on names not in the registry) are dropped silently
+// — they're legitimate cross-mesh boundaries that the workload sidecar
+// passes through the catch-all.
+func DeriveEdges(compose ComposeAggregate, reg *Registry) (map[string][]Edge, error) {
+	if err := validatePortCollisions(compose, reg); err != nil {
 		return nil, err
 	}
 	out := map[string][]Edge{}
-	for _, src := range reg.AllContainers() {
-		svc, _ := reg.Get(src)
-		if len(svc.Depends) == 0 {
+	for src, svc := range compose {
+		if IsExempt(svc.Labels) {
 			continue
 		}
-		edges := make([]Edge, 0, len(svc.Depends))
-		for _, dep := range svc.Depends {
+		var edges []Edge
+		for _, dep := range svc.DependsOn {
 			target, ok := reg.Get(dep)
 			if !ok {
-				return nil, fmt.Errorf("%w: %s depends on %q", ErrUnknownDepends, src, dep)
+				continue
+			}
+			depCompose, hasComposeEntry := compose[dep]
+			if hasComposeEntry && IsExempt(depCompose.Labels) {
+				continue
 			}
 			edges = append(edges, Edge{Target: dep, TargetPort: target.Port})
 		}
 		sort.Slice(edges, func(i, j int) bool { return edges[i].Target < edges[j].Target })
-		out[src] = edges
+		if len(edges) > 0 {
+			out[src] = edges
+		}
 	}
 	return out, nil
 }
 
-func validatePortCollisions(reg *Registry) error {
+func validatePortCollisions(compose ComposeAggregate, reg *Registry) error {
 	byPort := map[int][]string{}
 	for _, container := range reg.AllContainers() {
 		svc, _ := reg.Get(container)
+		if cs, ok := compose[container]; ok && IsExempt(cs.Labels) {
+			continue
+		}
 		byPort[svc.Port] = append(byPort[svc.Port], container)
 	}
 	for port, containers := range byPort {

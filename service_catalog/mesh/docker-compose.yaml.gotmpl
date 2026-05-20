@@ -5,7 +5,7 @@ from .Workloads (sorted by container name).
 
 Context expected (project-wide + workloads list):
   .Project.Name, .Project.LocalDomain
-  .Workloads []{Name string}   — populated by render.RunWith
+  .Workloads []{Name string, MeshExempt bool}   — populated by render.RunWith
 
 Certs travel as docker compose secrets (not bind mounts). The compose
 secrets driver lands files inside the container at the declared target
@@ -34,14 +34,14 @@ secrets:
     file: ../../.localmesh/secrets/egress-mesh/id.key
   egress-mesh_trust_ca:
     file: ../../.localmesh/secrets/egress-mesh/trust.ca.crt
-{{- range $w := .Workloads }}
+{{- range $w := .Workloads }}{{ if not $w.MeshExempt }}
   {{ $w.Name }}-mesh_id_crt:
     file: ../../.localmesh/secrets/{{ $w.Name }}/id.crt
   {{ $w.Name }}-mesh_id_key:
     file: ../../.localmesh/secrets/{{ $w.Name }}/id.key
   {{ $w.Name }}-mesh_trust_ca:
     file: ../../.localmesh/secrets/{{ $w.Name }}/trust.ca.crt
-{{- end }}
+{{- end }}{{ end }}
 
 services:
   ingress-mesh:
@@ -107,7 +107,7 @@ services:
       metrics.owned_by:     sre@example.com
       mesh.role:            egress
 
-{{ range $w := .Workloads }}
+{{ range $w := .Workloads }}{{ if not $w.MeshExempt }}
   {{ $w.Name }}-mesh-init:
     # busybox doesn't ship iptables; alpine + apk add is the smallest viable shape.
     # TODO: needs_prod_decisions swap to a pre-built iptables-init image for prod
@@ -153,4 +153,4 @@ services:
       metrics.module_name:  mesh
       metrics.owned_by:     sre@example.com
       mesh.role:            sidecar
-{{ end }}
+{{ end }}{{ end }}

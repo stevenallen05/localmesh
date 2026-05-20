@@ -17,11 +17,13 @@ import (
 )
 
 // WorkloadCtx is a per-workload entry surfaced to plugin templates that
-// need to iterate workloads (e.g. mesh's docker-compose.yaml.gotmpl emits
-// one sidecar block per workload). Populated by render.RunWith after it
-// has merged enough of the compose surface to know every service's name.
+// need to iterate non-exempt workloads (e.g. mesh's docker-compose.yaml.gotmpl
+// emits one sidecar block per workload). Populated by render.RunWith after
+// it has merged enough of the compose surface to know every service's
+// name + mesh.exempt label.
 type WorkloadCtx struct {
-	Name string
+	Name       string
+	MeshExempt bool
 }
 
 // Context is the data exposed to every template.

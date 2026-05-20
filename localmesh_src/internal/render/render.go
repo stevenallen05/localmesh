@@ -30,13 +30,13 @@ func Run(projectFile, catalogRoot, outputPath string) error {
 // verb) load once and pass the same structs to both render + envwriter.
 //
 // Two-pass: pass 1 renders every plugin with an empty Workloads list so
-// the merged compose surfaces every container name. The mesh plugin's
-// compose uses .Workloads, so on pass 1 it emits only the role services
-// (ingress-mesh, egress-mesh) and no sidecar blocks. Pass 2 re-renders
-// any plugin whose template depends on .Workloads with the populated
-// list. Today only the mesh plugin qualifies, so the second pass
-// re-renders just that one and swaps it into the rendered slice before
-// the final merge.
+// the merged compose surfaces every container name + its mesh.exempt
+// label. The mesh plugin's compose uses .Workloads, so on pass 1 it
+// emits only the role services (ingress-mesh, egress-mesh) and no
+// sidecar blocks. Pass 2 re-renders any plugin whose template depends
+// on .Workloads with the populated list. Today only the mesh plugin
+// qualifies, so the second pass re-renders just that one and swaps it
+// into the rendered slice before the final merge.
 func RunWith(proj *manifest.Project, plugins []*manifest.Plugin, catalogRoot, outputPath string) error {
 	env := envMap()
 	outputDir := filepath.Dir(outputPath)
@@ -155,8 +155,10 @@ func filterRegistryKnown(workloads []tmpl.WorkloadCtx, proj *manifest.Project, p
 // appendProjectWorkloads merges project-tier services (proj.Services) into
 // the workload list. These app-tier containers (www, server) live in the
 // root docker-compose.yml — not in any plugin compose — so the node walk
-// above misses them. Idempotent: existing entries (e.g. when a project
-// service is also declared via a plugin block) are preserved.
+// above misses them. They are never mesh-exempt today; if a future need
+// arises, mesh-exempt could be expressed in project.toml [[services]].
+// Idempotent: existing entries (e.g. when a project service is also
+// declared via a plugin block) are preserved.
 func appendProjectWorkloads(existing []tmpl.WorkloadCtx, proj *manifest.Project) []tmpl.WorkloadCtx {
 	seen := map[string]bool{}
 	for _, w := range existing {
@@ -166,19 +168,20 @@ func appendProjectWorkloads(existing []tmpl.WorkloadCtx, proj *manifest.Project)
 		if seen[s.Container] {
 			continue
 		}
-		existing = append(existing, tmpl.WorkloadCtx{Name: s.Container})
+		existing = append(existing, tmpl.WorkloadCtx{Name: s.Container, MeshExempt: false})
 		seen[s.Container] = true
 	}
 	sort.Slice(existing, func(i, j int) bool { return existing[i].Name < existing[j].Name })
 	return existing
 }
 
-// workloadsFromNodes extracts every services.<name> from the pass-1
-// rendered plugin compose nodes. The mesh plugin's own pass-1 output
-// (ingress-mesh, egress-mesh) is excluded — those are roles, not
-// workloads, and the mesh template never iterates itself. Services
-// appearing in multiple plugins (additive blocks across plugins for the
-// same container) are deduped. Result is sorted by name for
+// workloadsFromNodes extracts every services.<name> + its mesh.exempt
+// label from the pass-1 rendered plugin compose nodes. The mesh plugin's
+// own pass-1 output (ingress-mesh, egress-mesh) is excluded — those are
+// roles, not workloads, and the mesh template never iterates itself.
+// Services appearing in multiple plugins (additive blocks across plugins
+// for the same container) are deduped: a service is mesh-exempt if any
+// contributing plugin marks it exempt. Result is sorted by name for
 // deterministic output.
 func workloadsFromNodes(nodes []*yaml.Node, sources []string) []tmpl.WorkloadCtx {
 	byName := map[string]tmpl.WorkloadCtx{}
@@ -201,10 +204,15 @@ func workloadsFromNodes(nodes []*yaml.Node, sources []string) []tmpl.WorkloadCtx
 			}
 			for s := 0; s < len(v.Content); s += 2 {
 				svcName := v.Content[s].Value
-				if _, ok := byName[svcName]; ok {
+				svcBody := v.Content[s+1]
+				cur, ok := byName[svcName]
+				exempt := serviceLabelEquals(svcBody, "mesh.exempt", "true")
+				if !ok {
+					byName[svcName] = tmpl.WorkloadCtx{Name: svcName, MeshExempt: exempt}
 					continue
 				}
-				byName[svcName] = tmpl.WorkloadCtx{Name: svcName}
+				cur.MeshExempt = cur.MeshExempt || exempt
+				byName[svcName] = cur
 			}
 		}
 	}
@@ -214,6 +222,37 @@ func workloadsFromNodes(nodes []*yaml.Node, sources []string) []tmpl.WorkloadCtx
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
+}
+
+// serviceLabelEquals reports whether the given service mapping carries a
+// labels entry with key=value. Handles both compose label forms (mapping
+// "labels: { key: value }" and sequence "labels: [ key=value ]").
+func serviceLabelEquals(svc *yaml.Node, key, value string) bool {
+	if svc.Kind != yaml.MappingNode {
+		return false
+	}
+	for i := 0; i < len(svc.Content); i += 2 {
+		if svc.Content[i].Value != "labels" {
+			continue
+		}
+		labels := svc.Content[i+1]
+		switch labels.Kind {
+		case yaml.MappingNode:
+			for j := 0; j < len(labels.Content); j += 2 {
+				if labels.Content[j].Value == key && labels.Content[j+1].Value == value {
+					return true
+				}
+			}
+		case yaml.SequenceNode:
+			needle := key + "=" + value
+			for _, e := range labels.Content {
+				if e.Value == needle {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func pluginComposePath(catalogRoot, name string) string {

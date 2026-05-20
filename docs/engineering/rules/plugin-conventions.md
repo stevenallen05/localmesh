@@ -105,6 +105,8 @@ Worked example for the `database/` plugin lives at [`../../../service_catalog/da
 - From `[identity]`, keyed by **plugin slug**: `<PLUGIN>_MODULE_NAME`, `<PLUGIN>_OWNED_BY`.
 - From `[[services]]`, keyed by **container slug**: `<CONTAINER>_PORT`, `<CONTAINER>_EXPOSE_VIA_INGRESS`, `<CONTAINER>_INGRESS`.
 
+Mesh-exempt status (`mesh.exempt: "true"` compose label) is declared on each service's compose `labels:` block, not in `plugin.toml`. The localmesh CLI's `internal/mesh/` package parses each plugin's compose to derive the per-container exempt set, which drives cert-skip in `mtls mint` (TODO; see `docs/TODO.md`) and edge filtering in the envoy render path.
+
 `README.md`'s Environment table is for env vars the **consumer app** sets, not values exported into the platform's `.env`.
 
 ## See also

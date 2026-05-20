@@ -6,7 +6,7 @@ Dev OIDC IdP. One container: **dex** (built-in password DB, three pre-seeded use
 
 Dex's config lives in `.localmesh/dex.yaml`, copied from `dex.yaml.sample` by `make certs` on first run. The dev edits the local copy to add/remove `staticPasswords`. `make certs` never overwrites an existing `.localmesh/dex.yaml`.
 
-Identity (`module_name`, `owned_by`) and the service definition (`container`, `port`, `requires_auth`) live in this plugin's `plugin.toml` per [`../../docs/engineering/rules/plugin-conventions.md`](../../docs/engineering/rules/plugin-conventions.md) §1 + §3 — they are not redeclared here. Dex sits outside the SPIFFE mesh because it fronts it; the ingress envoy reaches it plaintext on the docker network.
+Identity (`module_name`, `owned_by`) and the service definition (`container`, `port`, `requires_auth`) live in this plugin's `plugin.toml` per [`../../docs/engineering/rules/plugin-conventions.md`](../../docs/engineering/rules/plugin-conventions.md) §1 + §3 — they are not redeclared here. Dex declares `mesh.exempt: "true"` on its compose `labels:` block (it sits outside the SPIFFE mesh because it fronts it; the ingress envoy reaches it plaintext on the docker network).
 
 ## Environment
 
@@ -33,7 +33,7 @@ The headers land automatically when the consumer's `[[services]]` entry leaves `
 
 ## Labels
 
-`None` consumer-side. Plugin-side identity labels are declared in this plugin's own compose.
+`None` consumer-side. Plugin-side identity + mesh-exempt labels are declared in this plugin's own compose.
 
 ## k8s rendering
 
@@ -45,7 +45,7 @@ The headers land automatically when the consumer's `[[services]]` entry leaves `
 - Three users come pre-seeded: `alice@example.invalid`, `bob@example.invalid`, `charlie@example.invalid`. All share password `dev`. Regenerate the bcrypt hash via `docker run --rm httpd:2.4-alpine htpasswd -bnBC 10 "" dev | cut -d: -f2`.
 - The OIDC client secret (`LOCALMESH_OIDC_CLIENT_SECRET`) is minted by the Go CLI on first `make certs` and persisted in `.env`. The ingress envoy reads the same value via two SDS-shaped files at `/run/ingress-mesh/oauth2-{client-secret,hmac}.yaml`, written by `make oauth2-secrets`. File-based SDS sidesteps the v1.31 oauth2-filter trap that static `GenericSecret` entries fall into (`Duplicate static GenericSecret secret name`).
 - Sign-out: hit `/oauth2/signout` on any gated subdomain. envoy's oauth2 filter clears the cookie and 302's home.
-- Dex sits outside the SPIFFE mesh. The ingress envoy talks plaintext on the docker network. Browser-facing dex traffic still rides the ingress (TLS terminated at envoy).
+- Dex is mesh-exempt: no SPIFFE certs minted, no inbound mTLS. The ingress envoy talks plaintext on the docker network. Browser-facing dex traffic still rides the ingress (TLS terminated at envoy).
 
 ## Example app service block
 

@@ -11,10 +11,10 @@ expects. The localmesh CLI's `internal/mesh/` package owns the render
 side:
 
 - **`docker-compose.yaml.gotmpl`** consumes project-wide context plus
-  `.Workloads` (list of `{Name}` derived from the catalog).
+  `.Workloads` (list of `{Name, MeshExempt}` derived from the catalog).
 - **`templates/workload-sidecar.envoy.yaml.gotmpl`** is rendered once
-  per workload; context is one entry from the edges set (workload name
-  + the peer clusters keyed off destination port).
+  per non-exempt workload; context is one entry from the edges set
+  (workload name + the peer clusters keyed off destination port).
 - **`templates/ingress-gateway.envoy.yaml.gotmpl`** consumes project-
   wide context plus `.Routes` (one entry per service with
   `expose_via_ingress = true`).
@@ -33,9 +33,9 @@ side:
    the project-wide context, assemble into
    `.localmesh/localmesh.compose.yaml`.
 2. Build the catalog (`{container → Service}`) from project + plugins.
-3. Walk each workload's compose `depends_on`, intersect with the
-   catalog, emit `MeshEdge` per workload. Fail the build on port
-   collisions.
+3. Walk each non-exempt workload's compose `depends_on`, intersect
+   with the catalog, drop mesh-exempt targets, emit `MeshEdge` per
+   workload. Fail the build on port collisions.
 4. Render each envoy template under `service_catalog/mesh/templates/`
    per-role (and per-workload for the sidecar template), drop outputs
    into `.localmesh/envoy/` (gitignored). Each container mounts its
@@ -57,6 +57,11 @@ envoy-image uid 101 vs host uid 1000 mismatch a bind-mount hits).
   RBAC fragment that envoy includes. Today the RBAC `policies` map is
   empty in every template. `TODO: needs_prod_decisions per-caller RBAC
   via cert-as-policy (row 14)`.
+- **Mesh-exempt enforcement in `mtls mint`.** The CLI mints leaves for
+  every `[[services]]` entry uniformly. The `internal/mesh/edges`
+  derivation already reads `mesh.exempt: "true"`; share that with the
+  cert path. `TODO: needs_prod_decisions mesh.exempt detection from
+  compose labels`.
 - **Compose `network_mode: "service:..."` and katenary.** Same-pod
   sidecars don't have a clean katenary expression yet. `TODO:
   needs_prod_decisions katenary same-pod label for sidecars`.

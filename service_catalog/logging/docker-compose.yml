@@ -239,6 +239,7 @@ services:
     labels:
       # Internal-only port; katenary needs the explicit declaration to
       # generate the depends_on init-container in the helm chart.
+      mesh.exempt: "true"
       katenary.v3/ports: |-
         - 3100
       metrics.service_name: logging
@@ -261,6 +262,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     labels:
+      mesh.exempt: "true"
       metrics.service_name: logging
       metrics.module_name: logging
       metrics.owned_by: sre@example.com

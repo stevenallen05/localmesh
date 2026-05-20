@@ -48,6 +48,7 @@ func newMTLSMintCmd() *cobra.Command {
 // [[services]] (app tier) plus every plugin.toml [[services]] entry.
 // For v0 we mint for every declared service and let the workload ignore
 // the mount when it doesn't need mTLS.
+// TODO: needs_prod_decisions mesh.exempt enforcement once localmesh parses compose
 func collectMeshContainers(proj *manifest.Project, plugins []*manifest.Plugin) []string {
 	out := []string{}
 	for _, s := range proj.Services {

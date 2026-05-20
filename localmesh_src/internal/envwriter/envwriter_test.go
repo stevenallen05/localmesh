@@ -80,6 +80,11 @@ func TestWriteManaged(t *testing.T) {
 				managedEnd,
 			},
 		},
+		{
+			name:        "no spurious mesh-exempt key",
+			seed:        "",
+			wantMissing: []string{"MESH_EXEMPT"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
