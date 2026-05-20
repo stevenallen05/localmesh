@@ -220,6 +220,71 @@ context-dependent.
   flip to `0.0.0.0` binds. `TODO: needs_prod_decisions ghostunnel
   metrics need JSON-to-Prom adapter`.
 
+## LocalMesh CLI follow-ups
+
+Items deferred from the 2026-05-20 localmesh Go CLI delivery. All
+flagged inline as `TODO: needs_prod_decisions <≤10 words>` at the
+relevant call site so they're greppable.
+
+- **Port Caddyfile + dex.yaml generators to Go CLI.**
+  `scripts/secrets-gen.py` is retained as a transitional helper for
+  `Caddyfile.generated` (per-`[[services]]` site blocks) +
+  `dex.yaml.generated` (`staticPasswords:` + per-client config). The Go
+  CLI already owns identity + service shape from `plugin.toml`; both
+  writers are the next port.
+  `TODO: needs_prod_decisions port Caddyfile + dex.yaml generators to Go CLI`.
+- **Port `.env` writer to Go CLI.** Managed-section emission
+  (per-plugin identity tuple as UPCASE_SNAKECASE for compose
+  interpolation) still runs in Python. Move it to Go to retire the
+  Python tail. `TODO: needs_prod_decisions port .env writer to Go CLI`.
+- **mkcert via go module.** mkcert v1.4.4 vendored as a binary at
+  `localmesh_src/tools/mkcert` today (subprocess invocation from
+  `internal/ca`). Importing mkcert as a Go module would remove the
+  binary commit and align with the rest of the Go CLI's dep story.
+  `TODO: needs_prod_decisions go mod import of mkcert`.
+- **Multi-arch mkcert.** Linux-amd64 binary only. macOS-arm64 / Linux-
+  arm64 contributors hit a clear "wrong arch" error today; a real
+  arch-detect step (or the go-mod import above) closes the gap.
+  `TODO: needs_prod_decisions detect arch beyond linux-amd64`.
+- **`validate` verb.** Schema-lint of `project.toml` + `plugin.toml`
+  deferred until a Go schema validator is picked. Five v0 verbs ship
+  without it. `TODO: needs_prod_decisions validate verb when go schema
+  validator picked`.
+- **`install` verb (production).** Verb name reserved for a future
+  production deployment command (chart push, registry auth, etc.).
+  Distinct from `ca install` (host trust-store). Today the CLI exits
+  with "unknown verb" — that's the intentional placeholder.
+  `TODO: needs_prod_decisions install verb for production deployment`.
+- **`.env` location.** Stays at repo root today because compose's
+  default lookup expects it there. Aspirational move under
+  `.localmesh/` once `docker compose --env-file` / config-loading tools
+  improve enough that the relocation doesn't break the
+  no-flag-needed path. `TODO: needs_prod_decisions .env move under
+  .localmesh once config-loading tools improve`.
+- **mesh-exempt enforcement in `mtls mint`.** The Go CLI mints leaves
+  for every `[[services]]` entry uniformly. The old `secrets-gen.py`
+  read each plugin compose's `mesh.exempt: "true"` label to skip cert
+  minting for observability / auth containers; that carve-out is not
+  yet ported. Cert minting for exempt containers is wasted work today
+  but harmless. `TODO: needs_prod_decisions mesh.exempt detection from
+  compose labels`.
+- **`tools/step` cleanup.** mkcert subsumes step for CA install + leaf
+  minting; the vendored `tools/step` binary is now dead weight. Delete
+  in a follow-up sweep. `TODO: needs_prod_decisions delete unused
+  tools/step`.
+- **`scripts/tests/test_secrets_gen.py` rename.** File trimmed (cert
+  tests removed; env/Caddy/dex tests stay) rather than deleted because
+  the Python helper still owns those three outputs. Rename to reflect
+  the transitional scope once the helper is retired (per port-to-Go
+  TODOs above). `TODO: needs_prod_decisions rename test file for
+  transitional helper`.
+- **Long-form volume rewrite in render.** `internal/render/rewrite.go`
+  rewrites relative paths for `build.context`, short-form volumes,
+  `configs.file`, `secrets.file`. Long-form `volumes:` with `source:`
+  + `target:` is not yet rewritten — no plugin uses it. Add when a
+  plugin adopts the long form. `TODO: needs_prod_decisions long-form
+  volume rewriting when a plugin adopts it`.
+
 ## Dashboards
 
 The default-dashboard set ships four files:
