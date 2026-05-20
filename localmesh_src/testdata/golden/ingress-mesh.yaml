@@ -75,8 +75,8 @@ static_resources:
               "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
               providers:
                 dex:
-                  issuer: ${DEX_ISSUER}
-                  remote_jwks: { http_uri: { uri: "${DEX_JWKS_URI}", cluster: dex, timeout: 5s }, cache_duration: { seconds: 300 } }
+                  issuer: http://dex:5556
+                  remote_jwks: { http_uri: { uri: "http://dex:5556/keys", cluster: dex, timeout: 5s }, cache_duration: { seconds: 300 } }
                   forward: true
                   payload_in_metadata: jwt_claims
                   claim_to_headers:
