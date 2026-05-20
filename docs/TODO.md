@@ -178,9 +178,22 @@ context-dependent.
   trust forwarded gRPC metadata (`x-user-id` / `x-user-email` /
   `x-user-name`) because the sidecar's `--allow-uri` gated the channel.
   Phantom-token broker is the cryptographic-narrowing successor
-  (per-workload claim allowlist, opaque token + introspection).
+  (per-workload claim allowlist, opaque token + introspection). In the
+  envoy-omakase MVP, JWT validation and claim extraction land once at
+  the ingress envoy. Claims become headers downstream sidecars read.
+  user_id stamps onto the trace as an attribute, not into log fields.
+  Loki lines carry the JWT key ID (`jwt_kid`) for forensic pivoting
+  without indexing user identity.
   `TODO: needs_prod_decisions phantom-token broker for cryptographic
   claim narrowing`.
+- **Per-callee outlier detection.** Three-strikes ejection of an
+  upstream host runs on the caller's sidecar, scoped per cluster.
+  Per-callee opt-in tuning needs the bundling CLI to join
+  caller↔callee at template time so the callee's labels flow into the
+  caller's outlier config. A single default applies uniformly until the
+  join is in place.
+  `TODO: needs_prod_decisions per-callee outlier detection needs CLI
+  caller-callee join`.
 - **katenary same-pod sidecar.** No native compose construct expresses
   "second container in the same pod." Hand-patch the chart for now;
   upstream feature request candidate. `TODO: needs_prod_decisions
@@ -309,3 +322,58 @@ then it is dead UI that invites picker-blindness.
   `/var/log/containers/*.log`. The k8s helm chart needs an override that
   swaps the path. Document the override pattern alongside the receiver
   config.
+
+# Aspirational
+
+Items not on the MVP critical path. Each articulates a desired prod
+state where the dev shape is sketched or working, but the full
+production form needs more design before it ships. The right shape
+usually depends on which prod runtime, IdP, mesh, or CA backend the
+org picks.
+
+- **External-destination declaration.** Apps declare what they reach
+  outside the mesh in `plugin.toml`. The take-home stops at the
+  declaration. Prod enforcement is the aspirational half. Options are
+  mechanical block at the egress gateway, SWG integration, allowlist
+  ingestion. The right choice depends on the enforcement complexity
+  the org needs. `TODO: needs_prod_decisions external-destination
+  enforcement depth`.
+
+- **East-west caller declaration.** Apps declare which other in-mesh
+  services they're allowed to dial. The dev version extrapolates from
+  which plugins the project manifest imports. mTLS client certs get
+  minted with the explicit list of allowed SPIFFE URIs embedded in
+  the x509. Elaborate enforcement (per-method allowlists,
+  time-bounded grants) is aspirational.
+
+- **App-tier cert as the access-policy carrier.** mTLS certs for the
+  `app` tier carry an "allowed to access" payload in x509 metadata.
+  The axes follow whatever the org cares about. Common axes are
+  destination URIs, OIDC claim names, data classes, billing buckets.
+  Sidecar reads the cert at startup. Cert rotation rotates policy.
+  Schema lives in step-ca's template, consuming code in the sidecar
+  bootstrap. Both are aspirational beyond the simplest URI-allowlist
+  axis. Envoy doesn't parse custom x509 OIDs natively. The MVP
+  delivery shape is a JSON-sidecar file (`id.policy.json`) that step-ca
+  emits alongside the cert. The envoy sidecar's init parses the file
+  once and writes RBAC config the listener consumes. Cert rotation
+  rotates both files together. Prod migration swaps the loader, not
+  the policy semantics — the RBAC contract downstream stays identical.
+
+- **Safety-net defaults.** Default timeouts, circuit breakers, and
+  retry caps. Sensible defaults are the omakase move. They would
+  surface as panel noise in MVP. Timed-out and ejected counters fire
+  on every cold-start blip without context for what's normal. Land
+  the defaults once a baseline is observable. Tune from there.
+  `TODO: needs_prod_decisions safety-net defaults need a baseline`.
+
+- **Convention + linter.** Conventions land in the take-home.
+  `plugin.toml` schema additions, naming rules, claim-availability
+  declarations. The build-time linter that verifies them is
+  aspirational. Rules are documented; mechanical enforcement is not.
+
+- **Mechanical in prod, working replica in dev.** The general posture
+  for everything in this section. Anything flagged `TODO:
+  needs_prod_decisions` or parked in DESIGN_DECISIONS Open lives in
+  this same spirit. Local dev's job is the working replica, not the
+  enforcer.
