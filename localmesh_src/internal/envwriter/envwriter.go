@@ -26,7 +26,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/tensorwave/localmesh/internal/manifest"
+	"github.com/stevenallen05/localmesh/internal/manifest"
 )
 
 const (

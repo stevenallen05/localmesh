@@ -12,4 +12,5 @@ owned_by    = "sre@example.com"
 [[services]]
 container          = "grafana"
 port               = 3000
+scheme             = "http"
 expose_via_ingress = true

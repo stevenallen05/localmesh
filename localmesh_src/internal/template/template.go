@@ -13,7 +13,7 @@ import (
 
 	sprig "github.com/Masterminds/sprig/v3"
 
-	"github.com/tensorwave/localmesh/internal/manifest"
+	"github.com/stevenallen05/localmesh/internal/manifest"
 )
 
 // Context is the data exposed to every template.

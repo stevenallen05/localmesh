@@ -7,8 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tensorwave/localmesh/internal/manifest"
-	"github.com/tensorwave/localmesh/internal/mtls"
+	"github.com/stevenallen05/localmesh/internal/manifest"
+	"github.com/stevenallen05/localmesh/internal/mtls"
 )
 
 func newMTLSCmd() *cobra.Command {

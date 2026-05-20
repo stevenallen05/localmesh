@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tensorwave/localmesh/internal/ca"
+	"github.com/stevenallen05/localmesh/internal/ca"
 )
 
 func newCACmd() *cobra.Command {

@@ -1,4 +1,4 @@
-module github.com/tensorwave/localmesh
+module github.com/stevenallen05/localmesh
 
 go 1.22
 

@@ -1,0 +1,9 @@
+[identity]
+module_name = "app"
+owned_by    = "test@example.com"
+
+[[services]]
+container          = "app-a"
+port               = 3000
+scheme             = "http"
+expose_via_ingress = true

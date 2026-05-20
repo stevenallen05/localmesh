@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"text/template"
 
-	"github.com/tensorwave/localmesh/internal/manifest"
+	"github.com/stevenallen05/localmesh/internal/manifest"
 )
 
 func customFuncs() template.FuncMap {

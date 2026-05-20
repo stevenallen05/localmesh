@@ -1,0 +1,10 @@
+services:
+  app-a:
+    image: alpine:3.20
+    depends_on:
+      app-b:
+        condition: service_started
+    labels:
+      metrics.service_name: app-a
+      metrics.module_name: app
+      metrics.owned_by: test@example.com

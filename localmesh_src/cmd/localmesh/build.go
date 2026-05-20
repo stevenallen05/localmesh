@@ -6,9 +6,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tensorwave/localmesh/internal/envwriter"
-	"github.com/tensorwave/localmesh/internal/manifest"
-	"github.com/tensorwave/localmesh/internal/render"
+	"github.com/stevenallen05/localmesh/internal/envwriter"
+	"github.com/stevenallen05/localmesh/internal/manifest"
+	"github.com/stevenallen05/localmesh/internal/render"
 )
 
 func newBuildCmd() *cobra.Command {

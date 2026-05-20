@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tensorwave/localmesh/internal/manifest"
+	"github.com/stevenallen05/localmesh/internal/manifest"
 )
 
 func TestSpiffeURI(t *testing.T) {

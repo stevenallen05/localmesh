@@ -1,4 +1,4 @@
-# envoy_wip notes
+# mesh plugin notes
 
 In-repo TODOs about the templates and their CLI contract. These belong
 next to the templates while the CLI is being written in parallel; they
@@ -26,12 +26,13 @@ The CLI is expected to:
 
 1. Read all `*.compose.yaml.gotmpl` across plugins, render each with the
    project-wide context, assemble into the final compose YAML.
-2. Read each envoy template under `envoy_wip/templates/`, render per-role
-   (and per-workload for the sidecar template), drop the outputs into
-   `envoy_wip/rendered/` (gitignored). Each container mounts its
-   rendered config at `/etc/envoy/envoy.yaml`.
-3. Trigger step-ca to mint certs + emit `id.policy.json` per workload
-   into `.secrets/policy/<workload>.policy.json`.
+2. Read each envoy template under `service_catalog/mesh/templates/`,
+   render per-role (and per-workload for the sidecar template), drop
+   the outputs into `.localmesh/envoy/` (gitignored). Each container
+   mounts its rendered config at `/etc/envoy/envoy.yaml`.
+3. Use mkcert as the dev root and the in-tree `crypto/x509` leaves
+   to mint certs + emit `id.policy.json` per workload into
+   `.localmesh/secrets/policy/<workload>.policy.json`.
 
 ## Known gaps
 
@@ -63,10 +64,10 @@ The CLI is expected to:
 ## Out of scope for this scaffold
 
 - Linter (aspirational; documented rules only).
-- step-ca template extension to emit `id.policy.json` (the file is
+- Cert-mint extension to emit `id.policy.json` (the file is
   hand-crafted in `policy/schema.example.json` for now).
 - Replacing the existing ghostunnel sidecars in `docker-compose.yml`
-  (envoy_wip lives in parallel; ghostunnel stays running until the
+  (service_catalog/mesh lives in parallel; ghostunnel stays running until the
   swap is ready).
 - Per-callee outlier detection (row 3, dropped to `needs_prod`).
 - Rows 8, 9, 10, 11, 12, 15 (deferred; see `scratch.envoy-omakase.md`).

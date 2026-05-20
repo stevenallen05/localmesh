@@ -2,6 +2,7 @@ package manifest
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -30,6 +31,89 @@ local_domain="lvh.me"`, nil},
 				t.Fatalf("got %v, want %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestLoadPlugin_SchemeRequired(t *testing.T) {
+	dir := t.TempDir()
+	pluginDir := filepath.Join(dir, "x")
+	if err := os.MkdirAll(pluginDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `
+[identity]
+module_name = "x"
+owned_by    = "x@example.com"
+
+[[services]]
+container = "x"
+port      = 1234
+# scheme intentionally missing
+`
+	if err := os.WriteFile(filepath.Join(pluginDir, "plugin.toml"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := LoadPlugin(dir, "x")
+	if !errors.Is(err, ErrMalformed) {
+		t.Errorf("expected ErrMalformed for missing scheme; got %v", err)
+	}
+}
+
+func TestLoadPlugin_SchemeValid(t *testing.T) {
+	valid := []string{"grpc", "http", "https", "tcp"}
+	for _, s := range valid {
+		t.Run(s, func(t *testing.T) {
+			dir := t.TempDir()
+			pluginDir := filepath.Join(dir, "x")
+			if err := os.MkdirAll(pluginDir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			body := fmt.Sprintf(`
+[identity]
+module_name = "x"
+owned_by    = "x@example.com"
+
+[[services]]
+container = "x"
+port      = 1234
+scheme    = %q
+`, s)
+			if err := os.WriteFile(filepath.Join(pluginDir, "plugin.toml"), []byte(body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			p, err := LoadPlugin(dir, "x")
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if p.Services[0].Scheme != s {
+				t.Errorf("scheme = %q, want %q", p.Services[0].Scheme, s)
+			}
+		})
+	}
+}
+
+func TestLoadPlugin_SchemeInvalid(t *testing.T) {
+	dir := t.TempDir()
+	pluginDir := filepath.Join(dir, "x")
+	if err := os.MkdirAll(pluginDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `
+[identity]
+module_name = "x"
+owned_by    = "x@example.com"
+
+[[services]]
+container = "x"
+port      = 1234
+scheme    = "ftp"
+`
+	if err := os.WriteFile(filepath.Join(pluginDir, "plugin.toml"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := LoadPlugin(dir, "x")
+	if !errors.Is(err, ErrMalformed) {
+		t.Errorf("expected ErrMalformed for invalid scheme; got %v", err)
 	}
 }
 

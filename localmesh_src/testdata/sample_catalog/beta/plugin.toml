@@ -5,4 +5,5 @@ owned_by    = "beta@example.invalid"
 [[services]]
 container          = "beta-svc"
 port               = 9090
+scheme             = "grpc"
 expose_via_ingress = false

@@ -17,7 +17,7 @@ local_domain      = "lvh.me"               # dev DNS suffix; TODO: needs_prod_de
 
 # Plugins the team consumes. Paths resolve to service_catalog/<name>/.
 # TODO: needs_prod_decisions service_catalog distribution
-plugins = ["observability", "logging", "caddy", "auth", "database"]
+plugins = ["observability", "logging", "caddy", "auth", "database", "mesh"]
 
 # App-tier services. Every container with an exposed port lives here or in
 # its plugin.toml. `make certs` reads these to mint certs (1 per service)
@@ -26,11 +26,13 @@ plugins = ["observability", "logging", "caddy", "auth", "database"]
 [[services]]
 container          = "www"
 port               = 3443
+scheme             = "https"
 expose_via_ingress = true                          # https://www.${PROJECT_NAME}.${LOCAL_DOMAIN}:8443 → www:3443
 
 [[services]]
 container          = "server"
 port               = 50051
+scheme             = "grpc"
 expose_via_ingress = false                         # east-west only; www dials this directly
 
 # Could page compliance, gate the PR, or trigger a control review.

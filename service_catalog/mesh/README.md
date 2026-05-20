@@ -49,9 +49,9 @@ The CLI mounts three things into each envoy container:
 
 | Mount | Source | Purpose |
 |-------|--------|---------|
-| `/run/<role>` | `./.secrets/certs/<role>` | step-ca cert bundle (`id.crt`, `id.key`, `trust.ca.crt`) |
-| `/etc/envoy/envoy.yaml` | `./envoy_wip/rendered/<role>.yaml` | rendered envoy bootstrap (gitignored output) |
-| `/var/mesh/policy/id.policy.json` | `./.secrets/policy/<workload>.policy.json` | per-caller policy file (sidecars + egress only) |
+| `/run/<role>` | `./.localmesh/secrets/<role>` | mkcert root + native crypto/x509 leaf bundle (`id.crt`, `id.key`, `trust.ca.crt`) |
+| `/etc/envoy/envoy.yaml` | `./.localmesh/envoy/<role>.yaml` | rendered envoy bootstrap (gitignored output) |
+| `/var/mesh/policy/id.policy.json` | `./.localmesh/secrets/policy/<workload>.policy.json` | per-caller policy file (sidecars + egress only) |
 
 ## depends_on
 

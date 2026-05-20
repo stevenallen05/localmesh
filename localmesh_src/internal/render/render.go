@@ -11,8 +11,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/tensorwave/localmesh/internal/manifest"
-	tmpl "github.com/tensorwave/localmesh/internal/template"
+	"github.com/stevenallen05/localmesh/internal/manifest"
+	tmpl "github.com/stevenallen05/localmesh/internal/template"
 )
 
 // Run renders every plugin in catalogRoot and writes the merged output

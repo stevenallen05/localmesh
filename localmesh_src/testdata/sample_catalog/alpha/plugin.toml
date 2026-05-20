@@ -5,4 +5,5 @@ owned_by    = "alpha@example.invalid"
 [[services]]
 container          = "alpha-svc"
 port               = 8080
+scheme             = "http"
 expose_via_ingress = false

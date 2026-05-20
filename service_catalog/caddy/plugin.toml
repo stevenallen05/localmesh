@@ -8,5 +8,6 @@ owned_by    = "sre@example.com"
 [[services]]
 container          = "caddy"
 port               = 8443
+scheme             = "https"
 ingress            = true
 expose_via_ingress = false
