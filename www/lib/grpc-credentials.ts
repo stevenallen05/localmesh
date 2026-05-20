@@ -1,6 +1,6 @@
-// Plain gRPC credentials. East-west mTLS is handled by the
-// `www-outbound` ghostunnel sidecar — www dials it on 127.0.0.1:50443
-// plaintext; the sidecar wraps mTLS to server:50051.
+// Plain gRPC credentials. East-west mTLS is handled by the local envoy
+// sidecar — www dials `server:50051` plaintext, iptables redirects to the
+// envoy outbound listener, and envoy origins mTLS to server-mesh:50051.
 //
 // Kept as a one-line indirection so a future TLS re-introduction stays
 // at this single site rather than scattering grpc.credentials calls

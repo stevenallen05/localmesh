@@ -96,7 +96,7 @@ static_resources:
               providers:
                 dex:
                   issuer: ${DEX_ISSUER}
-                  remote_jwks: { http_uri: { uri: ${DEX_JWKS_URI}, cluster: dex, timeout: 5s }, cache_duration: { seconds: 300 } }
+                  remote_jwks: { http_uri: { uri: "${DEX_JWKS_URI}", cluster: dex, timeout: 5s }, cache_duration: { seconds: 300 } }
                   forward: true
                   payload_in_metadata: jwt_claims
                   claim_to_headers:

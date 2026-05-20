@@ -975,6 +975,10 @@ services:
             timeout: 3s
             retries: 5
         labels:
+            # Mesh-exempt: postgres uses native pg STARTTLS (sslmode=verify-full),
+            # not a generic L4/L7 mTLS terminator. The mesh sidecar would re-wrap
+            # an already-TLS connection. See chart/Plan notes.
+            mesh.exempt: "true"
             metrics.service_name: postgres
             metrics.module_name: database
             metrics.owned_by: sre@example.com
@@ -1022,6 +1026,10 @@ services:
             # depends_on target → katenary needs a port for the init-container probe
             katenary.v3/ports: |-
                 - 9187
+            # Mesh-exempt: postgres-exporter dials postgres with native pg mTLS
+            # (sslmode=verify-full); same reasoning as postgres above. The sidecar
+            # would have nothing useful to do.
+            mesh.exempt: "true"
             # Project-wide convention: cadvisor metric_relabel_configs stamps this
             # value as the `service` label on container resource metrics, so the
             # exporter's cpu/mem/etc. roll up under the same `service=postgres` lens
@@ -1030,68 +1038,6 @@ services:
             metrics.service_name: postgres
             metrics.module_name: database
             metrics.owned_by: sre@example.com
-    postgres-exporter-mesh:
-        image: envoyproxy/envoy:v1.31-latest
-        network_mode: "service:postgres-exporter"
-        restart: unless-stopped
-        volumes:
-            - ../.localmesh/secrets/postgres-exporter:/run/postgres-exporter:ro
-            - ../.localmesh/envoy/postgres-exporter-mesh.yaml:/etc/envoy/envoy.yaml:ro
-        depends_on:
-            postgres-exporter-mesh-init:
-                condition: service_completed_successfully
-            postgres-exporter:
-                condition: service_started
-        labels:
-            prometheus.io/scrape: "true"
-            prometheus.io/port: "15090"
-            prometheus.io/path: "/stats/prometheus"
-            metrics.service_name: envoy
-            metrics.module_name: mesh
-            metrics.owned_by: sre@example.com
-            mesh.role: sidecar
-    postgres-exporter-mesh-init:
-        image: busybox:1.37
-        network_mode: "service:postgres-exporter"
-        cap_add: ["NET_ADMIN"]
-        volumes:
-            - ../.localmesh/envoy/postgres-exporter-mesh-init.sh:/init.sh:ro
-        command: ["/init.sh"]
-        restart: "no"
-        depends_on:
-            postgres-exporter:
-                condition: service_started
-    postgres-mesh:
-        image: envoyproxy/envoy:v1.31-latest
-        network_mode: "service:postgres"
-        restart: unless-stopped
-        volumes:
-            - ../.localmesh/secrets/postgres:/run/postgres:ro
-            - ../.localmesh/envoy/postgres-mesh.yaml:/etc/envoy/envoy.yaml:ro
-        depends_on:
-            postgres-mesh-init:
-                condition: service_completed_successfully
-            postgres:
-                condition: service_started
-        labels:
-            prometheus.io/scrape: "true"
-            prometheus.io/port: "15090"
-            prometheus.io/path: "/stats/prometheus"
-            metrics.service_name: envoy
-            metrics.module_name: mesh
-            metrics.owned_by: sre@example.com
-            mesh.role: sidecar
-    postgres-mesh-init:
-        image: busybox:1.37
-        network_mode: "service:postgres"
-        cap_add: ["NET_ADMIN"]
-        volumes:
-            - ../.localmesh/envoy/postgres-mesh-init.sh:/init.sh:ro
-        command: ["/init.sh"]
-        restart: "no"
-        depends_on:
-            postgres:
-                condition: service_started
     server-mesh:
         image: envoyproxy/envoy:v1.31-latest
         network_mode: "service:server"
