@@ -1062,12 +1062,14 @@ services:
             metrics.owned_by: sre@example.com
             mesh.role: sidecar
     server-mesh-init:
-        image: busybox:1.37
+        # busybox doesn't ship iptables; alpine + apk add is the smallest viable shape.
+        # TODO: needs_prod_decisions swap to a pre-built iptables-init image for prod
+        image: alpine:3.20
         network_mode: "service:server"
         cap_add: ["NET_ADMIN"]
         volumes:
             - ../.localmesh/envoy/server-mesh-init.sh:/init.sh:ro
-        command: ["/init.sh"]
+        command: ["sh", "-c", "apk add --no-cache iptables >/dev/null && /init.sh"]
         restart: "no"
         depends_on:
             server:
@@ -1151,12 +1153,14 @@ services:
             metrics.owned_by: sre@example.com
             mesh.role: sidecar
     www-mesh-init:
-        image: busybox:1.37
+        # busybox doesn't ship iptables; alpine + apk add is the smallest viable shape.
+        # TODO: needs_prod_decisions swap to a pre-built iptables-init image for prod
+        image: alpine:3.20
         network_mode: "service:www"
         cap_add: ["NET_ADMIN"]
         volumes:
             - ../.localmesh/envoy/www-mesh-init.sh:/init.sh:ro
-        command: ["/init.sh"]
+        command: ["sh", "-c", "apk add --no-cache iptables >/dev/null && /init.sh"]
         restart: "no"
         depends_on:
             www:
