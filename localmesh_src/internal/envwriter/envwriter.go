@@ -138,24 +138,20 @@ func readExisting(envPath string) (preamble string, kvs map[string]string, posta
 	}
 	text := string(data)
 
-	startIdx := strings.Index(text, managedStart)
-	if startIdx < 0 {
+	preamble, rest, found := strings.Cut(text, managedStart)
+	if !found {
 		// No managed section — everything is preamble; kvs harvested for mint preservation.
 		harvestKVs(text, kvs)
 		return text, kvs, "", nil
 	}
-	preamble = text[:startIdx]
-	rest := text[startIdx+len(managedStart):]
-	endIdx := strings.Index(rest, managedEnd)
-	if endIdx < 0 {
+	managedBody, postamble, found := strings.Cut(rest, managedEnd)
+	if !found {
 		// Malformed: start marker without end marker. Treat the rest of
 		// the file as managed body so we don't double-emit on rewrite.
 		harvestKVs(rest, kvs)
 		harvestKVs(preamble, kvs)
 		return preamble, kvs, "", nil
 	}
-	managedBody := rest[:endIdx]
-	postamble = rest[endIdx+len(managedEnd):]
 	harvestKVs(managedBody, kvs)
 	harvestKVs(preamble, kvs)
 	harvestKVs(postamble, kvs)
