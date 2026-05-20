@@ -595,6 +595,7 @@ services:
             metrics.service_name: caddy
             metrics.module_name: ${CADDY_MODULE_NAME}
             metrics.owned_by: ${CADDY_OWNED_BY}
+            mesh.exempt: "true" # transitional: caddy retires in Chunk 5; until then it parallel-ingresses w/ ingress-mesh
     cadvisor:
         image: gcr.io/cadvisor/cadvisor:v0.52.1
         container_name: cadvisor
@@ -665,6 +666,20 @@ services:
             metrics.service_name: dex
             metrics.module_name: ${AUTH_MODULE_NAME}
             metrics.owned_by: ${AUTH_OWNED_BY}
+    egress-mesh:
+        image: envoyproxy/envoy:v1.31-latest
+        restart: unless-stopped
+        volumes:
+            - ../.localmesh/secrets/egress-mesh:/run/egress-mesh:ro
+            - ../.localmesh/envoy/egress-mesh.yaml:/etc/envoy/envoy.yaml:ro
+        labels:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "15090"
+            prometheus.io/path: "/stats/prometheus"
+            metrics.service_name: envoy
+            metrics.module_name: mesh
+            metrics.owned_by: sre@example.com
+            mesh.role: egress
     grafana:
         image: grafana/grafana:12.4.3
         container_name: grafana
@@ -722,6 +737,31 @@ services:
         depends_on:
             victoriametrics:
                 condition: service_started
+    ingress-mesh:
+        image: envoyproxy/envoy:v1.31-latest
+        restart: unless-stopped
+        ports:
+            - "8443:8443"
+        volumes:
+            - ../.localmesh/secrets/ingress-mesh:/run/ingress-mesh:ro
+            - ../.localmesh/envoy/ingress-mesh.yaml:/etc/envoy/envoy.yaml:ro
+        environment:
+            OIDC_CLIENT_ID: ${LOCALMESH_OIDC_CLIENT_ID}
+            OIDC_CLIENT_SECRET: ${LOCALMESH_OIDC_CLIENT_SECRET}
+            DEX_ISSUER: http://dex:5556
+            DEX_JWKS_URI: http://dex:5556/keys
+            OAUTH2_HMAC_SECRET: ${LOCALMESH_OIDC_CLIENT_SECRET}
+        depends_on:
+            dex:
+                condition: service_healthy
+        labels:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "15090"
+            prometheus.io/path: "/stats/prometheus"
+            metrics.service_name: envoy
+            metrics.module_name: mesh
+            metrics.owned_by: sre@example.com
+            mesh.role: ingress
     loki:
         image: grafana/loki:3.3.2
         container_name: loki
@@ -989,6 +1029,99 @@ services:
             metrics.service_name: postgres
             metrics.module_name: database
             metrics.owned_by: sre@example.com
+    postgres-exporter-mesh:
+        image: envoyproxy/envoy:v1.31-latest
+        network_mode: "service:postgres-exporter"
+        restart: unless-stopped
+        volumes:
+            - ../.localmesh/secrets/postgres-exporter:/run/postgres-exporter:ro
+            - ../.localmesh/envoy/postgres-exporter-mesh.yaml:/etc/envoy/envoy.yaml:ro
+        depends_on:
+            postgres-exporter-mesh-init:
+                condition: service_completed_successfully
+            postgres-exporter:
+                condition: service_started
+        labels:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "15090"
+            prometheus.io/path: "/stats/prometheus"
+            metrics.service_name: envoy
+            metrics.module_name: mesh
+            metrics.owned_by: sre@example.com
+            mesh.role: sidecar
+    postgres-exporter-mesh-init:
+        image: busybox:1.37
+        network_mode: "service:postgres-exporter"
+        cap_add: ["NET_ADMIN"]
+        volumes:
+            - ../.localmesh/envoy/postgres-exporter-mesh-init.sh:/init.sh:ro
+        command: ["/init.sh"]
+        restart: "no"
+        depends_on:
+            postgres-exporter:
+                condition: service_started
+    postgres-mesh:
+        image: envoyproxy/envoy:v1.31-latest
+        network_mode: "service:postgres"
+        restart: unless-stopped
+        volumes:
+            - ../.localmesh/secrets/postgres:/run/postgres:ro
+            - ../.localmesh/envoy/postgres-mesh.yaml:/etc/envoy/envoy.yaml:ro
+        depends_on:
+            postgres-mesh-init:
+                condition: service_completed_successfully
+            postgres:
+                condition: service_started
+        labels:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "15090"
+            prometheus.io/path: "/stats/prometheus"
+            metrics.service_name: envoy
+            metrics.module_name: mesh
+            metrics.owned_by: sre@example.com
+            mesh.role: sidecar
+    postgres-mesh-init:
+        image: busybox:1.37
+        network_mode: "service:postgres"
+        cap_add: ["NET_ADMIN"]
+        volumes:
+            - ../.localmesh/envoy/postgres-mesh-init.sh:/init.sh:ro
+        command: ["/init.sh"]
+        restart: "no"
+        depends_on:
+            postgres:
+                condition: service_started
+    server-mesh:
+        image: envoyproxy/envoy:v1.31-latest
+        network_mode: "service:server"
+        restart: unless-stopped
+        volumes:
+            - ../.localmesh/secrets/server:/run/server:ro
+            - ../.localmesh/envoy/server-mesh.yaml:/etc/envoy/envoy.yaml:ro
+        depends_on:
+            server-mesh-init:
+                condition: service_completed_successfully
+            server:
+                condition: service_started
+        labels:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "15090"
+            prometheus.io/path: "/stats/prometheus"
+            metrics.service_name: envoy
+            metrics.module_name: mesh
+            metrics.owned_by: sre@example.com
+            mesh.role: sidecar
+    server-mesh-init:
+        image: busybox:1.37
+        network_mode: "service:server"
+        cap_add: ["NET_ADMIN"]
+        volumes:
+            - ../.localmesh/envoy/server-mesh-init.sh:/init.sh:ro
+        command: ["/init.sh"]
+        restart: "no"
+        depends_on:
+            server:
+                condition: service_started
     tempo:
         image: grafana/tempo:2.10.5
         container_name: tempo
@@ -1046,6 +1179,37 @@ services:
             metrics.owned_by: sre@example.com
         # No healthcheck: VM image is FROM scratch — no wget/curl/shell.
         # Reviewer-debug: `curl http://localhost:8428/health` from host.
+    www-mesh:
+        image: envoyproxy/envoy:v1.31-latest
+        network_mode: "service:www"
+        restart: unless-stopped
+        volumes:
+            - ../.localmesh/secrets/www:/run/www:ro
+            - ../.localmesh/envoy/www-mesh.yaml:/etc/envoy/envoy.yaml:ro
+        depends_on:
+            www-mesh-init:
+                condition: service_completed_successfully
+            www:
+                condition: service_started
+        labels:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "15090"
+            prometheus.io/path: "/stats/prometheus"
+            metrics.service_name: envoy
+            metrics.module_name: mesh
+            metrics.owned_by: sre@example.com
+            mesh.role: sidecar
+    www-mesh-init:
+        image: busybox:1.37
+        network_mode: "service:www"
+        cap_add: ["NET_ADMIN"]
+        volumes:
+            - ../.localmesh/envoy/www-mesh-init.sh:/init.sh:ro
+        command: ["/init.sh"]
+        restart: "no"
+        depends_on:
+            www:
+                condition: service_started
 volumes:
     vm-data: {}
     grafana-data: {}

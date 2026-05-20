@@ -1,7 +1,14 @@
 package mesh
 
 import (
+	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"text/template"
+
+	sprig "github.com/Masterminds/sprig/v3"
 
 	"github.com/stevenallen05/localmesh/internal/manifest"
 )
@@ -155,13 +162,92 @@ func meshClusterName(container string, compose ComposeAggregate) string {
 	return container + "-mesh"
 }
 
-// RenderAll is wired in Chunk 2. For now: no-op success so build can call it.
-func RenderAll(proj *manifest.Project, plugins []*manifest.Plugin, compose ComposeAggregate, outputDir string) error {
-	_, err := BuildContexts(proj, plugins, compose)
+// RenderAll renders the ingress, egress, and per-workload sidecar envoy
+// YAML configs into outputDir (typically .localmesh/envoy/). Also emits a
+// shell script per workload at <outputDir>/<container>-mesh-init.sh that
+// the iptables-init container runs.
+//
+// templatesDir points at the mesh plugin's templates/ directory (typically
+// service_catalog/mesh/templates).
+func RenderAll(proj *manifest.Project, plugins []*manifest.Plugin, compose ComposeAggregate, outputDir, templatesDir string) error {
+	ctxs, err := BuildContexts(proj, plugins, compose)
 	if err != nil {
 		return err
 	}
-	// Template rendering arrives in Chunk 2.
-	_ = outputDir
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		return fmt.Errorf("mkdir %s: %w", outputDir, err)
+	}
+	helperPath := filepath.Join(templatesDir, "_helpers.tmpl")
+	helperData, err := os.ReadFile(helperPath)
+	if err != nil {
+		return fmt.Errorf("read helpers: %w", err)
+	}
+	render := func(mainTmpl string, data any, outPath string, mode os.FileMode) error {
+		mainData, err := os.ReadFile(filepath.Join(templatesDir, mainTmpl))
+		if err != nil {
+			return fmt.Errorf("read %s: %w", mainTmpl, err)
+		}
+		// Pre-create template so we can register `include` against this
+		// instance. Helm's `include` runs a named template and returns the
+		// output as a string — the canonical workaround for text/template's
+		// built-in `template` not being usable in pipelines.
+		var tmpl *template.Template
+		include := func(name string, data any) (string, error) {
+			var buf bytes.Buffer
+			if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
+				return "", err
+			}
+			return buf.String(), nil
+		}
+		tmpl = template.New(mainTmpl).
+			Funcs(sprig.TxtFuncMap()).
+			Funcs(template.FuncMap{"include": include}).
+			Option("missingkey=error")
+		if _, err := tmpl.Parse(string(helperData)); err != nil {
+			return fmt.Errorf("parse helpers: %w", err)
+		}
+		if _, err := tmpl.Parse(string(mainData)); err != nil {
+			return fmt.Errorf("parse %s: %w", mainTmpl, err)
+		}
+		var buf bytes.Buffer
+		if err := tmpl.Execute(&buf, data); err != nil {
+			return fmt.Errorf("execute %s: %w", mainTmpl, err)
+		}
+		if err := os.WriteFile(outPath, buf.Bytes(), mode); err != nil {
+			return fmt.Errorf("write %s: %w", outPath, err)
+		}
+		return nil
+	}
+	if err := render("ingress-gateway.envoy.yaml.gotmpl", ctxs.Ingress, filepath.Join(outputDir, "ingress-mesh.yaml"), 0o644); err != nil {
+		return err
+	}
+	if err := render("egress-gateway.envoy.yaml.gotmpl", ctxs.Egress, filepath.Join(outputDir, "egress-mesh.yaml"), 0o644); err != nil {
+		return err
+	}
+	// Sorted iteration for deterministic write order (also keeps goldens stable).
+	names := make([]string, 0, len(ctxs.Sidecars))
+	for n := range ctxs.Sidecars {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		sidecar := ctxs.Sidecars[name]
+		if err := render("workload-sidecar.envoy.yaml.gotmpl", sidecar, filepath.Join(outputDir, name+"-mesh.yaml"), 0o644); err != nil {
+			return err
+		}
+		script, err := RenderIptables(IptablesContext{
+			Container:     name,
+			InboundPort:   sidecar.InboundPort,
+			Outbounds:     sidecar.Outbounds,
+			EnvoyInbound:  sidecar.EnvoyInbound,
+			EnvoyOutbound: sidecar.EnvoyOutbound,
+		})
+		if err != nil {
+			return fmt.Errorf("iptables %s: %w", name, err)
+		}
+		if err := os.WriteFile(filepath.Join(outputDir, name+"-mesh-init.sh"), []byte(script), 0o755); err != nil {
+			return fmt.Errorf("write iptables script for %s: %w", name, err)
+		}
+	}
 	return nil
 }

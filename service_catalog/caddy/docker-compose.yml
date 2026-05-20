@@ -56,3 +56,4 @@ services:
       metrics.service_name: caddy
       metrics.module_name: ${CADDY_MODULE_NAME}
       metrics.owned_by: ${CADDY_OWNED_BY}
+      mesh.exempt: "true"   # transitional: caddy retires in Chunk 5; until then it parallel-ingresses w/ ingress-mesh

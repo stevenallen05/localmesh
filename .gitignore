@@ -26,6 +26,8 @@ docs/superpowers
 
 # localmesh generated artifacts
 .localmesh/secrets/
+.localmesh/envoy/
+.localmesh/dex.yaml
 
 # But: reproducible-build compose output ships with the repo
 !.localmesh/localmesh.compose.yaml
