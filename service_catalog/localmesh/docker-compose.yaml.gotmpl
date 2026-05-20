@@ -22,10 +22,12 @@ services:
     image: docker.io/kumahq/kuma-dp:2.9.0
     command:
       - run
-      - --cp-address=grpc://kuma-cp:5678
+      - --cp-address=https://kuma-cp:5678
+      - --ca-cert-file=/certs/rootCA.pem
       - --dataplane-file=/bootstrap/ingress.dataplane.yaml
     volumes:
       - ./bootstrap/ingress.dataplane.yaml:/bootstrap/ingress.dataplane.yaml:ro
+      - ../../.localmesh/secrets/root_ca/rootCA.pem:/certs/rootCA.pem:ro
     depends_on:
       - kuma-cp
     expose:
@@ -34,10 +36,12 @@ services:
     image: docker.io/kumahq/kuma-dp:2.9.0
     command:
       - run
-      - --cp-address=grpc://kuma-cp:5678
+      - --cp-address=https://kuma-cp:5678
+      - --ca-cert-file=/certs/rootCA.pem
       - --dataplane-file=/bootstrap/egress.dataplane.yaml
     volumes:
       - ./bootstrap/egress.dataplane.yaml:/bootstrap/egress.dataplane.yaml:ro
+      - ../../.localmesh/secrets/root_ca/rootCA.pem:/certs/rootCA.pem:ro
     depends_on:
       - kuma-cp
     expose:
