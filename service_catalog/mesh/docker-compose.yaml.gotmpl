@@ -21,6 +21,13 @@ secrets:
     file: ../../.localmesh/secrets/ingress-mesh/id.key
   ingress-mesh_trust_ca:
     file: ../../.localmesh/secrets/ingress-mesh/trust.ca.crt
+  # SDS-shaped GenericSecret documents the envoy oauth2 filter reads via
+  # path_config_source. See Makefile oauth2-secrets target. File-based SDS
+  # sidesteps the v1.31 static_resources.secrets duplicate-name trap.
+  ingress-mesh_oauth2_client_secret:
+    file: ../../.localmesh/secrets/ingress-mesh/oauth2-client-secret.yaml
+  ingress-mesh_oauth2_hmac:
+    file: ../../.localmesh/secrets/ingress-mesh/oauth2-hmac.yaml
   egress-mesh_id_crt:
     file: ../../.localmesh/secrets/egress-mesh/id.crt
   egress-mesh_id_key:
@@ -55,14 +62,14 @@ services:
       - source: ingress-mesh_trust_ca
         target: /run/ingress-mesh/trust.ca.crt
         mode: 0444
+      - source: ingress-mesh_oauth2_client_secret
+        target: /run/ingress-mesh/oauth2-client-secret.yaml
+        mode: 0440
+      - source: ingress-mesh_oauth2_hmac
+        target: /run/ingress-mesh/oauth2-hmac.yaml
+        mode: 0440
     volumes:
       - ../../.localmesh/envoy/ingress-mesh.yaml:/etc/envoy/envoy.yaml:ro
-    environment:
-      OIDC_CLIENT_ID:     ${LOCALMESH_OIDC_CLIENT_ID}
-      OIDC_CLIENT_SECRET: ${LOCALMESH_OIDC_CLIENT_SECRET}
-      DEX_ISSUER:         http://dex:5556
-      DEX_JWKS_URI:       http://dex:5556/keys
-      OAUTH2_HMAC_SECRET: ${LOCALMESH_OIDC_CLIENT_SECRET}
     depends_on:
       dex:
         condition: service_healthy

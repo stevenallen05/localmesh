@@ -644,18 +644,18 @@ services:
         command:
             - dex
             - serve
-            - /etc/dex.yaml.generated
+            - /etc/dex/config.yaml
         environment:
             PROJECT_NAME: ${PROJECT_NAME}
             LOCAL_DOMAIN: ${LOCAL_DOMAIN}
             LOCALMESH_OIDC_CLIENT_SECRET: ${LOCALMESH_OIDC_CLIENT_SECRET}
         volumes:
-            # Only the merged file goes to dex; dex.yaml is read by secrets-gen.py
-            # as source, then merged with the per-user mockCallback connectors
-            # into dex.yaml.generated (dex's CLI accepts only one config file).
-            - ../service_catalog/auth/dex.yaml.generated:/etc/dex.yaml.generated:ro
+            # Dev-owned. Bootstrapped from dex.yaml.sample by `make certs`.
+            # Path is relative to this file (service_catalog/auth/); .localmesh/
+            # lives at the repo root.
+            - ../.localmesh/dex.yaml:/etc/dex/config.yaml:ro
         healthcheck:
-            test: ["CMD", "wget", "-qO-", "http://localhost:5556/dex/healthz"]
+            test: ["CMD", "wget", "-qO-", "http://localhost:5556/healthz"]
             interval: 10s
             timeout: 3s
             retries: 5
@@ -766,14 +766,14 @@ services:
             - source: ingress-mesh_trust_ca
               target: /run/ingress-mesh/trust.ca.crt
               mode: 0444
+            - source: ingress-mesh_oauth2_client_secret
+              target: /run/ingress-mesh/oauth2-client-secret.yaml
+              mode: 0440
+            - source: ingress-mesh_oauth2_hmac
+              target: /run/ingress-mesh/oauth2-hmac.yaml
+              mode: 0440
         volumes:
             - ../.localmesh/envoy/ingress-mesh.yaml:/etc/envoy/envoy.yaml:ro
-        environment:
-            OIDC_CLIENT_ID: ${LOCALMESH_OIDC_CLIENT_ID}
-            OIDC_CLIENT_SECRET: ${LOCALMESH_OIDC_CLIENT_SECRET}
-            DEX_ISSUER: http://dex:5556
-            DEX_JWKS_URI: http://dex:5556/keys
-            OAUTH2_HMAC_SECRET: ${LOCALMESH_OIDC_CLIENT_SECRET}
         depends_on:
             dex:
                 condition: service_healthy
@@ -831,62 +831,6 @@ services:
             metrics.service_name: observability
             metrics.module_name: observability
             metrics.owned_by: sre@example.com
-    oauth2-proxy:
-        image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
-        container_name: oauth2-proxy
-        restart: unless-stopped
-        environment:
-            # Every flag is exposed as an OAUTH2_PROXY_<UPPER_SNAKECASE>; env
-            # vars beat config-file values for shell-interpolated fields.
-            OAUTH2_PROXY_PROVIDER: "oidc"
-            OAUTH2_PROXY_OIDC_ISSUER_URL: "https://dex.${PROJECT_NAME}.${LOCAL_DOMAIN}:8443/dex"
-            OAUTH2_PROXY_CLIENT_ID: "localmesh-dev"
-            OAUTH2_PROXY_CLIENT_SECRET: "${LOCALMESH_OIDC_CLIENT_SECRET}"
-            OAUTH2_PROXY_REDIRECT_URL: "https://www.${PROJECT_NAME}.${LOCAL_DOMAIN}:8443/oauth2/callback"
-            OAUTH2_PROXY_COOKIE_SECRET: "${OAUTH2_PROXY_COOKIE_SECRET}"
-            OAUTH2_PROXY_COOKIE_DOMAINS: ".${PROJECT_NAME}.${LOCAL_DOMAIN}"
-            OAUTH2_PROXY_WHITELIST_DOMAINS: ".${PROJECT_NAME}.${LOCAL_DOMAIN}"
-            OAUTH2_PROXY_COOKIE_SECURE: "true"
-            OAUTH2_PROXY_EMAIL_DOMAINS: "*"
-            OAUTH2_PROXY_REVERSE_PROXY: "true"
-            OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER: "true"
-            OAUTH2_PROXY_SET_AUTHORIZATION_HEADER: "true"
-            OAUTH2_PROXY_PASS_ACCESS_TOKEN: "true"
-            OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
-            OAUTH2_PROXY_HTTP_ADDRESS: "0.0.0.0:4180"
-            # /ping endpoint enabled for the compose healthcheck (default is "").
-            OAUTH2_PROXY_PING_PATH: "/ping"
-            # forward_auth-only mode: never proxy real upstream traffic.
-            OAUTH2_PROXY_UPSTREAMS: "static://202"
-            # Split internal/external Dex endpoints — oauth2-proxy can't reach
-            # https://dex.${PROJECT_NAME}.${LOCAL_DOMAIN} from inside its container
-            # (lvh.me resolves to its own 127.0.0.1). Bypass OIDC discovery and
-            # configure endpoint URLs manually: LOGIN_URL stays browser-facing
-            # (302 target); REDEEM_URL + OIDC_JWKS_URL go via the internal docker
-            # hostname. SKIP_ISSUER_VERIFICATION covers the JWT iss mismatch.
-            OAUTH2_PROXY_SKIP_OIDC_DISCOVERY: "true"
-            OAUTH2_PROXY_LOGIN_URL: "https://dex.${PROJECT_NAME}.${LOCAL_DOMAIN}:8443/dex/auth"
-            OAUTH2_PROXY_REDEEM_URL: "http://dex:5556/dex/token"
-            OAUTH2_PROXY_OIDC_JWKS_URL: "http://dex:5556/dex/keys"
-            OAUTH2_PROXY_INSECURE_OIDC_SKIP_ISSUER_VERIFICATION: "true"
-            # Dev only: skip TLS verify on the OIDC browser-redirect hop.
-            # TODO: needs_prod_decisions trust real CA bundle in prod oauth2-proxy
-            OAUTH2_PROXY_SSL_INSECURE_SKIP_VERIFY: "true"
-        depends_on:
-            dex:
-                condition: service_healthy
-        healthcheck:
-            test: ["CMD", "wget", "-qO-", "http://localhost:4180/ping"]
-            interval: 10s
-            timeout: 3s
-            retries: 5
-        labels:
-            mesh.exempt: "true"
-            katenary.v3/ports: |-
-                - 4180
-            metrics.service_name: oauth2-proxy
-            metrics.module_name: ${AUTH_MODULE_NAME}
-            metrics.owned_by: ${AUTH_OWNED_BY}
     otel-collector:
         image: otel/opentelemetry-collector-contrib:0.152.0
         container_name: otel-collector
@@ -1248,6 +1192,13 @@ secrets:
         file: ../.localmesh/secrets/ingress-mesh/id.key
     ingress-mesh_trust_ca:
         file: ../.localmesh/secrets/ingress-mesh/trust.ca.crt
+    # SDS-shaped GenericSecret documents the envoy oauth2 filter reads via
+    # path_config_source. See Makefile oauth2-secrets target. File-based SDS
+    # sidesteps the v1.31 static_resources.secrets duplicate-name trap.
+    ingress-mesh_oauth2_client_secret:
+        file: ../.localmesh/secrets/ingress-mesh/oauth2-client-secret.yaml
+    ingress-mesh_oauth2_hmac:
+        file: ../.localmesh/secrets/ingress-mesh/oauth2-hmac.yaml
     egress-mesh_id_crt:
         file: ../.localmesh/secrets/egress-mesh/id.crt
     egress-mesh_id_key:

@@ -3,12 +3,6 @@ module_name = "auth"
 owned_by    = "sre@example.com"
 
 [[services]]
-container     = "oauth2-proxy"
-port          = 4180
-scheme        = "http"
-requires_auth = false           # IS the auth decider; can't gate itself
-
-[[services]]
 container          = "dex"
 port               = 5556
 scheme             = "http"

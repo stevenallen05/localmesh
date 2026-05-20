@@ -39,4 +39,3 @@ service_catalog/caddy/Caddyfile.generated
 __pycache__/
 *.pyc
 .pytest_cache/
-service_catalog/auth/dex.yaml.generated
