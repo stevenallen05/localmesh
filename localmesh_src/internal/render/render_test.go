@@ -14,7 +14,7 @@ func TestRun_sampleCatalog(t *testing.T) {
 	tmp := t.TempDir()
 	out := filepath.Join(tmp, "localmesh.compose.yaml")
 	root := filepath.Join("..", "..", "testdata", "sample_catalog")
-	if err := Run(root, out); err != nil {
+	if err := Run(filepath.Join(root, "project.toml"), root, out); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	got, err := os.ReadFile(out)
@@ -44,11 +44,11 @@ func TestRun_idempotent(t *testing.T) {
 	tmp := t.TempDir()
 	out := filepath.Join(tmp, "localmesh.compose.yaml")
 	root := filepath.Join("..", "..", "testdata", "sample_catalog")
-	if err := Run(root, out); err != nil {
+	if err := Run(filepath.Join(root, "project.toml"), root, out); err != nil {
 		t.Fatal(err)
 	}
 	first, _ := os.ReadFile(out)
-	if err := Run(root, out); err != nil {
+	if err := Run(filepath.Join(root, "project.toml"), root, out); err != nil {
 		t.Fatal(err)
 	}
 	second, _ := os.ReadFile(out)

@@ -1,8 +1,8 @@
 # Begin ops team responsibility
 
-.PHONY: setup chart chart-lint certs trust-ca untrust-ca caddy-image demo-auth
+.PHONY: setup chart chart-lint certs build trust-ca untrust-ca caddy-image demo-auth
 
-CERTS_DIR       := .secrets/certs
+CERTS_DIR       := .localmesh/secrets
 
 # TODO: standardize how contributors install pipx; pending prod infra & provider choices.
 setup:
@@ -26,29 +26,27 @@ chart:
 chart-lint:
 	./tools/helm-v4.1.4-linux-amd64 lint chart
 
-# LocalMesh dev-machine bootstrap. One button: untrust the old CA, blow
-# away .secrets/certs/, regenerate everything via scripts/secrets-gen.py
-# (CA + per-service leaf certs + .env managed section + Caddyfile.generated
-# + dex.yaml.generated), then install the new CA into the host trust store.
-# Always clean-slate; granular subtargets are out of scope for this phase.
-#
-# See docs/superpowers/specs/2026-05-18-localmesh-service-mesh-design.md §7.
+# Bootstrap the LocalMesh dev environment.
+# Chains: Go CLI (CA + leaves + compose) -> Python (env + Caddy + dex).
+# TODO: needs_prod_decisions port Caddyfile + dex.yaml generators to Go CLI
+# TODO: needs_prod_decisions port .env writer to Go CLI
 certs: untrust-ca
-	@rm -rf $(CERTS_DIR)
+	@rm -rf .localmesh/secrets
+	@go run ./localmesh_src/cmd/localmesh ca mint --force
+	@go run ./localmesh_src/cmd/localmesh ca install
+	@go run ./localmesh_src/cmd/localmesh mtls mint
+	@go run ./localmesh_src/cmd/localmesh build
 	@./scripts/secrets-gen.py
-	@$(MAKE) trust-ca
 
-# Install the LocalMesh CA into the host trust store so browsers / curl /
-# libraries verify cleanly. Idempotent. Run standalone after a fresh clone
-# (with an existing .secrets/certs/ca.crt) or to re-trust without regen.
+# Fast inner loop: re-render compose without touching certs.
+build:
+	@go run ./localmesh_src/cmd/localmesh build
+
 trust-ca:
-	@./tools/step certificate install $(CERTS_DIR)/ca.crt
+	@go run ./localmesh_src/cmd/localmesh ca install
 
-# Remove the LocalMesh CA from the host trust store. Silent if not present
-# so this is safe to chain from `certs` on first run. Useful standalone
-# when uninstalling the project.
 untrust-ca:
-	@./tools/step certificate uninstall $(CERTS_DIR)/ca.crt 2>/dev/null || true
+	@go run ./localmesh_src/cmd/localmesh ca uninstall || true
 
 caddy-image:
 	docker build -t localmesh/caddy:dev service_catalog/caddy/

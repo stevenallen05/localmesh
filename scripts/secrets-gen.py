@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
-"""LocalMesh secrets bootstrap.
+"""LocalMesh transitional helper — env + Caddyfile + dex.yaml generation.
+
+Cert minting (CA + leaves) + trust-store install moved to the Go CLI
+at ./localmesh_src/cmd/localmesh/. This script handles only the
+artifacts not yet ported.
+
+TODO: needs_prod_decisions port Caddyfile + dex.yaml generators to Go CLI
+TODO: needs_prod_decisions port .env writer to Go CLI
 
 Reads `project.toml` (repo root) and every `service_catalog/*/plugin.toml`,
 then:
 
-  1. Mints the LocalMesh CA at `.secrets/certs/ca.{crt,key}` (one-shot).
-  2. Mints a bidirectional leaf cert per declared service at
-     `.secrets/certs/<container>/{trust.ca.crt, id.crt, id.key}` — skipped
-     for services carrying `mesh.exempt: "true"` on their compose labels.
-  3. Writes `.env` with UPCASE_SNAKECASE versions of every TOML key (in a
+  1. Writes `.env` with UPCASE_SNAKECASE versions of every TOML key (in a
      managed section between `# >>> secrets-gen managed` markers).
-  4. Generates `service_catalog/caddy/Caddyfile.generated` with one site
+  2. Generates `service_catalog/caddy/Caddyfile.generated` with one site
      block per service that has `expose_via_ingress = true` — mTLS upstream
      for mesh-participating services, plaintext for mesh-exempt ones.
+  3. Generates `service_catalog/auth/dex.yaml.generated` (base + one
+     staticPasswords entry per dev user).
 
 Mesh-exempt status is the compose label `mesh.exempt: "true"` declared
 in each plugin's `docker-compose.yml`, not a TOML field. This script
@@ -20,10 +25,6 @@ parses each plugin's compose to derive the exempt set.
 
 See docs/superpowers/specs/2026-05-18-localmesh-service-mesh-design.md.
 
-TODO: needs_prod_decisions IP SAN list is over-permissive for dev convenience.
-TODO: needs_prod_decisions SPIFFE URI shape — flat (`spiffe://<svc>.<proj>.<dom>`)
-       is dev-only; prod uses canonical `spiffe://<trust-domain>/<workload-path>`.
-TODO: needs_prod_decisions cert lifespan — 10y dev; prod uses SVID rotation.
 TODO: needs_prod_decisions managed-section `.env` is the bridge — proper
        compose extension or build-step overlay replaces it later.
 """
@@ -32,7 +33,6 @@ from __future__ import annotations
 import os
 import pathlib
 import secrets as _secrets
-import subprocess
 import sys
 import tomllib
 
@@ -42,17 +42,8 @@ REPO = pathlib.Path(os.environ.get("REPO_ROOT", ".")).resolve()
 PROJECT_TOML = REPO / "project.toml"
 CATALOG = REPO / "service_catalog"
 SECRETS = REPO / ".secrets"
-CERTS = SECRETS / "certs"
 ENV_FILE = REPO / ".env"
 CADDYFILE = CATALOG / "caddy" / "Caddyfile.generated"
-STEP = str(REPO / "tools" / "step")
-
-# Over-permissive for dev. See TODO above.
-IP_SANS = [
-    "127.0.0.1", "::1", "0.0.0.0",
-    "10.0.0.1", "172.17.0.1", "172.18.0.1", "172.19.0.1", "172.20.0.1",
-    "192.168.65.1", "192.168.1.1",
-]
 
 MANAGED_START = "# >>> secrets-gen managed — do not edit; regenerated on `make certs`"
 MANAGED_END = "# <<< secrets-gen managed"
@@ -119,90 +110,6 @@ def services_iter(project: dict, plugins: list[tuple[str, dict]]):
                 slug,
                 svc.get("requires_auth", True),
             )
-
-
-# ---------------------------------------------------------------------------
-# Cert generation
-
-def san_list_for(container: str, project_name: str, local_domain: str, is_ingress: bool) -> list[str]:
-    """Bare SAN values — step CLI autodetects type from value shape.
-
-    URIs are detected by the presence of `://`; IPs by valid IP parse;
-    everything else is treated as a DNS name. So we pass values raw,
-    without `URI:`/`DNS:`/`IP:` prefixes.
-    """
-    sans = [
-        f"spiffe://{container}.{project_name}.{local_domain}",
-        container,
-        "localhost",
-        f"{container}.{project_name}.{local_domain}",
-        f"{project_name}.{local_domain}",
-    ]
-    if is_ingress:
-        sans.append(f"*.{project_name}.{local_domain}")
-    for ip in IP_SANS:
-        sans.append(ip)
-    return sans
-
-
-def ensure_ca():
-    CERTS.mkdir(parents=True, exist_ok=True)
-    if (CERTS / "ca.crt").exists():
-        return
-    subprocess.check_call([
-        STEP, "certificate", "create", "LocalMesh Root CA",
-        str(CERTS / "ca.crt"), str(CERTS / "ca.key"),
-        "--profile", "root-ca", "--not-after", "87600h",
-        "--insecure", "--no-password",
-    ])
-    os.chmod(CERTS / "ca.key", 0o600)
-
-
-def issue(container: str, project_name: str, local_domain: str, is_ingress: bool):
-    out = CERTS / container
-    out.mkdir(exist_ok=True)
-    (out / "trust.ca.crt").write_bytes((CERTS / "ca.crt").read_bytes())
-    crt, key = out / "id.crt", out / "id.key"
-    if crt.exists() and key.exists():
-        # Already issued — still ensure perms are container-readable. See
-        # the perm-rationale comment further down.
-        os.chmod(crt, 0o644)
-        os.chmod(key, 0o644)
-        return
-    san_args = sum(
-        [["--san", s] for s in san_list_for(container, project_name, local_domain, is_ingress)],
-        [],
-    )
-    subprocess.check_call([
-        STEP, "certificate", "create", container, str(crt), str(key),
-        "--profile", "leaf",
-        "--ca", str(CERTS / "ca.crt"),
-        "--ca-key", str(CERTS / "ca.key"),
-        *san_args,
-        "--not-after", "87600h",
-        "--insecure", "--no-password",
-    ])
-    # Dev convenience: cert + key are 0644 on the host so containers running
-    # under arbitrary uids can read them via bind-mount. Postgres demands
-    # 0600 on .key and rejects bind-mounted uid-1000 files outright; the
-    # database/ plugin's entrypoint wrapper copies them into the postgres-
-    # owned /etc/postgres-ssl/ at startup. Other consumers (rust sqlx, node
-    # @grpc/grpc-js, caddy) don't enforce perm checks.
-    #
-    # TODO: needs_prod_decisions tight key perms (0600 owned by the workload
-    # uid) once cert delivery is sidecar / SPIRE-managed instead of bind-mount.
-    os.chmod(crt, 0o644)
-    os.chmod(key, 0o644)
-
-
-def mint_certs(project: dict, plugins: list[tuple[str, dict]]):
-    ensure_ca()
-    pname = project["project_name"]
-    ldom = project["local_domain"]
-    for container, _port, _expose, exempt, ingress, _owner, _requires_auth in services_iter(project, plugins):
-        if exempt:
-            continue
-        issue(container, pname, ldom, ingress)
 
 
 # ---------------------------------------------------------------------------
@@ -498,11 +405,10 @@ def main():
         print(f"ERROR: {PROJECT_TOML} not found.", file=sys.stderr)
         sys.exit(1)
     project, plugins = load_manifests()
-    mint_certs(project, plugins)
     write_env(project, plugins)
     write_caddyfile(project, plugins)
     write_dex_connectors()
-    print("LocalMesh secrets: regenerated.")
+    print("LocalMesh env + Caddyfile + dex.yaml: regenerated.")
 
 
 if __name__ == "__main__":

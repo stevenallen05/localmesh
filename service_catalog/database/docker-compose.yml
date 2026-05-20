@@ -87,7 +87,7 @@ services:
       - ./initdb:/docker-entrypoint-initdb.d:ro
       - ./postgresql.conf:/etc/postgresql/postgresql.conf:ro
       - ./pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
-      - ../../.secrets/certs/postgres:/run/postgres:ro
+      - ../../.localmesh/secrets/postgres:/run/postgres:ro
     healthcheck:
       # Local unix-socket connection as `postgres` (no SSL needed). Verifies
       # the database is up; cert auth is exercised by the actual mTLS
@@ -134,7 +134,7 @@ services:
       # same name. Role was provisioned by initdb/00-roles.sql.
       DATA_SOURCE_NAME: "postgresql://postgres-exporter@postgres:5432/app?sslmode=verify-full&sslrootcert=/tmp/pgx-ssl/trust.ca.crt&sslcert=/tmp/pgx-ssl/id.crt&sslkey=/tmp/pgx-ssl/id.key"
     volumes:
-      - ../../.secrets/certs/postgres-exporter:/run/postgres-exporter:ro
+      - ../../.localmesh/secrets/postgres-exporter:/run/postgres-exporter:ro
     configs:
       - source: database_pgexporter_queries
         target: /etc/postgres-exporter/queries.yaml

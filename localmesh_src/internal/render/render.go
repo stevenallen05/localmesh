@@ -16,13 +16,15 @@ import (
 )
 
 // Run renders every plugin in catalogRoot and writes the merged output
-// to outputPath. Returns an error with context on the first failure.
-func Run(catalogRoot, outputPath string) error {
-	proj, plugins, err := manifest.LoadAll(catalogRoot)
+// to outputPath. projectFile is the path to project.toml. Returns an
+// error with context on the first failure.
+func Run(projectFile, catalogRoot, outputPath string) error {
+	proj, plugins, err := manifest.LoadAll(projectFile, catalogRoot)
 	if err != nil {
 		return err
 	}
 	env := envMap()
+	outputDir := filepath.Dir(outputPath)
 	rendered := make([]*yaml.Node, 0, len(plugins))
 	sources := make([]string, 0, len(plugins))
 	for _, p := range plugins {
@@ -36,6 +38,23 @@ func Run(catalogRoot, outputPath string) error {
 		if err := yaml.Unmarshal(body, &node); err != nil {
 			return fmt.Errorf("parse rendered %s: %w", composePath, err)
 		}
+		// Relative paths inside each plugin's compose are authored relative
+		// to that plugin's dir; rewrite them so they resolve from the merged
+		// output's dir instead. Both sides absolutized so filepath.Rel works
+		// even when callers pass relative paths.
+		absOut, err := filepath.Abs(outputDir)
+		if err != nil {
+			return fmt.Errorf("abs %s: %w", outputDir, err)
+		}
+		absPlugin, err := filepath.Abs(filepath.Dir(composePath))
+		if err != nil {
+			return fmt.Errorf("abs %s: %w", composePath, err)
+		}
+		relPrefix, err := filepath.Rel(absOut, absPlugin)
+		if err != nil {
+			return fmt.Errorf("rel path %s -> %s: %w", absOut, absPlugin, err)
+		}
+		RewriteRelativePaths(&node, relPrefix)
 		rendered = append(rendered, &node)
 		sources = append(sources, p.Name)
 	}
@@ -58,11 +77,19 @@ func Run(catalogRoot, outputPath string) error {
 }
 
 func pluginComposePath(catalogRoot, name string) string {
-	tmplPath := filepath.Join(catalogRoot, name, "docker-compose.yaml.gotmpl")
-	if _, err := os.Stat(tmplPath); err == nil {
-		return tmplPath
+	candidates := []string{
+		filepath.Join(catalogRoot, name, "docker-compose.yaml.gotmpl"),
+		filepath.Join(catalogRoot, name, "docker-compose.yml.gotmpl"),
+		filepath.Join(catalogRoot, name, "docker-compose.yaml"),
+		filepath.Join(catalogRoot, name, "docker-compose.yml"),
 	}
-	return filepath.Join(catalogRoot, name, "docker-compose.yaml")
+	for _, p := range candidates {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	// Return the last candidate — the read will fail with a clear error.
+	return candidates[len(candidates)-1]
 }
 
 func envMap() map[string]string {

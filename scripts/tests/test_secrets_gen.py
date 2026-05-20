@@ -1,9 +1,8 @@
 """Unit tests for secrets-gen.py.
 
-The cert-minting path needs a real `step` binary + a real filesystem, so
-those are exercised by the integration smoke (make certs). Tests here
-cover the pure logic — SAN assembly, env-var name conversion, env-file
-managed-section roundtrip, Caddyfile generation.
+Cert minting has moved to the Go CLI (./localmesh_src/cmd/localmesh/);
+tests here cover what remains in this script — env-var name conversion,
+env-file managed-section roundtrip, Caddyfile generation, dex.yaml merge.
 """
 import importlib.util
 import pathlib
@@ -38,26 +37,6 @@ def test_upcase_snake(tmp_path, monkeypatch):
     assert mod.upcase_snake("project_name") == "PROJECT_NAME"
     assert mod.upcase_snake("auth-shim") == "AUTH_SHIM"
     assert mod.upcase_snake("Postgres-Exporter") == "POSTGRES_EXPORTER"
-
-
-def test_san_list_includes_spiffe_dns_localhost_and_ips(tmp_path, monkeypatch):
-    mod = _load(monkeypatch, tmp_path)
-    sans = mod.san_list_for("server", "demo", "lvh.me", is_ingress=False)
-    # Bare values — step CLI autodetects URI / IP / DNS from value shape.
-    assert "spiffe://server.demo.lvh.me" in sans
-    assert "server" in sans
-    assert "localhost" in sans
-    assert "server.demo.lvh.me" in sans
-    assert "demo.lvh.me" in sans
-    assert "127.0.0.1" in sans
-    assert "::1" in sans
-    assert "*.demo.lvh.me" not in sans
-
-
-def test_san_list_for_ingress_adds_wildcard(tmp_path, monkeypatch):
-    mod = _load(monkeypatch, tmp_path)
-    sans = mod.san_list_for("caddy", "demo", "lvh.me", is_ingress=True)
-    assert "*.demo.lvh.me" in sans
 
 
 def test_env_lines_strict_upcase_snakecase(tmp_path, monkeypatch):

@@ -11,7 +11,7 @@ func newBuildCmd() *cobra.Command {
 		Use:   "build",
 		Short: "Render .localmesh/localmesh.compose.yaml from plugin templates",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return render.Run("service_catalog", ".localmesh/localmesh.compose.yaml")
+			return render.Run("project.toml", "service_catalog", ".localmesh/localmesh.compose.yaml")
 		},
 	}
 }

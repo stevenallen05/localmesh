@@ -26,7 +26,7 @@ func newMTLSMintCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			proj, plugins, err := manifest.LoadAll(filepath.Join(repoRoot, "service_catalog"))
+			proj, plugins, err := manifest.LoadAll(filepath.Join(repoRoot, "project.toml"), filepath.Join(repoRoot, "service_catalog"))
 			if err != nil {
 				return err
 			}
@@ -34,7 +34,7 @@ func newMTLSMintCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			containers := collectMeshContainers(plugins)
+			containers := collectMeshContainers(proj, plugins)
 			if err := minter.MintAll(containers); err != nil {
 				return err
 			}
@@ -44,12 +44,16 @@ func newMTLSMintCmd() *cobra.Command {
 	}
 }
 
-// collectMeshContainers returns every container declared across the loaded
-// plugins. Today's secrets-gen.py reads compose YAML for the mesh.exempt
-// carve-out; for v0 we mint for every service in plugin.toml [[services]].
+// collectMeshContainers returns every container declared in project.toml
+// [[services]] (app tier) plus every plugin.toml [[services]] entry.
+// secrets-gen.py reads compose YAML for the mesh.exempt carve-out; for v0
+// we mint for every declared service and let the workload ignore the mount.
 // TODO: needs_prod_decisions mesh.exempt enforcement once localmesh parses compose
-func collectMeshContainers(plugins []*manifest.Plugin) []string {
+func collectMeshContainers(proj *manifest.Project, plugins []*manifest.Plugin) []string {
 	out := []string{}
+	for _, s := range proj.Services {
+		out = append(out, s.Container)
+	}
 	for _, p := range plugins {
 		for _, s := range p.Services {
 			out = append(out, s.Container)

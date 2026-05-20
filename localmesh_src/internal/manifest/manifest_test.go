@@ -35,7 +35,7 @@ local_domain="lvh.me"`, nil},
 
 func TestLoadAll_sampleCatalog(t *testing.T) {
 	root := filepath.Join("..", "..", "testdata", "sample_catalog")
-	proj, plugins, err := LoadAll(root)
+	proj, plugins, err := LoadAll(filepath.Join(root, "project.toml"), root)
 	if err != nil {
 		t.Fatalf("LoadAll: %v", err)
 	}

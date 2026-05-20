@@ -35,7 +35,7 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./Caddyfile.generated:/etc/caddy/Caddyfile.generated:ro
-      - ../../.secrets/certs/caddy:/run/caddy:ro
+      - ../../.localmesh/secrets/caddy:/run/caddy:ro
     environment:
       PROJECT_NAME: ${PROJECT_NAME}
       LOCAL_DOMAIN: ${LOCAL_DOMAIN}

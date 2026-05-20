@@ -18,12 +18,13 @@ var ErrMalformed = errors.New("manifest malformed")
 
 // Project is the typed project.toml schema for templates.
 type Project struct {
-	Name        string   `toml:"project_name"`
-	Namespace   string   `toml:"project_namespace"`
-	TechLead    string   `toml:"tech_lead_email"`
-	LocalDomain string   `toml:"local_domain"`
-	Plugins     []string `toml:"plugins"`
-	// (services + compliance + legal + billing + vendors omitted —
+	Name        string    `toml:"project_name"`
+	Namespace   string    `toml:"project_namespace"`
+	TechLead    string    `toml:"tech_lead_email"`
+	LocalDomain string    `toml:"local_domain"`
+	Plugins     []string  `toml:"plugins"`
+	Services    []Service `toml:"services"` // app-tier services minted alongside plugins
+	// (compliance + legal + billing + vendors omitted —
 	// templates don't need them today; add when a use surfaces.)
 }
 
@@ -87,9 +88,12 @@ func LoadPlugin(catalogRoot, name string) (*Plugin, error) {
 	return &p, nil
 }
 
-// LoadAll loads project.toml + every plugin.toml listed in project.Plugins.
-func LoadAll(catalogRoot string) (*Project, []*Plugin, error) {
-	proj, err := LoadProject(filepath.Join(catalogRoot, "project.toml"))
+// LoadAll loads project.toml from projectFile + every plugin.toml listed
+// in project.Plugins, resolved relative to catalogRoot. In the real repo
+// project.toml lives at the repo root and plugins under service_catalog/;
+// in test fixtures both live in the same directory.
+func LoadAll(projectFile, catalogRoot string) (*Project, []*Plugin, error) {
+	proj, err := LoadProject(projectFile)
 	if err != nil {
 		return nil, nil, err
 	}

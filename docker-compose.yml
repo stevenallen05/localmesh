@@ -4,8 +4,7 @@
 name: ${PROJECT_NAME}
 
 include:
-  - path: service_catalog/required.compose.yaml
-  - path: service_catalog/optional.compose.yaml
+  - path: .localmesh/localmesh.compose.yaml
 
 services:
   server:
@@ -41,7 +40,7 @@ services:
       # outbound postgres mTLS (sqlx reads sslcert/sslkey via DATABASE_URL).
       # Inbound gRPC mTLS now lives in the server-inbound sidecar; that
       # service mounts the same dir for ghostunnel.
-      - ./.secrets/certs/server:/run/server:ro
+      - ./.localmesh/secrets/server:/run/server:ro
     depends_on:
       otel-collector:
         condition: service_started
@@ -149,7 +148,7 @@ services:
       # `server:9090` because the sidecar shares server's netns.
       - --status=127.0.0.1:9090
     volumes:
-      - ./.secrets/certs/server:/run/server:ro
+      - ./.localmesh/secrets/server:/run/server:ro
     depends_on:
       server:
         condition: service_started
@@ -182,7 +181,7 @@ services:
       - --allow-uri=spiffe://caddy.${PROJECT_NAME}.${LOCAL_DOMAIN}
       - --status=127.0.0.1:9090
     volumes:
-      - ./.secrets/certs/www:/run/www:ro
+      - ./.localmesh/secrets/www:/run/www:ro
     depends_on:
       www:
         condition: service_started
@@ -210,7 +209,7 @@ services:
       - --verify-uri=spiffe://server.${PROJECT_NAME}.${LOCAL_DOMAIN}
       - --status=127.0.0.1:9091
     volumes:
-      - ./.secrets/certs/www:/run/www:ro
+      - ./.localmesh/secrets/www:/run/www:ro
     depends_on:
       www:
         condition: service_started
