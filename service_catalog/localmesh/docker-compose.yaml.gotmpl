@@ -13,3 +13,15 @@ services:
     expose:
       - "5678"
       - "5681"
+  ingress:
+    image: docker.io/kumahq/kuma-dp:2.9.0
+    command:
+      - run
+      - --cp-address=grpc://kuma-cp:5678
+      - --dataplane-file=/bootstrap/ingress.dataplane.yaml
+    volumes:
+      - ./bootstrap/ingress.dataplane.yaml:/bootstrap/ingress.dataplane.yaml:ro
+    depends_on:
+      - kuma-cp
+    expose:
+      - "8443"
