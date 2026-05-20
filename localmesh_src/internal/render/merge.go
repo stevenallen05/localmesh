@@ -53,8 +53,7 @@ func mergeMapping(dst, src *yaml.Node, dstSrc, srcSrc, path string) error {
 	}
 	for i := 0; i < len(src.Content); i += 2 {
 		k, v := src.Content[i], src.Content[i+1]
-		dk, dv := findKey(dst, k.Value)
-		_ = dk
+		_, dv := findKey(dst, k.Value)
 		if dv == nil {
 			dst.Content = append(dst.Content, k, v)
 			continue
