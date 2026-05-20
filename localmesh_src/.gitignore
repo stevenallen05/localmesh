@@ -1,4 +1,5 @@
 bin/
+/localmesh
 *.test
 *.out
 .golangci-cache/
