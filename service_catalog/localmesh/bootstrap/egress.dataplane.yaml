@@ -2,7 +2,7 @@ type: Dataplane
 mesh: default
 name: egress
 networking:
-  address: 0.0.0.0
+  address: egress
   inbound:
     - port: 15001
       tags:
