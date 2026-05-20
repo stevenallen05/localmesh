@@ -115,7 +115,7 @@ context-dependent.
   prod uses short-lived SPIRE-issued SVIDs (~1h) with automatic
   rotation. Whichever cert-delivery mechanism prod picks (cert-manager
   vs SPIRE Workload API vs Vault PKI) sets the rotation cadence.
-- **CA key handling.** Dev's `.secrets/certs/ca.key` lives on the host
+- **CA key handling.** Dev's `.localmesh/secrets/root_ca/rootCA-key.pem` lives on the host
   filesystem. Prod never has CA key in any workload pod; it's locked in
   the chosen issuer (SPIRE / Vault / cert-manager backend).
 - **Strict EKU per role.** `plugin.toml`'s `[[certs]]` entries don't carry

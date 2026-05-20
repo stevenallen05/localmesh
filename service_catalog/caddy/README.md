@@ -23,7 +23,7 @@ For workloads that expose a port via the ingress and aren't mesh-exempt:
 
 ```yaml
 volumes:
-  - ./.secrets/certs/<container>:/run/<container>:ro
+  - ./.localmesh/secrets/<container>:/run/<container>:ro
 ```
 
 The directory contains `trust.ca.crt`, `id.crt`, `id.key`. Consumer code loads `id.crt`/`id.key` for its TLS listener and trusts `trust.ca.crt` for verifying inbound peer certs.
@@ -61,7 +61,7 @@ services:
   www:
     image: …
     volumes:
-      - ./.secrets/certs/www:/run/www:ro
+      - ./.localmesh/secrets/www:/run/www:ro
     environment:
       WWW_PORT: ${WWW_PORT}              # picked up by https.createServer
     healthcheck:
