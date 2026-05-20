@@ -2,7 +2,7 @@
 
 > **LocalMesh** is a deployment pattern I designed for this take-home and am bootstrapping through a small Rust + Next.js metrics service.
 
-The take-home asked for a metrics monitoring system. The artifact here is two things at once: the metrics service itself, and the early shape of LocalMesh — the pattern I built the service inside of. The top-level `docker-compose.yml` `include:`s a few LocalMesh plugins from a stub catalogue: observability, logging, mesh (envoy ingress + per-workload sidecar + egress), auth (dex IdP) — required — plus database — optional. The helm chart is generated from compose, not hand-maintained. Everything past this point describes LocalMesh as the pattern intends to work; the repo is the first implementation against it.
+The take-home asked for a metrics monitoring system. The artifact here is two things at once: the metrics service itself, and the early shape of LocalMesh — the pattern I built the service inside of. The top-level `docker-compose.yml` `include:`s a few LocalMesh plugins from a stub catalogue: observability, logging, auth (dex IdP) — required — plus database — optional. The helm chart is generated from compose, not hand-maintained. Everything past this point describes LocalMesh as the pattern intends to work; the repo is the first implementation against it.
 
 ## TL;DR
 
