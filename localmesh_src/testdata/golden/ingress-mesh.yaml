@@ -112,13 +112,14 @@ static_resources:
                 # :authority that covers every opt-out host. Per-VH
                 # typed_per_filter_config doesn't disable oauth2 in
                 # v1.31 — pass_through is the supported escape hatch.
-                # TODO: needs_prod_decisions grafana joins the dance once
-                # cross-subdomain cookie shape lands in Chunk 7.
+                # TODO: needs_prod_decisions grafana auth via envoy in prod
+                # — dev grafana is browsed openly via requires_auth=false on
+                # observability/plugin.toml's grafana service.
                 pass_through_matcher:
                 - name: ":authority"
                   string_match:
                     safe_regex:
-                      regex: "^(dex|envoy)\\.[^:]+(:[0-9]+)?$"
+                      regex: "^(dex|envoy|grafana)\\.[^:]+(:[0-9]+)?$"
           # jwt_authn validates the dex-minted bearer on every subsequent
           # request and projects claims into x-user-* headers. Per-VH
           # disable on RequiresAuth=false hosts keeps the IdP/grafana
