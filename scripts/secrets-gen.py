@@ -329,9 +329,10 @@ def main():
         print(f"ERROR: {PROJECT_TOML} not found.", file=sys.stderr)
         sys.exit(1)
     project, plugins = load_manifests()
-    write_caddyfile(project, plugins)
+    # Caddyfile generation retired in Chunk 5 (caddy plugin deleted);
+    # full script retirement lands in Chunk 6.
     write_dex_connectors()
-    print("LocalMesh Caddyfile + dex.yaml: regenerated.")
+    print("LocalMesh dex.yaml: regenerated.")
 
 
 if __name__ == "__main__":

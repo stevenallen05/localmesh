@@ -108,8 +108,8 @@ services:
       # :3443 and forwards plain to here. App + sidecar share the same
       # netns via `network_mode: "service:www"`.
       WWW_PORT: 3444
-    # No host port mapping — Caddy is the only ingress. The www-mesh
-    # sidecar exposes :3443 on the shared netns for caddy's upstream.
+    # No host port mapping — ingress-mesh is the only ingress. The
+    # www-mesh sidecar exposes :3443 on the shared netns for it to dial.
     depends_on:
       server:
         condition: service_healthy

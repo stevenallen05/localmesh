@@ -1,7 +1,0 @@
-# LocalMesh north-south ingress.
-#
-# Static glue: the route table lives in Caddyfile.generated, emitted by
-# scripts/secrets-gen.py from project.toml + plugin.toml. Re-run `make
-# certs` whenever the manifest schema changes.
-
-import /etc/caddy/Caddyfile.generated

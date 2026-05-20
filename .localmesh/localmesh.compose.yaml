@@ -68,7 +68,7 @@ configs:
                         # OTLP `service.name`, which becomes the `service_name`
                         # series label after resource_to_telemetry_conversion.
                         # That's the same path the old static jobs took
-                        # (`job_name: caddy` → `service_name=caddy`); Pattern B's
+                        # (`job_name: <svc>` → `service_name=<svc>`); Pattern B's
                         # OTLP-pushed metrics carry `service_name` via the same
                         # resource attr — the two paths converge.
                         - source_labels: [__meta_docker_container_label_metrics_service_name]
@@ -383,7 +383,6 @@ configs:
                 route:
                   postgres:        '.service_name == "postgres"'
                   grafana:         '.service_name == "observability" && .container_name == "grafana"'
-                  caddy:           '.service_name == "caddy"'
 
               # Postgres 15+ with log_destination=jsonlog emits {timestamp,
               # error_severity, message, ...}. Map error_severity enum into the
@@ -414,35 +413,6 @@ configs:
                                } else                          { parsed.lvl }
                   .message   = parsed.msg
 
-              # Caddy ingress access logs (JSON format). Lifts mTLS + HTTP fields
-              # onto the event so dashboards / structured metadata can address
-              # them. Severity derived from status (4xx → warn, 5xx → error).
-              # Spec §11.1.
-              norm_caddy:
-                type: remap
-                inputs: ["normalise.caddy"]
-                source: |
-                  if exists(.status) {
-                    .http_status = to_int(.status) ?? 0
-                    .level = if .http_status >= 500 { "error"
-                             } else if .http_status >= 400 { "warn"
-                             } else                         { "info" }
-                  } else {
-                    .level = "info"
-                  }
-                  if exists(.request.method) { .http_method = .request.method }
-                  if exists(.request.uri)    { .http_path   = .request.uri }
-                  if exists(.request.tls.client.subject) {
-                    .mtls_peer_subject = .request.tls.client.subject
-                  }
-                  if exists(.request.tls.version) {
-                    .mtls_tls_version = .request.tls.version
-                  }
-                  if exists(.duration) {
-                    d, err = to_float(.duration)
-                    if err == null { .duration_ms = d * 1000.0 }
-                  }
-
               # Catch-all for everything not explicitly routed. App events (server,
               # www) fall here too — they already have .level set by parse_envelope,
               # so the `if !exists` guard makes this a no-op for them. Infra sources
@@ -462,7 +432,7 @@ configs:
               # directly here would duplicate every event.
               validate:
                 type: remap
-                inputs: ["norm_postgres", "norm_grafana", "norm_caddy", "norm_default"]
+                inputs: ["norm_postgres", "norm_grafana", "norm_default"]
                 source: |
                   .level = if exists(.level) { downcase(string!(.level)) } else { null }
                   allowed = ["trace", "debug", "info", "warn", "error", "fatal"]
@@ -500,8 +470,10 @@ configs:
                   container_id: "{{ container_id }}"
                 # trace_id / span_id from parse_envelope — addressable in LogQL
                 # via `| trace_id="…"` without being indexed (spec AC 5).
-                # Caddy-only mtls/http fields piggy-back here; absent on non-caddy
-                # events thanks to Loki accepting empty structured-metadata values.
+                # mTLS / HTTP structured fields previously sourced from caddy access
+                # logs; envoy now emits comparable fields but the access-log shape
+                # is not yet wired through Vector. Empty defaults survive Loki.
+                # TODO: needs_prod_decisions wire envoy access logs to structured_metadata
                 structured_metadata:
                   trace_id: "{{ trace_id }}"
                   span_id:  "{{ span_id }}"
@@ -511,12 +483,6 @@ configs:
                   http_path:         "{{ http_path }}"
                   http_status:       "{{ http_status }}"
                   duration_ms:       "{{ duration_ms }}"
-    # Mounted into Grafana as /etc/grafana/dashboards/caddy/ingress.json
-    # via the additive `grafana` service entry below — same pattern as
-    # database/'s postgres.json. Query layer is Loki-based, driven by
-    # the caddy_enrich VRL in service_catalog/logging/.
-    caddy_dashboard_ingress:
-        file: ../service_catalog/caddy/ingress.json
     # Self-contained metrics emission for the database module. The sidecar
     # collector scrapes postgres-exporter and pushes OTLP to the main
     # collector at otel-collector:4317. Spec §6.3 fallback — chosen because
@@ -563,39 +529,6 @@ configs:
                   processors: [resource]
                   exporters: [otlp]
 services:
-    caddy:
-        image: localmesh/caddy:dev
-        build:
-            context: ../service_catalog/caddy
-        restart: unless-stopped
-        ports:
-            - "8443:8443"
-            - "127.0.0.1:2019:2019" # admin API, localhost-only
-        volumes:
-            - ../service_catalog/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-            - ../service_catalog/caddy/Caddyfile.generated:/etc/caddy/Caddyfile.generated:ro
-            - ../.localmesh/secrets/caddy:/run/caddy:ro
-        environment:
-            PROJECT_NAME: ${PROJECT_NAME}
-            LOCAL_DOMAIN: ${LOCAL_DOMAIN}
-            OTEL_SERVICE_NAME: caddy
-            OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-            OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
-        healthcheck:
-            test: ["CMD", "wget", "-qO-", "http://localhost:2019/config/"]
-            interval: 10s
-            timeout: 3s
-            retries: 5
-        labels:
-            prometheus.io/scrape: "true"
-            prometheus.io/port: "2019"
-            prometheus.io/path: "/metrics"
-            katenary.v3/ports: |-
-                - 8443
-            metrics.service_name: caddy
-            metrics.module_name: ${CADDY_MODULE_NAME}
-            metrics.owned_by: ${CADDY_OWNED_BY}
-            mesh.exempt: "true" # transitional: caddy retires in Chunk 5; until then it parallel-ingresses w/ ingress-mesh
     cadvisor:
         image: gcr.io/cadvisor/cadvisor:v0.52.1
         container_name: cadvisor
@@ -729,8 +662,6 @@ services:
               target: /etc/grafana/dashboards/observability/apm.json
             - source: observability_dashboard_cluster_health
               target: /etc/grafana/dashboards/observability/cluster-health.json
-            - source: caddy_dashboard_ingress
-              target: /etc/grafana/dashboards/caddy/ingress.json
             - source: database_dashboard_postgres
               target: /etc/grafana/dashboards/database/postgres.json
         volumes:
@@ -753,9 +684,8 @@ services:
         entrypoint: ["envoy"]
         command: ["-c", "/etc/envoy/envoy.yaml"]
         restart: unless-stopped
-        # Caddy still owns 8443 until Chunk 5 retires it; coexist on 18443 till then.
         ports:
-            - "18443:8443" # TODO: needs_prod_decisions flip to 8443 when caddy retires in Chunk 5
+            - "8443:8443"
         secrets:
             - source: ingress-mesh_id_crt
               target: /run/ingress-mesh/id.crt

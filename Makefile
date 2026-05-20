@@ -1,6 +1,6 @@
 # Begin ops team responsibility
 
-.PHONY: setup chart chart-lint certs build trust-ca untrust-ca caddy-image demo-auth dex-config oauth2-secrets
+.PHONY: setup chart chart-lint certs build trust-ca untrust-ca demo-auth dex-config oauth2-secrets
 
 CERTS_DIR       := .localmesh/secrets
 DEX_LOCAL       := .localmesh/dex.yaml
@@ -18,7 +18,7 @@ setup:
 	@echo "    catalogue item). That's beyond the scope of this take-home —"
 	@echo "    fresh state every setup is fine for the demo."
 	docker compose down -v
-	@echo "==> Regenerating LocalMesh CA + per-service certs + .env + Caddyfile"
+	@echo "==> Regenerating LocalMesh CA + per-service certs + .env"
 	@$(MAKE) certs
 	@echo "==> Setup complete. Run 'docker compose up -d --build' to start the stack."
 
@@ -30,9 +30,9 @@ chart-lint:
 	./tools/helm-v4.1.4-linux-amd64 lint chart
 
 # Bootstrap the LocalMesh dev environment.
-# Chains: Go CLI (CA + leaves + .env + compose) -> Python (Caddy)
+# Chains: Go CLI (CA + leaves + .env + compose) -> Python (secrets mint)
 # -> envsubst (dex.yaml seed) -> SDS files (oauth2 secrets).
-# TODO: needs_prod_decisions Caddyfile generator sunsets with Caddy→Envoy migration
+# TODO: needs_prod_decisions retire secrets-gen.py once Go CLI mints secrets
 certs: untrust-ca
 	@rm -rf .localmesh/secrets
 	@go run ./localmesh_src/cmd/localmesh ca mint --force
@@ -84,9 +84,6 @@ trust-ca:
 
 untrust-ca:
 	@go run ./localmesh_src/cmd/localmesh ca uninstall || true
-
-caddy-image:
-	docker build -t localmesh/caddy:dev service_catalog/caddy/
 
 demo-auth: setup
 	@echo "==> Bringing up the LocalMesh stack with auth at ingress"

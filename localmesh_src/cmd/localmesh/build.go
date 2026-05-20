@@ -28,8 +28,8 @@ func newBuildCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			// .env first — Caddyfile + dex.yaml generation (still in
-			// scripts/secrets-gen.py for now) reads .env for substitution.
+			// .env first — dex.yaml seeding (still in scripts/secrets-gen.py
+			// for now) reads .env for substitution.
 			if err := envwriter.WriteManaged(repoRoot, proj, plugins); err != nil {
 				return err
 			}

@@ -179,10 +179,10 @@ func appendProjectWorkloads(existing []tmpl.WorkloadCtx, proj *manifest.Project)
 // label from the pass-1 rendered plugin compose nodes. The mesh plugin's
 // own pass-1 output (ingress-mesh, egress-mesh) is excluded — those are
 // roles, not workloads, and the mesh template never iterates itself.
-// Services appearing in multiple plugins (additive blocks like caddy
-// dropping a config onto observability's grafana) are deduped: a service
-// is mesh-exempt if any contributing plugin marks it exempt. Result is
-// sorted by name for deterministic output.
+// Services appearing in multiple plugins (additive blocks across plugins
+// for the same container) are deduped: a service is mesh-exempt if any
+// contributing plugin marks it exempt. Result is sorted by name for
+// deterministic output.
 func workloadsFromNodes(nodes []*yaml.Node, sources []string) []tmpl.WorkloadCtx {
 	byName := map[string]tmpl.WorkloadCtx{}
 	for i, n := range nodes {

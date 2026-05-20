@@ -49,9 +49,8 @@ services:
     entrypoint: ["envoy"]
     command: ["-c", "/etc/envoy/envoy.yaml"]
     restart: unless-stopped
-    # Caddy still owns 8443 until Chunk 5 retires it; coexist on 18443 till then.
     ports:
-      - "18443:8443"   # TODO: needs_prod_decisions flip to 8443 when caddy retires in Chunk 5
+      - "8443:8443"
     secrets:
       - source: ingress-mesh_id_crt
         target: /run/ingress-mesh/id.crt

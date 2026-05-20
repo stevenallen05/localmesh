@@ -26,10 +26,10 @@ func sampleProject() *manifest.Project {
 func samplePlugins() []*manifest.Plugin {
 	return []*manifest.Plugin{
 		{
-			Name:     "caddy",
-			Identity: manifest.Identity{ModuleName: "caddy", OwnedBy: "sre@example.com"},
+			Name:     "edge",
+			Identity: manifest.Identity{ModuleName: "edge", OwnedBy: "sre@example.com"},
 			Services: []manifest.Service{
-				{Container: "caddy", Port: 8443, Ingress: true},
+				{Container: "edge", Port: 8443, Ingress: true},
 			},
 		},
 		{
@@ -58,12 +58,12 @@ func TestWriteManaged(t *testing.T) {
 				"PROJECT_NAMESPACE=test",
 				"EXTERNAL_DOMAIN=demo.example.com",
 				"LOCAL_DOMAIN=lvh.me",
-				"CADDY_MODULE_NAME=caddy",
+				"EDGE_MODULE_NAME=edge",
 				"AUTH_OWNED_BY=sre@example.com",
 				"WWW_PORT=3443",
 				"WWW_EXPOSE_VIA_INGRESS=true",
-				"CADDY_PORT=8443",
-				"CADDY_INGRESS=true",
+				"EDGE_PORT=8443",
+				"EDGE_INGRESS=true",
 				"DEX_EXPOSE_VIA_INGRESS=true",
 				"LOCALMESH_OIDC_CLIENT_SECRET=",
 				"OAUTH2_PROXY_COOKIE_SECRET=",

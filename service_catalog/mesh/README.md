@@ -1,16 +1,10 @@
-# Consumer wiring — `mesh/` (envoy-omakase WIP)
-
-> **Status: scaffold.** Templates are minimally-plausible until the
-> bundling CLI lands the catalog-pass that feeds context. Today the
-> templates document their CLI contract via header comments; nothing
-> renders end-to-end yet. The existing ghostunnel + caddy + oauth2-proxy
-> stack stays the runtime answer until this swap is ready.
+# Consumer wiring — `mesh/` (envoy-omakase)
 
 ## Overview
 
-One Envoy fleet across three roles replaces caddy (north-south ingress
-+ OIDC), ghostunnel (east-west mTLS sidecars), and oauth2-proxy (login
-flow). Per-workload sidecars share their workload's netns and terminate
+One Envoy fleet across three roles replaces the prior caddy ingress
+(north-south HTTPS + OIDC), ghostunnel pairs (east-west mTLS sidecars),
+and oauth2-proxy (login flow). Per-workload sidecars share their workload's netns and terminate
 inbound mTLS on the declared east-west port. The ingress role
 terminates HTTPS on `:8443`, runs the OIDC dance against Dex, validates
 the issued JWT, and stamps user claims onto downstream headers. The
@@ -26,7 +20,7 @@ omakase list. Rows in scope: 1, 2, 4, 5, 6, 7, 13, 14. Deferred:
 
 | Role | Container | Replaces | Listens on |
 |------|-----------|----------|------------|
-| Ingress | `ingress-mesh` | `caddy` + `oauth2-proxy` | `0.0.0.0:8443` (HTTPS) |
+| Ingress | `ingress-mesh` | (was) `caddy` + `oauth2-proxy` | `0.0.0.0:8443` (HTTPS) |
 | Egress | `egress-mesh` | none today (new) | `0.0.0.0:15001` (mTLS) |
 | Sidecar | `<workload>-mesh` | `<workload>-inbound` + `<workload>-outbound` ghostunnel pair | per-workload east-west port (mTLS) + `127.0.0.1:15001` (outbound catch-all) |
 

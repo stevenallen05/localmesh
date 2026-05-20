@@ -67,7 +67,7 @@ configs:
                   # OTLP `service.name`, which becomes the `service_name`
                   # series label after resource_to_telemetry_conversion.
                   # That's the same path the old static jobs took
-                  # (`job_name: caddy` → `service_name=caddy`); Pattern B's
+                  # (`job_name: <svc>` → `service_name=<svc>`); Pattern B's
                   # OTLP-pushed metrics carry `service_name` via the same
                   # resource attr — the two paths converge.
                   - source_labels: [__meta_docker_container_label_metrics_service_name]

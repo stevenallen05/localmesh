@@ -31,8 +31,7 @@ static_resources:
           stat_prefix: ingress
           codec_type: AUTO
           # Strip :PORT from Host before VH matching so VH `domains:`
-          # entries don't need to enumerate every listener port (browser
-          # hits :18443 today, :8443 once caddy retires in Chunk 5).
+          # entries don't need to enumerate every listener port.
           strip_matching_host_port: true
                     
           access_log:
@@ -90,8 +89,8 @@ static_resources:
                   cluster: dex
                   uri: http://dex:5556/token
                   timeout: 5s
-                authorization_endpoint: https://dex.sample-mesh.lvh.me:18443/auth
-                redirect_uri: "https://www.sample-mesh.lvh.me:18443/oauth2/callback"
+                authorization_endpoint: https://dex.sample-mesh.lvh.me:8443/auth
+                redirect_uri: "https://www.sample-mesh.lvh.me:8443/oauth2/callback"
                 redirect_path_matcher: { path: { exact: /oauth2/callback } }
                 signout_path: { path: { exact: /oauth2/signout } }
                 credentials:
