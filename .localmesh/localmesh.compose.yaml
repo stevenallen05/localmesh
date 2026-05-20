@@ -740,8 +740,9 @@ services:
     ingress-mesh:
         image: envoyproxy/envoy:v1.31-latest
         restart: unless-stopped
+        # Caddy still owns 8443 until Chunk 5 retires it; coexist on 18443 till then.
         ports:
-            - "8443:8443"
+            - "18443:8443" # TODO: needs_prod_decisions flip to 8443 when caddy retires in Chunk 5
         volumes:
             - ../.localmesh/secrets/ingress-mesh:/run/ingress-mesh:ro
             - ../.localmesh/envoy/ingress-mesh.yaml:/etc/envoy/envoy.yaml:ro

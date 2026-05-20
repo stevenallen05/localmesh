@@ -6,14 +6,9 @@ import (
 )
 
 func TestRenderIptables_Outbound(t *testing.T) {
-	edges := []Edge{
-		{Target: "server", TargetPort: 50051},
-		{Target: "auth", TargetPort: 5000},
-	}
 	workload := IptablesContext{
 		Container:     "www",
 		InboundPort:   3443,
-		Outbounds:     edges,
 		EnvoyInbound:  15006,
 		EnvoyOutbound: 15001,
 	}
@@ -21,12 +16,11 @@ func TestRenderIptables_Outbound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
-	// outbound: redirect target ports
-	if !strings.Contains(out, "--dport 50051") || !strings.Contains(out, "--to-ports 15001") {
-		t.Errorf("expected outbound REDIRECT for 50051 -> 15001:\n%s", out)
-	}
-	if !strings.Contains(out, "--dport 5000") {
-		t.Errorf("expected outbound REDIRECT for auth port 5000:\n%s", out)
+	// catch-all outbound rule: all non-loopback TCP SYN → envoy outbound.
+	// Envoy routes per-edge via filter_chain_match on destination_port, so
+	// iptables intentionally does NOT install per-edge rules.
+	if !strings.Contains(out, "OUTPUT -p tcp ! -d 127.0.0.1/32") || !strings.Contains(out, "--to-ports 15001") {
+		t.Errorf("expected catch-all outbound REDIRECT -> 15001:\n%s", out)
 	}
 	// inbound: redirect workload's port
 	if !strings.Contains(out, "--dport 3443") || !strings.Contains(out, "--to-ports 15006") {
@@ -43,7 +37,6 @@ func TestRenderIptables_NoOutbounds(t *testing.T) {
 	workload := IptablesContext{
 		Container:     "callee",
 		InboundPort:   50051,
-		Outbounds:     nil,
 		EnvoyInbound:  15006,
 		EnvoyOutbound: 15001,
 	}

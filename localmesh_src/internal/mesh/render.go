@@ -238,7 +238,6 @@ func RenderAll(proj *manifest.Project, plugins []*manifest.Plugin, compose Compo
 		script, err := RenderIptables(IptablesContext{
 			Container:     name,
 			InboundPort:   sidecar.InboundPort,
-			Outbounds:     sidecar.Outbounds,
 			EnvoyInbound:  sidecar.EnvoyInbound,
 			EnvoyOutbound: sidecar.EnvoyOutbound,
 		})

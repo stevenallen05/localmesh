@@ -8,10 +8,9 @@ import (
 // IptablesContext is the per-workload context for init-script rendering.
 type IptablesContext struct {
 	Container     string
-	InboundPort   int    // workload's [[services]] port; redirected inbound
-	Outbounds     []Edge // per-edge dport redirected outbound
-	EnvoyInbound  int    // envoy's inbound listener (typically 15006)
-	EnvoyOutbound int    // envoy's outbound listener (typically 15001)
+	InboundPort   int // workload's [[services]] port; redirected inbound
+	EnvoyInbound  int // envoy's inbound listener (typically 15006)
+	EnvoyOutbound int // envoy's outbound listener (typically 15001)
 }
 
 // RenderIptables produces a /bin/sh script that an init container runs in
@@ -32,12 +31,9 @@ func RenderIptables(ctx IptablesContext) (string, error) {
 	fmt.Fprintf(&b, "# Mesh interception rules for %s — installed by mesh-init.\n", ctx.Container)
 	fmt.Fprintln(&b, "iptables -t nat -F OUTPUT 2>/dev/null || true")
 	fmt.Fprintln(&b, "iptables -t nat -F PREROUTING 2>/dev/null || true")
-	// Per-edge outbound redirects (specific ports → envoy outbound)
-	for _, e := range ctx.Outbounds {
-		fmt.Fprintf(&b, "iptables -t nat -A OUTPUT -p tcp --dport %d -j REDIRECT --to-ports %d\n",
-			e.TargetPort, ctx.EnvoyOutbound)
-	}
-	// Catch-all outbound for everything else (excluding loopback)
+	// Catch-all outbound: all non-loopback TCP SYN → envoy outbound. Envoy
+	// then routes by destination_port via original_dst + filter_chain_match,
+	// so iptables doesn't need per-edge discrimination.
 	fmt.Fprintf(&b, "iptables -t nat -A OUTPUT -p tcp ! -d 127.0.0.1/32 --syn -j REDIRECT --to-ports %d\n",
 		ctx.EnvoyOutbound)
 	// Inbound: workload's [[services]] port → envoy inbound
