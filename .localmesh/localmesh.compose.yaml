@@ -668,6 +668,7 @@ services:
             metrics.owned_by: ${AUTH_OWNED_BY}
     egress-mesh:
         image: envoyproxy/envoy:v1.31-latest
+        user: "0:0" # TODO: needs_prod_decisions envoy non-root via build image uid match
         restart: unless-stopped
         volumes:
             - ../.localmesh/secrets/egress-mesh:/run/egress-mesh:ro
@@ -739,6 +740,7 @@ services:
                 condition: service_started
     ingress-mesh:
         image: envoyproxy/envoy:v1.31-latest
+        user: "0:0" # TODO: needs_prod_decisions envoy non-root via build image uid match
         restart: unless-stopped
         # Caddy still owns 8443 until Chunk 5 retires it; coexist on 18443 till then.
         ports:
@@ -1040,6 +1042,7 @@ services:
             metrics.owned_by: sre@example.com
     server-mesh:
         image: envoyproxy/envoy:v1.31-latest
+        user: "0:0" # TODO: needs_prod_decisions envoy non-root via build image uid match
         network_mode: "service:server"
         restart: unless-stopped
         volumes:
@@ -1128,6 +1131,7 @@ services:
         # Reviewer-debug: `curl http://localhost:8428/health` from host.
     www-mesh:
         image: envoyproxy/envoy:v1.31-latest
+        user: "0:0" # TODO: needs_prod_decisions envoy non-root via build image uid match
         network_mode: "service:www"
         restart: unless-stopped
         volumes:
