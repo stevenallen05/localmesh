@@ -1,0 +1,24 @@
+[identity]
+module_name = "localmesh"
+owned_by    = "sre@example.com"
+
+[[services]]
+container          = "kuma-cp"
+port               = 5681
+scheme             = "http"
+ingress            = false
+expose_via_ingress = false
+
+[[services]]
+container          = "ingress"
+port               = 8443
+scheme             = "https"
+ingress            = true
+expose_via_ingress = false
+
+[[services]]
+container          = "egress"
+port               = 15001
+scheme             = "tcp"
+ingress            = false
+expose_via_ingress = false
