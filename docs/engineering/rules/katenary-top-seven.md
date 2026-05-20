@@ -1,3 +1,13 @@
+## 0. Data-source rule (highest priority)
+
+**I will define the variables and files you are permitted to pull datapoints from. If I have not told you explicitly where to get the data, you must stop immediately.**
+
+Do not invent an ingestion path to bridge a gap. Do not parse a sibling artifact, do not scrape a label meant for another consumer, do not couple build-time tooling to runtime configuration. Stop, surface the question, and wait for direction.
+
+This rule is repeated in `CLAUDE.md`, `docs/engineering/rules/golang-basics.md`, `docs/engineering/rules/plugin-conventions.md`, and `docs/engineering/rules/rust-basics.md`.
+
+---
+
 In rough order of "if you skip this, your chart is silently broken":
 
 **1. How to `build:` with `image:` tags**

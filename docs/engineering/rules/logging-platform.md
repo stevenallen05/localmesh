@@ -1,5 +1,15 @@
 # Logging platform — omakase
 
+## 0. Data-source rule (highest priority)
+
+**I will define the variables and files you are permitted to pull datapoints from. If I have not told you explicitly where to get the data, you must stop immediately.**
+
+When data isn't where you expected, do not "fix" the gap by reaching for a different input. Do not scrape a label meant for another consumer; do not parse a runtime artifact at build time; do not introduce a new ingestion path to make the call site work. Stop, surface the question, and wait for direction.
+
+This rule is repeated in `CLAUDE.md`, `docs/engineering/rules/golang-basics.md`, `docs/engineering/rules/plugin-conventions.md`, and `docs/engineering/rules/rust-basics.md`.
+
+---
+
 The cross-language logging contract for LocalMesh. Stack-agnostic envelope + cardinality rules + the agent's job; prescriptive per-language emitter and per-source extractor recipes so a team can install one package, copy a 5-line init, and be conformant.
 
 Sibling rules: OTel-semconv (traces + metrics), [`katenary-top-seven.md`](./katenary-top-seven.md) (compose→k8s), [`rust-basics.md`](./rust-basics.md) (stack notes), AUTH / SPIFFE-SPIRE (identity, planned). The compose realisation of this rule lives in [`docs/superpowers/specs/2026-05-17-logging-platform-contract-design.md`](../../superpowers/specs/2026-05-17-logging-platform-contract-design.md).

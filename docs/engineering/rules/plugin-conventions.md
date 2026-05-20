@@ -6,6 +6,14 @@ The conventions exist informally in the current compose files. This file makes t
 
 Long-form rationale: [`../../superpowers/specs/2026-05-18-localmesh-namespacing-and-plugin-exports-design.md`](../../superpowers/specs/2026-05-18-localmesh-namespacing-and-plugin-exports-design.md).
 
+## 0. Data-source rule (highest priority)
+
+**I will define the variables and files you are permitted to pull datapoints from. If I have not told you explicitly where to get the data, you must stop immediately.**
+
+A plugin or tool reads only the inputs explicitly designated for it. Compose files are runtime, not build inputs. Labels carry meaning for their declared consumer only — do not scrape them from another layer. When data isn't where you expected, do not invent an ingestion path. Stop, surface the question, and wait for direction.
+
+This rule is repeated in `CLAUDE.md`, `docs/engineering/rules/golang-basics.md`, and `docs/engineering/rules/rust-basics.md`.
+
 ## 1. Identity tuple
 
 Every service in this project — app-tier or catalog plugin — declares an **identity tuple** of three values: `service_name`, `module_name`, `owned_by`. The tuple already exists in the compose files; this rule binds it.

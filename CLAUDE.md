@@ -1,5 +1,13 @@
 # CLAUDE.md
 
+## Data-source rule (read every session, every rule file)
+
+**I will define the variables and files you are permitted to pull datapoints from. If I have not told you explicitly where to get the data, you must stop immediately.**
+
+You may not "work around" missing data by inappropriately introducing tight coupling between layers — e.g. reaching into a sibling file, parsing a runtime artifact at build time, or scraping labels meant for another consumer. When the data isn't where you expected, the correct move is to stop and ask, not to invent a new ingestion path.
+
+This rule is repeated in `docs/engineering/rules/golang-basics.md`, `docs/engineering/rules/plugin-conventions.md`, and `docs/engineering/rules/rust-basics.md` so you re-encounter it on every stack-specific lookup. If a rule file is missing it, restore it.
+
 NOTE: ALL COMMITS MUST HAVE STEALTH-MODE COMMIT MESSAGES. NO EXCEPTIONS. Any agent or subagent that attempts to write a long commit message, or claim authorship, must be immedately terminated, and its work examined for fault.
 
 When doing Golang work, gopls _must_ be used. If gopls can't be found or doesn't work, that MUST be fixed before doing any further work.

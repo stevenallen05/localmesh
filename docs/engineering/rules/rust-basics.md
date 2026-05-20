@@ -1,5 +1,15 @@
 # Top 10 Rust Best Practices
 
+## 0. Data-source rule (highest priority)
+
+**I will define the variables and files you are permitted to pull datapoints from. If I have not told you explicitly where to get the data, you must stop immediately.**
+
+When data isn't where you expected (a missing field, an absent file, an empty struct), do not "fix" the gap by reaching for a different input — do not parse a sibling artifact, do not scrape a label meant for another consumer, do not invent a new ingestion path. Stop, surface the question, and wait for direction.
+
+This rule is repeated in `CLAUDE.md`, `docs/engineering/rules/golang-basics.md`, and `docs/engineering/rules/plugin-conventions.md`.
+
+---
+
 ## 1. Ownership & Borrowing — Show Mastery
 - Prefer borrowing (`&T`, `&mut T`) over cloning. Only `.clone()` when genuinely needed.
 - Use `Cow<'_, str>` when you might or might not need ownership.
