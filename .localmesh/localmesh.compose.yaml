@@ -668,12 +668,20 @@ services:
             metrics.owned_by: ${AUTH_OWNED_BY}
     egress-mesh:
         image: envoyproxy/envoy:v1.31-latest
-        user: "0:0" # TODO: needs_prod_decisions envoy non-root via build image uid match
         entrypoint: ["envoy"]
         command: ["-c", "/etc/envoy/envoy.yaml"]
         restart: unless-stopped
+        secrets:
+            - source: egress-mesh_id_crt
+              target: /run/egress-mesh/id.crt
+              mode: 0444
+            - source: egress-mesh_id_key
+              target: /run/egress-mesh/id.key
+              mode: 0440
+            - source: egress-mesh_trust_ca
+              target: /run/egress-mesh/trust.ca.crt
+              mode: 0444
         volumes:
-            - ../.localmesh/secrets/egress-mesh:/run/egress-mesh:ro
             - ../.localmesh/envoy/egress-mesh.yaml:/etc/envoy/envoy.yaml:ro
         labels:
             prometheus.io/scrape: "true"
@@ -742,15 +750,23 @@ services:
                 condition: service_started
     ingress-mesh:
         image: envoyproxy/envoy:v1.31-latest
-        user: "0:0" # TODO: needs_prod_decisions envoy non-root via build image uid match
         entrypoint: ["envoy"]
         command: ["-c", "/etc/envoy/envoy.yaml"]
         restart: unless-stopped
         # Caddy still owns 8443 until Chunk 5 retires it; coexist on 18443 till then.
         ports:
             - "18443:8443" # TODO: needs_prod_decisions flip to 8443 when caddy retires in Chunk 5
+        secrets:
+            - source: ingress-mesh_id_crt
+              target: /run/ingress-mesh/id.crt
+              mode: 0444
+            - source: ingress-mesh_id_key
+              target: /run/ingress-mesh/id.key
+              mode: 0440
+            - source: ingress-mesh_trust_ca
+              target: /run/ingress-mesh/trust.ca.crt
+              mode: 0444
         volumes:
-            - ../.localmesh/secrets/ingress-mesh:/run/ingress-mesh:ro
             - ../.localmesh/envoy/ingress-mesh.yaml:/etc/envoy/envoy.yaml:ro
         environment:
             OIDC_CLIENT_ID: ${LOCALMESH_OIDC_CLIENT_ID}
@@ -916,11 +932,12 @@ services:
             POSTGRES_HOST_AUTH_METHOD: trust
             OTEL_RESOURCE_ATTRIBUTES: "module_name=database,owned_by=sre@example.com"
             OTEL_SERVICE_NAME: postgres
-        # Wrap the image's entrypoint: copy the bind-mounted cert files into a
-        # postgres-owned location with the strict perms postgres requires
-        # (0600 on .key, owned by the postgres user). The bind-mount is uid
-        # 1000 on the host; postgres runs as uid 999 inside the container and
-        # cannot read files owned by another uid even at perm 0644.
+        # Wrap the image's entrypoint: copy cert files (delivered via docker
+        # compose secrets at /run/postgres/) into a postgres-owned location
+        # with the strict perms postgres requires (0600 on .key, owned by the
+        # postgres user). Compose secrets land at the target path with the
+        # mode declared below, but postgres still requires uid match on .key,
+        # so the install step stays.
         #
         # TODO: needs_prod_decisions cert delivery in prod (cert-manager Secret
         # mount, SPIRE Workload API, or sidecar copy) makes this gymnastics
@@ -971,7 +988,16 @@ services:
             - ../service_catalog/database/initdb:/docker-entrypoint-initdb.d:ro
             - ../service_catalog/database/postgresql.conf:/etc/postgresql/postgresql.conf:ro
             - ../service_catalog/database/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
-            - ../.localmesh/secrets/postgres:/run/postgres:ro
+        secrets:
+            - source: postgres_id_crt
+              target: /run/postgres/id.crt
+              mode: 0444
+            - source: postgres_id_key
+              target: /run/postgres/id.key
+              mode: 0444
+            - source: postgres_trust_ca
+              target: /run/postgres/trust.ca.crt
+              mode: 0444
         healthcheck:
             # Local unix-socket connection as `postgres` (no SSL needed). Verifies
             # the database is up; cert auth is exercised by the actual mTLS
@@ -1020,8 +1046,16 @@ services:
             # (CN=postgres-exporter) and connects as the cert-bound role of the
             # same name. Role was provisioned by initdb/00-roles.sql.
             DATA_SOURCE_NAME: "postgresql://postgres-exporter@postgres:5432/app?sslmode=verify-full&sslrootcert=/tmp/pgx-ssl/trust.ca.crt&sslcert=/tmp/pgx-ssl/id.crt&sslkey=/tmp/pgx-ssl/id.key"
-        volumes:
-            - ../.localmesh/secrets/postgres-exporter:/run/postgres-exporter:ro
+        secrets:
+            - source: postgres-exporter_id_crt
+              target: /run/postgres-exporter/id.crt
+              mode: 0444
+            - source: postgres-exporter_id_key
+              target: /run/postgres-exporter/id.key
+              mode: 0440
+            - source: postgres-exporter_trust_ca
+              target: /run/postgres-exporter/trust.ca.crt
+              mode: 0444
         configs:
             - source: database_pgexporter_queries
               target: /etc/postgres-exporter/queries.yaml
@@ -1046,13 +1080,21 @@ services:
             metrics.owned_by: sre@example.com
     server-mesh:
         image: envoyproxy/envoy:v1.31-latest
-        user: "0:0" # TODO: needs_prod_decisions envoy non-root via build image uid match
         entrypoint: ["envoy"]
         command: ["-c", "/etc/envoy/envoy.yaml"]
         network_mode: "service:server"
         restart: unless-stopped
+        secrets:
+            - source: server-mesh_id_crt
+              target: /run/server/id.crt
+              mode: 0444
+            - source: server-mesh_id_key
+              target: /run/server/id.key
+              mode: 0440
+            - source: server-mesh_trust_ca
+              target: /run/server/trust.ca.crt
+              mode: 0444
         volumes:
-            - ../.localmesh/secrets/server:/run/server:ro
             - ../.localmesh/envoy/server-mesh.yaml:/etc/envoy/envoy.yaml:ro
         depends_on:
             server-mesh-init:
@@ -1139,13 +1181,21 @@ services:
         # Reviewer-debug: `curl http://localhost:8428/health` from host.
     www-mesh:
         image: envoyproxy/envoy:v1.31-latest
-        user: "0:0" # TODO: needs_prod_decisions envoy non-root via build image uid match
         entrypoint: ["envoy"]
         command: ["-c", "/etc/envoy/envoy.yaml"]
         network_mode: "service:www"
         restart: unless-stopped
+        secrets:
+            - source: www-mesh_id_crt
+              target: /run/www/id.crt
+              mode: 0444
+            - source: www-mesh_id_key
+              target: /run/www/id.key
+              mode: 0440
+            - source: www-mesh_trust_ca
+              target: /run/www/trust.ca.crt
+              mode: 0444
         volumes:
-            - ../.localmesh/secrets/www:/run/www:ro
             - ../.localmesh/envoy/www-mesh.yaml:/etc/envoy/envoy.yaml:ro
         depends_on:
             www-mesh-init:
@@ -1179,3 +1229,40 @@ volumes:
     tempo-data: {}
     loki-data: {}
     postgres-data: {}
+secrets:
+    postgres_id_crt:
+        file: ../.localmesh/secrets/postgres/id.crt
+    postgres_id_key:
+        file: ../.localmesh/secrets/postgres/id.key
+    postgres_trust_ca:
+        file: ../.localmesh/secrets/postgres/trust.ca.crt
+    postgres-exporter_id_crt:
+        file: ../.localmesh/secrets/postgres-exporter/id.crt
+    postgres-exporter_id_key:
+        file: ../.localmesh/secrets/postgres-exporter/id.key
+    postgres-exporter_trust_ca:
+        file: ../.localmesh/secrets/postgres-exporter/trust.ca.crt
+    ingress-mesh_id_crt:
+        file: ../.localmesh/secrets/ingress-mesh/id.crt
+    ingress-mesh_id_key:
+        file: ../.localmesh/secrets/ingress-mesh/id.key
+    ingress-mesh_trust_ca:
+        file: ../.localmesh/secrets/ingress-mesh/trust.ca.crt
+    egress-mesh_id_crt:
+        file: ../.localmesh/secrets/egress-mesh/id.crt
+    egress-mesh_id_key:
+        file: ../.localmesh/secrets/egress-mesh/id.key
+    egress-mesh_trust_ca:
+        file: ../.localmesh/secrets/egress-mesh/trust.ca.crt
+    server-mesh_id_crt:
+        file: ../.localmesh/secrets/server/id.crt
+    server-mesh_id_key:
+        file: ../.localmesh/secrets/server/id.key
+    server-mesh_trust_ca:
+        file: ../.localmesh/secrets/server/trust.ca.crt
+    www-mesh_id_crt:
+        file: ../.localmesh/secrets/www/id.crt
+    www-mesh_id_key:
+        file: ../.localmesh/secrets/www/id.key
+    www-mesh_trust_ca:
+        file: ../.localmesh/secrets/www/trust.ca.crt

@@ -6,19 +6,56 @@ from .Workloads (sorted by container name).
 Context expected (project-wide + workloads list):
   .Project.Name, .Project.LocalDomain
   .Workloads []{Name string, MeshExempt bool}   — populated by render.RunWith
+
+Certs travel as docker compose secrets (not bind mounts). The compose
+secrets driver lands files inside the container at the declared target
+path with a fresh mode, regardless of host-side ownership. That sidesteps
+the uid mismatch between the envoy image's drop-priv (uid 101) and the
+host bind-mount's uid (1000). TODO: needs_prod_decisions cert delivery
+via SPIRE Workload API or cert-manager Secret mount.
 */}}
+secrets:
+  ingress-mesh_id_crt:
+    file: ../../.localmesh/secrets/ingress-mesh/id.crt
+  ingress-mesh_id_key:
+    file: ../../.localmesh/secrets/ingress-mesh/id.key
+  ingress-mesh_trust_ca:
+    file: ../../.localmesh/secrets/ingress-mesh/trust.ca.crt
+  egress-mesh_id_crt:
+    file: ../../.localmesh/secrets/egress-mesh/id.crt
+  egress-mesh_id_key:
+    file: ../../.localmesh/secrets/egress-mesh/id.key
+  egress-mesh_trust_ca:
+    file: ../../.localmesh/secrets/egress-mesh/trust.ca.crt
+{{- range $w := .Workloads }}{{ if not $w.MeshExempt }}
+  {{ $w.Name }}-mesh_id_crt:
+    file: ../../.localmesh/secrets/{{ $w.Name }}/id.crt
+  {{ $w.Name }}-mesh_id_key:
+    file: ../../.localmesh/secrets/{{ $w.Name }}/id.key
+  {{ $w.Name }}-mesh_trust_ca:
+    file: ../../.localmesh/secrets/{{ $w.Name }}/trust.ca.crt
+{{- end }}{{ end }}
+
 services:
   ingress-mesh:
     image: envoyproxy/envoy:v1.31-latest
-    user: "0:0"  # TODO: needs_prod_decisions envoy non-root via build image uid match
     entrypoint: ["envoy"]
     command: ["-c", "/etc/envoy/envoy.yaml"]
     restart: unless-stopped
     # Caddy still owns 8443 until Chunk 5 retires it; coexist on 18443 till then.
     ports:
       - "18443:8443"   # TODO: needs_prod_decisions flip to 8443 when caddy retires in Chunk 5
+    secrets:
+      - source: ingress-mesh_id_crt
+        target: /run/ingress-mesh/id.crt
+        mode: 0444
+      - source: ingress-mesh_id_key
+        target: /run/ingress-mesh/id.key
+        mode: 0440
+      - source: ingress-mesh_trust_ca
+        target: /run/ingress-mesh/trust.ca.crt
+        mode: 0444
     volumes:
-      - ../../.localmesh/secrets/ingress-mesh:/run/ingress-mesh:ro
       - ../../.localmesh/envoy/ingress-mesh.yaml:/etc/envoy/envoy.yaml:ro
     environment:
       OIDC_CLIENT_ID:     ${LOCALMESH_OIDC_CLIENT_ID}
@@ -40,12 +77,20 @@ services:
 
   egress-mesh:
     image: envoyproxy/envoy:v1.31-latest
-    user: "0:0"  # TODO: needs_prod_decisions envoy non-root via build image uid match
     entrypoint: ["envoy"]
     command: ["-c", "/etc/envoy/envoy.yaml"]
     restart: unless-stopped
+    secrets:
+      - source: egress-mesh_id_crt
+        target: /run/egress-mesh/id.crt
+        mode: 0444
+      - source: egress-mesh_id_key
+        target: /run/egress-mesh/id.key
+        mode: 0440
+      - source: egress-mesh_trust_ca
+        target: /run/egress-mesh/trust.ca.crt
+        mode: 0444
     volumes:
-      - ../../.localmesh/secrets/egress-mesh:/run/egress-mesh:ro
       - ../../.localmesh/envoy/egress-mesh.yaml:/etc/envoy/envoy.yaml:ro
     labels:
       prometheus.io/scrape: "true"
@@ -73,13 +118,21 @@ services:
 
   {{ $w.Name }}-mesh:
     image: envoyproxy/envoy:v1.31-latest
-    user: "0:0"  # TODO: needs_prod_decisions envoy non-root via build image uid match
     entrypoint: ["envoy"]
     command: ["-c", "/etc/envoy/envoy.yaml"]
     network_mode: "service:{{ $w.Name }}"
     restart: unless-stopped
+    secrets:
+      - source: {{ $w.Name }}-mesh_id_crt
+        target: /run/{{ $w.Name }}/id.crt
+        mode: 0444
+      - source: {{ $w.Name }}-mesh_id_key
+        target: /run/{{ $w.Name }}/id.key
+        mode: 0440
+      - source: {{ $w.Name }}-mesh_trust_ca
+        target: /run/{{ $w.Name }}/trust.ca.crt
+        mode: 0444
     volumes:
-      - ../../.localmesh/secrets/{{ $w.Name }}:/run/{{ $w.Name }}:ro
       - ../../.localmesh/envoy/{{ $w.Name }}-mesh.yaml:/etc/envoy/envoy.yaml:ro
     depends_on:
       {{ $w.Name }}-mesh-init:

@@ -32,11 +32,12 @@ services:
       POSTGRES_HOST_AUTH_METHOD: trust
       OTEL_RESOURCE_ATTRIBUTES: "module_name=database,owned_by=sre@example.com"
       OTEL_SERVICE_NAME: postgres
-    # Wrap the image's entrypoint: copy the bind-mounted cert files into a
-    # postgres-owned location with the strict perms postgres requires
-    # (0600 on .key, owned by the postgres user). The bind-mount is uid
-    # 1000 on the host; postgres runs as uid 999 inside the container and
-    # cannot read files owned by another uid even at perm 0644.
+    # Wrap the image's entrypoint: copy cert files (delivered via docker
+    # compose secrets at /run/postgres/) into a postgres-owned location
+    # with the strict perms postgres requires (0600 on .key, owned by the
+    # postgres user). Compose secrets land at the target path with the
+    # mode declared below, but postgres still requires uid match on .key,
+    # so the install step stays.
     #
     # TODO: needs_prod_decisions cert delivery in prod (cert-manager Secret
     # mount, SPIRE Workload API, or sidecar copy) makes this gymnastics
@@ -87,7 +88,16 @@ services:
       - ./initdb:/docker-entrypoint-initdb.d:ro
       - ./postgresql.conf:/etc/postgresql/postgresql.conf:ro
       - ./pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
-      - ../../.localmesh/secrets/postgres:/run/postgres:ro
+    secrets:
+      - source: postgres_id_crt
+        target: /run/postgres/id.crt
+        mode: 0444
+      - source: postgres_id_key
+        target: /run/postgres/id.key
+        mode: 0444
+      - source: postgres_trust_ca
+        target: /run/postgres/trust.ca.crt
+        mode: 0444
     healthcheck:
       # Local unix-socket connection as `postgres` (no SSL needed). Verifies
       # the database is up; cert auth is exercised by the actual mTLS
@@ -137,8 +147,16 @@ services:
       # (CN=postgres-exporter) and connects as the cert-bound role of the
       # same name. Role was provisioned by initdb/00-roles.sql.
       DATA_SOURCE_NAME: "postgresql://postgres-exporter@postgres:5432/app?sslmode=verify-full&sslrootcert=/tmp/pgx-ssl/trust.ca.crt&sslcert=/tmp/pgx-ssl/id.crt&sslkey=/tmp/pgx-ssl/id.key"
-    volumes:
-      - ../../.localmesh/secrets/postgres-exporter:/run/postgres-exporter:ro
+    secrets:
+      - source: postgres-exporter_id_crt
+        target: /run/postgres-exporter/id.crt
+        mode: 0444
+      - source: postgres-exporter_id_key
+        target: /run/postgres-exporter/id.key
+        mode: 0440
+      - source: postgres-exporter_trust_ca
+        target: /run/postgres-exporter/trust.ca.crt
+        mode: 0444
     configs:
       - source: database_pgexporter_queries
         target: /etc/postgres-exporter/queries.yaml
@@ -235,6 +253,20 @@ configs:
             receivers: [prometheus]
             processors: [resource]
             exporters: [otlp]
+
+secrets:
+  postgres_id_crt:
+    file: ../../.localmesh/secrets/postgres/id.crt
+  postgres_id_key:
+    file: ../../.localmesh/secrets/postgres/id.key
+  postgres_trust_ca:
+    file: ../../.localmesh/secrets/postgres/trust.ca.crt
+  postgres-exporter_id_crt:
+    file: ../../.localmesh/secrets/postgres-exporter/id.crt
+  postgres-exporter_id_key:
+    file: ../../.localmesh/secrets/postgres-exporter/id.key
+  postgres-exporter_trust_ca:
+    file: ../../.localmesh/secrets/postgres-exporter/trust.ca.crt
 
 volumes:
   postgres-data: {}

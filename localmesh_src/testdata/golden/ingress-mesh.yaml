@@ -69,7 +69,7 @@ static_resources:
               - match: { prefix: "/workload/egress-mesh/" }
                 route: { cluster: egress-mesh_admin, prefix_rewrite: "/" }
           http_filters:
-          # TODO Chunk 4: re-add envoy.filters.http.oauth2 with proper SDS or inline secret shape
+          # TODO Chunk 4: re-add envoy.filters.http.oauth2 with SDS file-based secrets
           - name: envoy.filters.http.jwt_authn
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication

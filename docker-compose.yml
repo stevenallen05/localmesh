@@ -36,12 +36,20 @@ services:
       # workload name matches the postgres role declared in
       # service_catalog/database/initdb/00-roles.sql).
       DATABASE_URL: postgres://server@postgres:5432/app?sslmode=verify-full&sslrootcert=/run/server/trust.ca.crt&sslcert=/run/server/id.crt&sslkey=/run/server/id.key
-    volumes:
-      # LocalMesh cert dir for the server workload. App uses it for
+    secrets:
+      # LocalMesh cert material for the server workload. App uses it for
       # outbound postgres mTLS (sqlx reads sslcert/sslkey via DATABASE_URL).
-      # Inbound gRPC mTLS now lives in the server-mesh envoy sidecar; that
-      # service mounts the same dir.
-      - ./.localmesh/secrets/server:/run/server:ro
+      # Inbound gRPC mTLS lives in the server-mesh envoy sidecar; that
+      # service mounts the same triple via the mesh plugin's compose.
+      - source: server_id_crt
+        target: /run/server/id.crt
+        mode: 0444
+      - source: server_id_key
+        target: /run/server/id.key
+        mode: 0444
+      - source: server_trust_ca
+        target: /run/server/trust.ca.crt
+        mode: 0444
     depends_on:
       otel-collector:
         condition: service_started
@@ -123,3 +131,10 @@ services:
       metrics.module_name: app
       metrics.owned_by: ${TECH_LEAD_EMAIL}
 
+secrets:
+  server_id_crt:
+    file: ./.localmesh/secrets/server/id.crt
+  server_id_key:
+    file: ./.localmesh/secrets/server/id.key
+  server_trust_ca:
+    file: ./.localmesh/secrets/server/trust.ca.crt
