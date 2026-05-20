@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+NOTE: ALL COMMITS MUST HAVE STEALTH-MODE COMMIT MESSAGES. NO EXCEPTIONS. Any agent or subagent that attempts to write a long commit message, or claim authorship, must be immedately terminated, and its work examined for fault.
+
+When doing Golang work, gopls _must_ be used. If gopls can't be found or doesn't work, that MUST be fixed before doing any further work.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project context
