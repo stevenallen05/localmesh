@@ -24,7 +24,7 @@ otelcol.processor.batch "default" {
       otelcol.exporter.otlp.tempo.input,
     ]
     metrics = [otelcol.exporter.prometheus.appmetrics.input]
-    logs    = []
+    logs    = [otelcol.exporter.otlphttp.loki.input]
   }
 }
 
@@ -70,5 +70,61 @@ otelcol.exporter.otlp "tempo" {
 prometheus.remote_write "default" {
   endpoint {
     url = "http://prometheus:9090/api/v1/write"
+  }
+}
+
+// ---- Container log tailing ----
+
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+
+  filter {
+    name   = "label"
+    values = ["com.docker.compose.project=obs-cleanroom"]
+  }
+}
+
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.docker.containers.targets
+  forward_to = [loki.process.containers.receiver]
+  labels = {
+    job = "docker",
+  }
+}
+
+loki.process "containers" {
+  forward_to = [loki.write.default.receiver]
+
+  stage.json {
+    expressions = {
+      level   = "level",
+      message = "message",
+    }
+  }
+
+  stage.labels {
+    values = {
+      level = "",
+    }
+  }
+
+  stage.match {
+    selector = "{level!~\"trace|debug|info|warn|error|fatal|\"}"
+    action   = "drop"
+  }
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+// ---- OTLP logs to Loki ----
+// telemetrygen --logs (and any SDK push) lands here.
+otelcol.exporter.otlphttp "loki" {
+  client {
+    endpoint = "http://loki:3100/otlp"
   }
 }

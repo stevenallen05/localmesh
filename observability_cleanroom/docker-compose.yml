@@ -4,5 +4,6 @@ include:
   - ./alloy/docker-compose.yml
   - ./prometheus/docker-compose.yml
   - ./tempo/docker-compose.yml
+  - ./loki/docker-compose.yml
   - ./grafana/docker-compose.yml
   - ./noise-generator/docker-compose.yml

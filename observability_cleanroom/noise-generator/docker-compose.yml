@@ -27,3 +27,17 @@ services:
     restart: unless-stopped
     depends_on:
       - alloy
+
+  noise-gen-logs:
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest
+    container_name: noise-gen-logs
+    command:
+      - logs
+      - --otlp-endpoint=alloy:4317
+      - --otlp-insecure
+      - --rate=50
+      - --duration=24h
+      - --service=noisegen-logs
+    restart: unless-stopped
+    depends_on:
+      - alloy
