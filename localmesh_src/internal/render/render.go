@@ -26,55 +26,27 @@ func Run(projectFile, catalogRoot, outputPath string) error {
 	return RunWith(proj, plugins, catalogRoot, outputPath)
 }
 
-// RunWith is Run with already-loaded manifests. Lets callers (the build
-// verb) load once and pass the same structs to both render + envwriter.
+// RunWith is Run with already-loaded manifests. Lets callers (the build verb)
+// load once and pass the same structs to render + envwriter.
 //
-// Two-pass: pass 1 renders every plugin with an empty Workloads list so
-// the merged compose surfaces every container name + its mesh.exempt
-// label. The security plugin's compose uses .Workloads, so on pass 1 it
-// emits only the role services (ingress-mesh, egress-mesh) and no
-// sidecar blocks. Pass 2 re-renders any plugin whose template depends
-// on .Workloads with the populated list. Today only the security plugin
-// qualifies, so the second pass re-renders just that one and swaps it
-// into the rendered slice before the final merge.
+// Single pass: the meshed-workload set is known from the manifests before any
+// template runs (needs_mtls_sidecar lives in [[services]], not in compose), so
+// every plugin is rendered once with the full ServiceCtx list in its context.
+// The security plugin iterates it to emit sidecars + ingress routes; other
+// plugins ignore it.
 func RunWith(proj *manifest.Project, plugins []*manifest.Plugin, catalogRoot, outputPath string) error {
 	env := envMap()
 	outputDir := filepath.Dir(outputPath)
+	services := serviceList(proj, plugins)
 	rendered := make([]*yaml.Node, 0, len(plugins))
 	sources := make([]string, 0, len(plugins))
-	securityIdx := -1
-	for i, p := range plugins {
-		node, err := renderPluginCompose(proj, p, env, nil, catalogRoot, outputDir)
+	for _, p := range plugins {
+		node, err := renderPluginCompose(proj, p, env, services, catalogRoot, outputDir)
 		if err != nil {
 			return err
 		}
 		rendered = append(rendered, node)
 		sources = append(sources, p.Name)
-		if p.Name == "security" {
-			securityIdx = i
-		}
-	}
-	// Discover workloads from pass-1 rendered nodes + project-tier services
-	// (proj.Services declares app containers like www, server that live in
-	// the root docker-compose.yml, not in any plugin compose). Security's
-	// pass-1 output is filtered out — its ingress-mesh + egress-mesh are
-	// roles, not workloads, and the security template never iterates itself.
-	//
-	// Filter the result to registry-known containers: only services with a
-	// declared [[services]] entry have port/scheme metadata, which the
-	// sidecar bootstrap needs. Compose-only services (e.g. helper
-	// containers like database-collector with no plugin.toml entry) are
-	// dropped here so we don't emit a sidecar compose block without a
-	// matching envoy YAML.
-	if securityIdx >= 0 {
-		workloads := workloadsFromNodes(rendered, sources)
-		workloads = appendProjectWorkloads(workloads, proj)
-		workloads = filterRegistryKnown(workloads, proj, plugins)
-		node, err := renderPluginCompose(proj, plugins[securityIdx], env, workloads, catalogRoot, outputDir)
-		if err != nil {
-			return err
-		}
-		rendered[securityIdx] = node
 	}
 	merged, err := Merge(rendered, sources)
 	if err != nil {
@@ -94,12 +66,42 @@ func RunWith(proj *manifest.Project, plugins []*manifest.Plugin, catalogRoot, ou
 	return os.WriteFile(outputPath, append([]byte(header), out...), 0o644)
 }
 
+// serviceList collects every registry-known service (project [[services]] +
+// every plugin [[services]]) into the template context shape. Project services
+// first, then plugins in load order; deduped by container (first wins); sorted
+// by name for deterministic output.
+func serviceList(proj *manifest.Project, plugins []*manifest.Plugin) []tmpl.ServiceCtx {
+	seen := map[string]bool{}
+	out := []tmpl.ServiceCtx{}
+	add := func(s manifest.Service) {
+		if seen[s.Container] {
+			return
+		}
+		seen[s.Container] = true
+		out = append(out, tmpl.ServiceCtx{
+			Name:             s.Container,
+			Port:             s.Port,
+			Meshed:           s.Meshed(),
+			ExposeViaIngress: s.ExposeViaIngress,
+		})
+	}
+	for _, s := range proj.Services {
+		add(s)
+	}
+	for _, p := range plugins {
+		for _, s := range p.Services {
+			add(s)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
 // renderPluginCompose renders one plugin's docker-compose template + parses
-// the output + rewrites relative paths. Factored out so RunWith can call it
-// twice (the second pass repopulates .Workloads for the security plugin).
-func renderPluginCompose(proj *manifest.Project, p *manifest.Plugin, env map[string]string, workloads []tmpl.WorkloadCtx, catalogRoot, outputDir string) (*yaml.Node, error) {
+// the output + rewrites relative paths.
+func renderPluginCompose(proj *manifest.Project, p *manifest.Plugin, env map[string]string, services []tmpl.ServiceCtx, catalogRoot, outputDir string) (*yaml.Node, error) {
 	composePath := pluginComposePath(catalogRoot, p.Name)
-	ctx := &tmpl.Context{Project: proj, Plugin: p, Env: env, Workloads: workloads}
+	ctx := &tmpl.Context{Project: proj, Plugin: p, Env: env, Services: services}
 	body, err := tmpl.Render(composePath, ctx)
 	if err != nil {
 		return nil, err
@@ -126,133 +128,6 @@ func renderPluginCompose(proj *manifest.Project, p *manifest.Plugin, env map[str
 	}
 	RewriteRelativePaths(&node, relPrefix)
 	return &node, nil
-}
-
-// filterRegistryKnown drops workloads whose container name doesn't appear
-// in any plugin.toml or project.toml [[services]] block. Those entries
-// have no port/scheme metadata, so the mesh sidecar render can't generate
-// a YAML for them — emitting a compose block for them would point at a
-// missing config file.
-func filterRegistryKnown(workloads []tmpl.WorkloadCtx, proj *manifest.Project, plugins []*manifest.Plugin) []tmpl.WorkloadCtx {
-	known := map[string]bool{}
-	for _, s := range proj.Services {
-		known[s.Container] = true
-	}
-	for _, p := range plugins {
-		for _, s := range p.Services {
-			known[s.Container] = true
-		}
-	}
-	out := make([]tmpl.WorkloadCtx, 0, len(workloads))
-	for _, w := range workloads {
-		if known[w.Name] {
-			out = append(out, w)
-		}
-	}
-	return out
-}
-
-// appendProjectWorkloads merges project-tier services (proj.Services) into
-// the workload list. These app-tier containers (www, server) live in the
-// root docker-compose.yml — not in any plugin compose — so the node walk
-// above misses them. They are never mesh-exempt today; if a future need
-// arises, mesh-exempt could be expressed in project.toml [[services]].
-// Idempotent: existing entries (e.g. when a project service is also
-// declared via a plugin block) are preserved.
-func appendProjectWorkloads(existing []tmpl.WorkloadCtx, proj *manifest.Project) []tmpl.WorkloadCtx {
-	seen := map[string]bool{}
-	for _, w := range existing {
-		seen[w.Name] = true
-	}
-	for _, s := range proj.Services {
-		if seen[s.Container] {
-			continue
-		}
-		existing = append(existing, tmpl.WorkloadCtx{Name: s.Container, MeshExempt: false})
-		seen[s.Container] = true
-	}
-	sort.Slice(existing, func(i, j int) bool { return existing[i].Name < existing[j].Name })
-	return existing
-}
-
-// workloadsFromNodes extracts every services.<name> + its mesh.exempt
-// label from the pass-1 rendered plugin compose nodes. The security plugin's
-// own pass-1 output (ingress-mesh, egress-mesh) is excluded — those are
-// roles, not workloads, and the security template never iterates itself.
-// Services appearing in multiple plugins (additive blocks across plugins
-// for the same container) are deduped: a service is mesh-exempt if any
-// contributing plugin marks it exempt. Result is sorted by name for
-// deterministic output.
-func workloadsFromNodes(nodes []*yaml.Node, sources []string) []tmpl.WorkloadCtx {
-	byName := map[string]tmpl.WorkloadCtx{}
-	for i, n := range nodes {
-		if sources[i] == "security" {
-			continue
-		}
-		if n.Kind != yaml.DocumentNode || len(n.Content) == 0 {
-			continue
-		}
-		top := n.Content[0]
-		if top.Kind != yaml.MappingNode {
-			continue
-		}
-		for j := 0; j < len(top.Content); j += 2 {
-			k := top.Content[j]
-			v := top.Content[j+1]
-			if k.Value != "services" || v.Kind != yaml.MappingNode {
-				continue
-			}
-			for s := 0; s < len(v.Content); s += 2 {
-				svcName := v.Content[s].Value
-				svcBody := v.Content[s+1]
-				cur, ok := byName[svcName]
-				exempt := serviceLabelEquals(svcBody, "mesh.exempt", "true")
-				if !ok {
-					byName[svcName] = tmpl.WorkloadCtx{Name: svcName, MeshExempt: exempt}
-					continue
-				}
-				cur.MeshExempt = cur.MeshExempt || exempt
-				byName[svcName] = cur
-			}
-		}
-	}
-	out := make([]tmpl.WorkloadCtx, 0, len(byName))
-	for _, w := range byName {
-		out = append(out, w)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
-	return out
-}
-
-// serviceLabelEquals reports whether the given service mapping carries a
-// labels entry with key=value. Handles both compose label forms (mapping
-// "labels: { key: value }" and sequence "labels: [ key=value ]").
-func serviceLabelEquals(svc *yaml.Node, key, value string) bool {
-	if svc.Kind != yaml.MappingNode {
-		return false
-	}
-	for i := 0; i < len(svc.Content); i += 2 {
-		if svc.Content[i].Value != "labels" {
-			continue
-		}
-		labels := svc.Content[i+1]
-		switch labels.Kind {
-		case yaml.MappingNode:
-			for j := 0; j < len(labels.Content); j += 2 {
-				if labels.Content[j].Value == key && labels.Content[j+1].Value == value {
-					return true
-				}
-			}
-		case yaml.SequenceNode:
-			needle := key + "=" + value
-			for _, e := range labels.Content {
-				if e.Value == needle {
-					return true
-				}
-			}
-		}
-	}
-	return false
 }
 
 func pluginComposePath(catalogRoot, name string) string {

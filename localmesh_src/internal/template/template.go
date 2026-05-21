@@ -16,22 +16,23 @@ import (
 	"github.com/stevenallen05/localmesh/internal/manifest"
 )
 
-// WorkloadCtx is a per-workload entry surfaced to plugin templates that
-// need to iterate non-exempt workloads (e.g. mesh's docker-compose.yaml.gotmpl
-// emits one sidecar block per workload). Populated by render.RunWith after
-// it has merged enough of the compose surface to know every service's
-// name + mesh.exempt label.
-type WorkloadCtx struct {
-	Name       string
-	MeshExempt bool
+// ServiceCtx is a per-service entry surfaced to plugin templates. The security
+// plugin's compose template iterates it: a kuma-dp sidecar per Meshed service,
+// a MeshHTTPRoute per ExposeViaIngress service. Populated by render.RunWith
+// from the loaded manifests (project + plugin [[services]]).
+type ServiceCtx struct {
+	Name             string
+	Port             int
+	Meshed           bool
+	ExposeViaIngress bool
 }
 
 // Context is the data exposed to every template.
 type Context struct {
-	Project   *manifest.Project
-	Plugin    *manifest.Plugin
-	Env       map[string]string
-	Workloads []WorkloadCtx // post-merge view; nil on the first render pass
+	Project  *manifest.Project
+	Plugin   *manifest.Plugin
+	Env      map[string]string
+	Services []ServiceCtx // all registry-known services; nil for the plugins that ignore it
 }
 
 // Render reads a .gotmpl file and returns its rendered output.
