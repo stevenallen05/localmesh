@@ -1,6 +1,6 @@
 services:
   kuma-cp:
-    image: docker.io/kumahq/kuma-cp:2.9.0
+    image: docker.io/kumahq/kuma-cp:2.13.6
     environment:
       KUMA_MODE: standalone
       KUMA_ENVIRONMENT: universal
@@ -9,9 +9,118 @@ services:
       KUMA_API_SERVER_HTTP_PORT: "5681"
       KUMA_DP_SERVER_PORT: "5678"
       KUMA_DP_SERVER_AUTH_TYPE: none
-      # DP-server TLS: no dedicated disable flag in Kuma 2.9. Leaving
-      # KUMA_DP_SERVER_TLS_CERT_FILE / _KEY_FILE (and the general.* fallbacks)
-      # unset causes kuma-cp to serve the DP-server over plain gRPC.
+      # DP-server TLS skew with the sidecar's https dial is a live-bring-up
+      # concern (deferred). TODO: needs_prod_decisions dp-server transport
     expose:
       - "5678"
       - "5681"
+
+  localmesh-bootstrap:
+    build:
+      context: .
+      dockerfile: Dockerfile.sidecar
+    image: localmesh-sidecar:dev
+    entrypoint: ["/bin/bash", "/usr/local/bin/bootstrap.sh"]
+    depends_on:
+      kuma-cp:
+        condition: service_started
+    configs:
+      - source: mesh_defaults
+        target: /etc/localmesh/bootstrap/00-mesh-defaults.yaml
+      - source: ingress_gateway
+        target: /etc/localmesh/bootstrap/10-ingress-mesh-gateway.yaml
+      - source: allow_all
+        target: /etc/localmesh/bootstrap/20-allow-all.yaml
+      - source: ingress_routes
+        target: /etc/localmesh/bootstrap/30-ingress-routes.yaml
+    restart: "no"
+
+  ingress:
+    build:
+      context: .
+      dockerfile: Dockerfile.sidecar
+    image: localmesh-sidecar:dev
+    # BUILTIN gateway dataplane. Gateways don't transparent-proxy, so no
+    # NET_ADMIN; kuma fills the dataplane address var via --dataplane-var.
+    command:
+      - /bin/bash
+      - -c
+      - 'APP_ADDR=$$(hostname -i | awk "{print \$$1}"); exec /usr/local/bin/kuma-dp run --cp-address=https://kuma-cp:5678 --dataplane-file=/etc/kuma/ingress.yaml --dataplane-var=address=$$APP_ADDR'
+    configs:
+      - source: ingress_dataplane
+        target: /etc/kuma/ingress.yaml
+    ports:
+      - "8443:8443"
+    depends_on:
+      kuma-cp:
+        condition: service_started
+      localmesh-bootstrap:
+        condition: service_completed_successfully
+    restart: unless-stopped
+{{- range .Services }}
+{{- if .Meshed }}
+
+  {{ .Name }}-mesh:
+    build:
+      context: .
+      dockerfile: Dockerfile.sidecar
+    image: localmesh-sidecar:dev
+    network_mode: "service:{{ .Name }}"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      WORKLOAD_NAME: {{ .Name }}
+      APP_PORT: "{{ .Port }}"
+      CP_HOST: kuma-cp:5678
+    depends_on:
+      {{ .Name }}:
+        condition: service_started
+      kuma-cp:
+        condition: service_started
+      localmesh-bootstrap:
+        condition: service_completed_successfully
+    restart: unless-stopped
+{{- end }}
+{{- end }}
+
+configs:
+  mesh_defaults:
+    file: ./bootstrap/00-mesh-defaults.yaml
+  ingress_gateway:
+    file: ./bootstrap/10-ingress-mesh-gateway.yaml
+  allow_all:
+    file: ./bootstrap/20-allow-all.yaml
+  ingress_dataplane:
+    file: ./dataplane/ingress.yaml
+  ingress_routes:
+    content: |
+{{- range .Services }}
+{{- if .ExposeViaIngress }}
+      ---
+      type: MeshHTTPRoute
+      mesh: default
+      name: ingress-route-{{ .Name }}
+      spec:
+        targetRef:
+          kind: MeshGateway
+          name: ingress
+          tags:
+            port: http-ingress
+        to:
+          - targetRef:
+              kind: Mesh
+            hostnames:
+              - {{ .Name }}.{{ $.Project.Name }}.{{ $.Project.LocalDomain }}
+            rules:
+              - matches:
+                  - path:
+                      type: PathPrefix
+                      value: "/"
+                default:
+                  backendRefs:
+                    - kind: MeshService
+                      name: {{ .Name }}
+                      port: {{ .Port }}
+{{- end }}
+{{- end }}

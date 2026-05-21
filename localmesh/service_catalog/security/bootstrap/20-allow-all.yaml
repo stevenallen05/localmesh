@@ -1,0 +1,14 @@
+# TODO: needs_prod_decisions allow-all mesh permission
+# Demo shortcut: every meshed dataplane may talk to every other. Production
+# replaces this with default-deny + per-edge permissions from depends_on.
+type: MeshTrafficPermission
+mesh: default
+name: allow-all
+spec:
+  targetRef:
+    kind: Mesh
+  from:
+    - targetRef:
+        kind: Mesh
+      default:
+        action: Allow

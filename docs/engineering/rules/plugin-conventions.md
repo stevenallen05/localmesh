@@ -124,7 +124,7 @@ Worked example for the `postgres16/` plugin lives at [`../../../localmesh/servic
 - From `[identity]`, keyed by **plugin slug**: `<PLUGIN>_MODULE_NAME`, `<PLUGIN>_OWNED_BY`.
 - From `[[services]]`, keyed by **container slug**: `<CONTAINER>_PORT`, `<CONTAINER>_EXPOSE_VIA_INGRESS`, `<CONTAINER>_INGRESS`.
 
-Mesh-exempt status (`mesh.exempt: "true"` compose label) is declared on each service's compose `labels:` block, not in `plugin.toml`. The label marks services that opt out of the mesh data plane (the observability and logging sinks, postgres's native mTLS). It is consumed at runtime by the `security/` plugin's kuma sidecar wiring, not at build time by the CLI.
+Mesh membership is the `needs_mtls_sidecar` field in each `[[services]]` entry (default `true`; `false` opts a service out of the mesh data plane). `kuma-cp`, `ingress`, `dex`, `postgres`, and `postgres-exporter` set it to `false`. The CLI reads the field at build time to populate `.Services[*].Meshed` in the template context; the `security/` plugin's compose template iterates that list to emit sidecars.
 
 `README.md`'s Environment table is for env vars the **consumer app** sets, not values exported into the platform's `.env`.
 
@@ -138,8 +138,8 @@ Templates receive a `*Context` (`localmesh_src/internal/template/template.go`) w
 
 - `.Project` — the typed `project.toml` view. Fields: `.Project.Name`, `.Project.Namespace`, `.Project.TechLead`, `.Project.ExternalDomain`, `.Project.LocalDomain`, `.Project.Plugins`, `.Project.Services` (the app-tier `[[services]]`).
 - `.Plugin` — this plugin's own typed `plugin.toml`. Fields: `.Plugin.Name` (the directory-derived slug), `.Plugin.Identity.ModuleName`, `.Plugin.Identity.OwnedBy`, `.Plugin.Plugins` (meta-dependencies; empty for leaf plugins), `.Plugin.Services`.
-- `.Env` — `map[string]string` of the `.env`-managed values the CLI emitted (`internal/envwriter`). This carries CA / OIDC / SDS material, not the per-plugin `<PLUGIN>_*` vars from §4 — those reach compose through `${}` interpolation at runtime, not the template map.
-- `.Workloads` — `[]WorkloadCtx` (`.Name`, `.MeshExempt`) of every workload in the merged compose surface. Populated only on the second render pass, for plugins whose template iterates workloads (today: just `security/`). `nil` on the first pass.
+- `.Env` — `map[string]string` of the `.env`-managed values the CLI emitted (`internal/envwriter`). This carries CA / OIDC material, not the per-plugin `<PLUGIN>_*` vars from §4 — those reach compose through `${}` interpolation at runtime, not the template map.
+- `.Services` — `[]ServiceCtx` (`Name`, `Port`, `Meshed`, `ExposeViaIngress`) of every registry-known service (project `[[services]]` + every plugin `[[services]]`), sorted by name. `Meshed` is true when the service's `needs_mtls_sidecar` field is true (the default). `ExposeViaIngress` mirrors `expose_via_ingress`. Plugins that don't need the list ignore it. The `security/` template is the canonical consumer: it ranges over `.Services`, emits a `<name>-mesh` kuma-dp sidecar for each `Meshed` entry, and emits a `MeshHTTPRoute` for each `ExposeViaIngress` entry.
 
 ### Custom functions
 
