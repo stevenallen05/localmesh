@@ -206,3 +206,34 @@ func extractKey(t *testing.T, text, key string) string {
 	}
 	return m[1]
 }
+
+func TestLoadEnv_parsesKVsAcrossManagedAndUnmanagedSections(t *testing.T) {
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, ".env")
+	body := strings.Join([]string{
+		"# hand-edited line",
+		"PROJECT_NAME=metrics-collector",
+		"",
+		"# >>> secrets-gen managed — do not edit; regenerated on `make certs`",
+		"LOCALMESH_OIDC_CLIENT_SECRET=cafebabe",
+		"LOCAL_DOMAIN=lvh.me",
+		"# <<< secrets-gen managed",
+	}, "\n") + "\n"
+	if err := os.WriteFile(envPath, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LoadEnv(envPath)
+	if err != nil {
+		t.Fatalf("LoadEnv: %v", err)
+	}
+	want := map[string]string{
+		"PROJECT_NAME":                 "metrics-collector",
+		"LOCALMESH_OIDC_CLIENT_SECRET": "cafebabe",
+		"LOCAL_DOMAIN":                 "lvh.me",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("LoadEnv()[%q] = %q, want %q", k, got[k], v)
+		}
+	}
+}

@@ -26,6 +26,6 @@ func newRootCmd() *cobra.Command {
 		// TODO: needs_prod_decisions validate verb when go schema validator picked
 		// TODO: needs_prod_decisions install verb for production deployment
 	}
-	root.AddCommand(newBuildCmd(), newCACmd(), newMTLSCmd())
+	root.AddCommand(newBuildCmd(), newCACmd(), newSetupCmd())
 	return root
 }

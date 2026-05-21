@@ -230,3 +230,23 @@ func boolStr(b bool) string {
 	}
 	return "false"
 }
+
+// LoadEnv reads the given .env file and returns every KEY=VALUE pair
+// it finds — across both the managed and unmanaged sections, since
+// hand-edited values outside the markers are equally valid sources.
+// Empty file or missing file returns an empty map, no error.
+//
+// Used by callers that need to substitute .env values into other
+// artifacts (e.g. dexseed's template expansion of dex.yaml.sample).
+func LoadEnv(envPath string) (map[string]string, error) {
+	out := map[string]string{}
+	data, err := os.ReadFile(envPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return out, nil
+		}
+		return nil, fmt.Errorf("read %s: %w", envPath, err)
+	}
+	harvestKVs(string(data), out)
+	return out, nil
+}
