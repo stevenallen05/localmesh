@@ -3,9 +3,6 @@
 .PHONY: setup chart chart-lint demo-auth
 
 setup:
-	@command -v pipx >/dev/null || { echo "ERROR: pipx not found — install pipx (e.g. 'python3 -m pip install --user pipx') and re-run."; exit 1; }
-	@pipx run pre-commit install \
-		|| { echo "ERROR: pipx install pre-commit failed — fix and re-run."; exit 1; }
 	@echo "==> Wiping all compose state (sledgehammer reset)"
 	docker compose down -v
 	@go run ./localmesh_src/cmd/localmesh setup
