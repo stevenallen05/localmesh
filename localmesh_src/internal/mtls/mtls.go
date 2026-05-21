@@ -39,8 +39,8 @@ var IPSANs = []net.IP{
 // CA happens to use. mkcert v1.4.4 mints an RSA-3072 CA by default;
 // the in-memory test CA uses ECDSA P256.
 type Minter struct {
-	caRoot      string // .localmesh/secrets/root_ca
-	outputRoot  string // .localmesh/secrets
+	caRoot      string // localmesh/secrets/root_ca
+	outputRoot  string // localmesh/secrets
 	projectName string
 	localDomain string
 	caCert      *x509.Certificate
@@ -49,8 +49,8 @@ type Minter struct {
 
 // New loads mkcert's rootCA.pem + rootCA-key.pem and returns a Minter.
 func New(repoRoot, projectName, localDomain string) (*Minter, error) {
-	caRoot := filepath.Join(repoRoot, ".localmesh", "secrets", "root_ca")
-	outRoot := filepath.Join(repoRoot, ".localmesh", "secrets")
+	caRoot := filepath.Join(repoRoot, "localmesh", "secrets", "root_ca")
+	outRoot := filepath.Join(repoRoot, "localmesh", "secrets")
 	caCert, caKey, err := loadCA(caRoot)
 	if err != nil {
 		return nil, err

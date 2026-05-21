@@ -1,7 +1,7 @@
 // Package ca wraps mkcert for root CA generation + host trust-store
 // install/uninstall. Spec §2.6.
 //
-// CAROOT pinned to .localmesh/secrets/root_ca/; mkcert writes
+// CAROOT pinned to localmesh/secrets/root_ca/; mkcert writes
 // rootCA.pem + rootCA-key.pem under that path.
 package ca
 
@@ -21,7 +21,7 @@ var ErrAlreadyExists = errors.New("CA already exists; use --force to overwrite")
 // CA wraps the mkcert binary and CAROOT path.
 type CA struct {
 	BinPath string // localmesh_src/tools/mkcert
-	CARoot  string // .localmesh/secrets/root_ca
+	CARoot  string // localmesh/secrets/root_ca
 }
 
 // New returns a CA with defaults wired to the project's filesystem layout.
@@ -36,7 +36,7 @@ func New(repoRoot string) *CA {
 	}
 	return &CA{
 		BinPath: bin,
-		CARoot:  filepath.Join(repoRoot, ".localmesh", "secrets", "root_ca"),
+		CARoot:  filepath.Join(repoRoot, "localmesh", "secrets", "root_ca"),
 	}
 }
 

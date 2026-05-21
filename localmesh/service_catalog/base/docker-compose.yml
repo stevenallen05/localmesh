@@ -1,3 +1,11 @@
 # Meta-package — pulls in auth + security + observability + logging via
 # plugin.toml's plugins = [...]. No services of its own.
 services: {}
+
+secrets:
+  server_id_crt:
+    file: ./secrets/server/id.crt
+  server_id_key:
+    file: ./secrets/server/id.key
+  server_trust_ca:
+    file: ./secrets/server/trust.ca.crt

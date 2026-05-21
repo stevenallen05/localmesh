@@ -132,10 +132,3 @@ services:
       metrics.module_name: app
       metrics.owned_by: ${TECH_LEAD_EMAIL}
 
-secrets:
-  server_id_crt:
-    file: ./localmesh/secrets/server/id.crt
-  server_id_key:
-    file: ./localmesh/secrets/server/id.key
-  server_trust_ca:
-    file: ./localmesh/secrets/server/trust.ca.crt

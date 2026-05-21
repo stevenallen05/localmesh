@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/stevenallen05/localmesh/internal/ca"
 )
 
 func writeTestCA(t *testing.T, caRoot string) {
@@ -52,7 +54,7 @@ func writeTestCA(t *testing.T, caRoot string) {
 
 func TestMint_signsLeafWithExpectedSANs(t *testing.T) {
 	repoRoot := t.TempDir()
-	writeTestCA(t, filepath.Join(repoRoot, ".localmesh", "secrets", "root_ca"))
+	writeTestCA(t, filepath.Join(repoRoot, "localmesh", "secrets", "root_ca"))
 	m, err := New(repoRoot, "metrics-collector", "lvh.me")
 	if err != nil {
 		t.Fatal(err)
@@ -60,7 +62,7 @@ func TestMint_signsLeafWithExpectedSANs(t *testing.T) {
 	if err := m.Mint("server"); err != nil {
 		t.Fatalf("Mint: %v", err)
 	}
-	leafPath := filepath.Join(repoRoot, ".localmesh", "secrets", "server", "id.crt")
+	leafPath := filepath.Join(repoRoot, "localmesh", "secrets", "server", "id.crt")
 	pemBytes, err := os.ReadFile(leafPath)
 	if err != nil {
 		t.Fatal(err)
@@ -85,7 +87,7 @@ func TestMint_signsLeafWithExpectedSANs(t *testing.T) {
 
 func TestMint_keyFileMode0600(t *testing.T) {
 	repoRoot := t.TempDir()
-	writeTestCA(t, filepath.Join(repoRoot, ".localmesh", "secrets", "root_ca"))
+	writeTestCA(t, filepath.Join(repoRoot, "localmesh", "secrets", "root_ca"))
 	m, err := New(repoRoot, "x", "lvh.me")
 	if err != nil {
 		t.Fatal(err)
@@ -93,11 +95,39 @@ func TestMint_keyFileMode0600(t *testing.T) {
 	if err := m.Mint("worker"); err != nil {
 		t.Fatal(err)
 	}
-	info, err := os.Stat(filepath.Join(repoRoot, ".localmesh", "secrets", "worker", "id.key"))
+	info, err := os.Stat(filepath.Join(repoRoot, "localmesh", "secrets", "worker", "id.key"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if info.Mode().Perm() != 0o600 {
 		t.Errorf("id.key mode = %v, want 0600", info.Mode().Perm())
+	}
+}
+
+// TestSecretsPath_caAndMtlsAgree is a regression guard. The package
+// constants in internal/ca and internal/mtls used to drift between
+// `.localmesh/secrets/...` and `localmesh/secrets/...`, which broke
+// `make certs` end-to-end because the Makefile and docker-compose
+// secrets paths only spoke the no-dot form. This test fails loudly if
+// either package's constant strays from the agreed shape.
+func TestSecretsPath_caAndMtlsAgree(t *testing.T) {
+	repoRoot := t.TempDir()
+	wantCARoot := filepath.Join(repoRoot, "localmesh", "secrets", "root_ca")
+	if got := ca.New(repoRoot).CARoot; got != wantCARoot {
+		t.Errorf("ca.New(%q).CARoot = %q, want %q", repoRoot, got, wantCARoot)
+	}
+	// mtls.New loads the CA at construction; give it a stub CA so we
+	// can reach the path-only assertion below.
+	writeTestCA(t, wantCARoot)
+	m, err := New(repoRoot, "metrics-collector", "lvh.me")
+	if err != nil {
+		t.Fatalf("mtls.New: %v", err)
+	}
+	wantOutRoot := filepath.Join(repoRoot, "localmesh", "secrets")
+	if m.outputRoot != wantOutRoot {
+		t.Errorf("mtls.New(%q).outputRoot = %q, want %q", repoRoot, m.outputRoot, wantOutRoot)
+	}
+	if m.caRoot != wantCARoot {
+		t.Errorf("mtls.New(%q).caRoot = %q, want %q", repoRoot, m.caRoot, wantCARoot)
 	}
 }
