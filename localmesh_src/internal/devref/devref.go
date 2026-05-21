@@ -193,6 +193,7 @@ func lineCount(s string) int {
 	// so a 4-line block lands here as "line 1\nline 2\nline 3\nline 4\n"
 	// (or without the trailing \n if author omitted it). Trim trailing
 	// whitespace, then count newlines + 1 for the final line.
+	// TODO: needs_prod_decisions strip \r from CRLF sidecars
 	trimmed := strings.TrimRight(s, "\n \t")
 	if trimmed == "" {
 		return 0
