@@ -244,3 +244,23 @@ func TestLoadAll_selfCycle(t *testing.T) {
 		t.Errorf("error message %q missing self-cycle path", err.Error())
 	}
 }
+
+func TestService_Meshed(t *testing.T) {
+	tr, fa := true, false
+	tests := []struct {
+		name string
+		in   *bool
+		want bool
+	}{
+		{"absent defaults meshed", nil, true},
+		{"explicit true", &tr, true},
+		{"explicit false exempt", &fa, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := (Service{NeedsMTLSSidecar: tt.in}).Meshed(); got != tt.want {
+				t.Errorf("Meshed() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
