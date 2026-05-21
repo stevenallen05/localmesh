@@ -1,6 +1,71 @@
-// Grown across chunks.
-
+// observability_cleanroom/alloy/config.alloy
 logging {
   level  = "info"
   format = "logfmt"
+}
+
+// OTLP receiver — apps push traces, metrics, logs here.
+otelcol.receiver.otlp "default" {
+  grpc { endpoint = "0.0.0.0:4317" }
+  http { endpoint = "0.0.0.0:4318" }
+
+  output {
+    traces  = [otelcol.processor.batch.default.input]
+    metrics = [otelcol.processor.batch.default.input]
+    logs    = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.batch "default" {
+  output {
+    traces  = [
+      otelcol.connector.spanmetrics.default.input,
+      otelcol.connector.servicegraph.default.input,
+      otelcol.exporter.otlp.tempo.input,
+    ]
+    metrics = []
+    logs    = []
+  }
+}
+
+// Span metrics: traces_spanmetrics_calls_total + duration histograms.
+// Output goes to a Prom remote-write that doesn't exist yet — that lands in
+// Chunk 3. The pipeline still validates and runs; data is dropped silently.
+otelcol.connector.spanmetrics "default" {
+  histogram {
+    explicit {}
+  }
+
+  output {
+    metrics = [otelcol.exporter.prometheus.spanmetrics.input]
+  }
+}
+
+otelcol.connector.servicegraph "default" {
+  output {
+    metrics = [otelcol.exporter.prometheus.servicegraph.input]
+  }
+}
+
+otelcol.exporter.prometheus "spanmetrics" {
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+
+otelcol.exporter.prometheus "servicegraph" {
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+
+// Tempo exporter — gRPC, plaintext, no TLS for localdev.
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls { insecure = true }
+  }
+}
+
+// Placeholder — Chunk 3 replaces this with a real Prom endpoint.
+prometheus.remote_write "default" {
+  endpoint {
+    url = "http://localhost:9999/api/v1/write"
+  }
 }
