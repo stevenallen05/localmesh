@@ -57,9 +57,6 @@ requires_accelerator_class = "ml_training"   # one of: none, ml_inference, ml_tr
 
 # Could trigger security review, secrets provisioning, or a DPA check.
 [vendors]
-uses_payments_processor       = true    # implies compliance.handles_pci_data
-uses_secrets_manager          = true    # security review on every change
 uses_identity_provider        = true    # SOC2 in-scope
 uses_hardware_security_module = false   # HSM-backed key custody
-uses_generative_ai_api        = false   # data-residency, DLP review
-sends_telemetry_to_vendor     = true    # off-prem sink — requires a DPA
+uses_anthropic_api            = false   # Usage-based vendor API
