@@ -291,6 +291,80 @@ func TestWrite_pluginWithoutSidecarOmitted(t *testing.T) {
 	}
 }
 
+func TestWrite_descriptionMissingErrors(t *testing.T) {
+	repoRoot := t.TempDir()
+	mustMkdir(t, filepath.Join(repoRoot, "localmesh"))
+	catalogRoot := t.TempDir()
+	writeSidecar(t, catalogRoot, "auth", `extras = "only extras, no description"`)
+	proj := &manifest.Project{Name: "p", LocalDomain: "lvh.me"}
+	plugins := []*manifest.Plugin{{Name: "auth"}}
+	err := Write(repoRoot, catalogRoot, proj, plugins)
+	if err == nil {
+		t.Fatal("expected error for missing description, got nil")
+	}
+	if !strings.Contains(err.Error(), "description required") {
+		t.Errorf("error should mention 'description required'; got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "developer_reference.md.toml") {
+		t.Errorf("error should include the sidecar path; got: %v", err)
+	}
+}
+
+func TestWrite_descriptionExceedsCapErrors(t *testing.T) {
+	repoRoot := t.TempDir()
+	mustMkdir(t, filepath.Join(repoRoot, "localmesh"))
+	catalogRoot := t.TempDir()
+	writeSidecar(t, catalogRoot, "auth", `description = """
+line 1
+line 2
+line 3
+line 4
+line 5
+"""`)
+	proj := &manifest.Project{Name: "p", LocalDomain: "lvh.me"}
+	plugins := []*manifest.Plugin{{Name: "auth"}}
+	err := Write(repoRoot, catalogRoot, proj, plugins)
+	if err == nil {
+		t.Fatal("expected error for >4-line description, got nil")
+	}
+	if !strings.Contains(err.Error(), "description must be ≤4 lines, got 5") {
+		t.Errorf("error should mention 'description must be ≤4 lines, got 5'; got: %v", err)
+	}
+}
+
+func TestWrite_descriptionAtCapAccepted(t *testing.T) {
+	repoRoot := t.TempDir()
+	mustMkdir(t, filepath.Join(repoRoot, "localmesh"))
+	catalogRoot := t.TempDir()
+	writeSidecar(t, catalogRoot, "auth", `description = """
+line 1
+line 2
+line 3
+line 4
+"""`)
+	proj := &manifest.Project{Name: "p", LocalDomain: "lvh.me"}
+	plugins := []*manifest.Plugin{{Name: "auth"}}
+	if err := Write(repoRoot, catalogRoot, proj, plugins); err != nil {
+		t.Fatalf("4-line description should be accepted; got: %v", err)
+	}
+}
+
+func TestWrite_sidecarUnparseableErrors(t *testing.T) {
+	repoRoot := t.TempDir()
+	mustMkdir(t, filepath.Join(repoRoot, "localmesh"))
+	catalogRoot := t.TempDir()
+	writeSidecar(t, catalogRoot, "auth", `description = "unterminated`)
+	proj := &manifest.Project{Name: "p", LocalDomain: "lvh.me"}
+	plugins := []*manifest.Plugin{{Name: "auth"}}
+	err := Write(repoRoot, catalogRoot, proj, plugins)
+	if err == nil {
+		t.Fatal("expected error for malformed TOML, got nil")
+	}
+	if !strings.Contains(err.Error(), "developer_reference.md.toml") {
+		t.Errorf("error should include the sidecar path; got: %v", err)
+	}
+}
+
 // Helpers — keep at the bottom of devref_test.go.
 
 func mustMkdir(t *testing.T, path string) {

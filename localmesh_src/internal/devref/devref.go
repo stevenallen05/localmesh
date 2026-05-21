@@ -172,5 +172,30 @@ func readSidecar(catalogRoot, pluginName string) (sidecar, bool, error) {
 	if err := toml.Unmarshal(data, &sc); err != nil {
 		return sidecar{}, false, fmt.Errorf("parse %s: %w", path, err)
 	}
+	if err := validateSidecar(path, sc); err != nil {
+		return sidecar{}, false, err
+	}
 	return sc, true, nil
+}
+
+func validateSidecar(path string, sc sidecar) error {
+	if sc.Description == "" {
+		return fmt.Errorf("%s: description required", path)
+	}
+	if n := lineCount(sc.Description); n > 4 {
+		return fmt.Errorf("%s: description must be ≤4 lines, got %d", path, n)
+	}
+	return nil
+}
+
+func lineCount(s string) int {
+	// TOML """…""" strips the first newline after the opening delimiter,
+	// so a 4-line block lands here as "line 1\nline 2\nline 3\nline 4\n"
+	// (or without the trailing \n if author omitted it). Trim trailing
+	// whitespace, then count newlines + 1 for the final line.
+	trimmed := strings.TrimRight(s, "\n \t")
+	if trimmed == "" {
+		return 0
+	}
+	return strings.Count(trimmed, "\n") + 1
 }
