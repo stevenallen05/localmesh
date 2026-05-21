@@ -111,8 +111,8 @@ func TestRenderDoc_ingressMixedProjectAndPlugin(t *testing.T) {
 	if strings.Contains(got, "server") {
 		t.Errorf("non-ingress service 'server' must not appear; got:\n%s", got)
 	}
-	if strings.Contains(got, "postgres") && strings.Contains(strings.Split(got, "## Ingress")[1], "postgres") {
-		t.Errorf("non-ingress service 'postgres' must not appear in Ingress section; got:\n%s", got)
+	if strings.Contains(got, "| postgres |") {
+		t.Errorf("non-ingress service 'postgres' must not appear as an ingress row; got:\n%s", got)
 	}
 	// Order: project rows before plugin rows.
 	wwwIdx := strings.Index(got, "www.metrics-collector")
