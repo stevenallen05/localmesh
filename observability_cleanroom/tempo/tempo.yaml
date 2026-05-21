@@ -18,3 +18,23 @@ storage:
       path: /var/tempo/blocks
     wal:
       path: /var/tempo/wal
+
+# local-blocks powers TraceQL metrics (| rate(), | histogram_over_time()).
+# Grafana's Tempo Explore auto-issues these; without a generator they 500 with
+# "empty ring". Only local-blocks is enabled — no span-metrics/service-graph
+# processors and no remote_write, so Alloy stays the sole spanmetrics→Prom path.
+metrics_generator:
+  processor:
+    local_blocks:
+      filter_server_spans: false
+      flush_to_storage: true
+  storage:
+    path: /var/tempo/generator/wal
+  traces_storage:
+    path: /var/tempo/generator/traces
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors:
+        - local-blocks
