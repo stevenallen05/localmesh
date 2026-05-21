@@ -42,6 +42,8 @@ services:
     image: localmesh-sidecar:dev
     # BUILTIN gateway dataplane. Gateways don't transparent-proxy, so no
     # NET_ADMIN; kuma fills the dataplane address var via --dataplane-var.
+    # `$$` is Compose's variable-escape (renders to `$` at runtime); `\$$1`
+    # reaches awk as `$1`.
     command:
       - /bin/bash
       - -c
@@ -93,6 +95,8 @@ configs:
     file: ./bootstrap/20-allow-all.yaml
   ingress_dataplane:
     file: ./dataplane/ingress.yaml
+  # Rendered inline (not file:) so per-service routes use the template context.
+  # Block-scalar body: indentation is content; `---` separates each route doc.
   ingress_routes:
     content: |
 {{- range .Services }}
