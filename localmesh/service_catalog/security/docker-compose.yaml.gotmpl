@@ -69,6 +69,9 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
+    configs:
+      - source: transparent_proxy
+        target: /etc/kuma/transparent-proxy.yaml
     environment:
       WORKLOAD_NAME: {{ .Name }}
       APP_PORT: "{{ .Port }}"
@@ -93,6 +96,23 @@ configs:
     file: ./bootstrap/20-allow-all.yaml
   ingress_dataplane:
     file: ./dataplane/ingress.yaml
+  # Rendered inline: the outbound-redirect exclude list is derived from the
+  # ports of mesh-exempt (!Meshed) services. Meshed workloads reach exempt
+  # services (e.g. postgres native mTLS) directly, bypassing the sidecar.
+  transparent_proxy:
+    content: |
+      kumaDPUser: kuma-data-plane-proxy
+      redirect:
+        dns:
+          enabled: true
+        outbound:
+          excludePorts:
+{{- range .Services }}
+{{- if not .Meshed }}
+            - {{ .Port }}
+{{- end }}
+{{- end }}
+      verbose: true
   # Rendered inline (not file:) so per-service routes use the template context.
   # Block-scalar body: indentation is content; `---` separates each route doc.
   ingress_routes:
