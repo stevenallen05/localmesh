@@ -1,6 +1,6 @@
 # plugins must precede [identity]: a bare key after a table header is
 # parsed into that table, so `plugins` here would become identity.plugins.
-plugins = ["auth", "security", "observability", "logging"]
+plugins = ["auth", "security"]
 
 [identity]
 module_name = "base"

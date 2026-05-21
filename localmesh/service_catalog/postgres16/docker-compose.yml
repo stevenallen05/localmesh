@@ -180,11 +180,6 @@ services:
       metrics.module_name: postgres16
       metrics.owned_by: sre@example.com
 
-  grafana:
-    configs:
-      - source: database_dashboard_postgres
-        target: /etc/grafana/dashboards/database/postgres.json
-
   database-collector:
     image: otel/opentelemetry-collector-contrib:0.152.0
     container_name: database-collector
