@@ -8,7 +8,7 @@
 #     (HTTP/JSON OTLP) on a background worker every otel_naptime ms.
 #   - Spans inherit the trace context from a `/*traceparent='...'*/` SQL
 #     comment, which the Rust server's Persist RPC injects.
-#   - Spans carry `service.name=postgres`, `module_name=database`,
+#   - Spans carry `service.name=postgres`, `module_name=postgres16`,
 #     `owned_by=sre@example.com` via OTEL_RESOURCE_ATTRIBUTES.
 #
 # In prod this module would point at the managed offering (e.g., RDS
@@ -198,7 +198,7 @@ services:
     labels:
       # Sidecar is functionally part of the observability plane; share the
       # `service=observability` lens with the main collector so cluster-health
-      # rolls them up together. `module_name=database` though — catalog
+      # rolls them up together. `module_name=postgres16` though — catalog
       # attribution follows where the service is declared, not its functional
       # role; the two lenses are intentionally different on this service.
       metrics.service_name: observability
