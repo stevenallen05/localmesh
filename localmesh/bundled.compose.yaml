@@ -452,6 +452,12 @@ configs:
                   processors: [resource]
                   exporters: [otlp]
 secrets:
+    server_id_crt:
+        file: ./secrets/server/id.crt
+    server_id_key:
+        file: ./secrets/server/id.key
+    server_trust_ca:
+        file: ./secrets/server/trust.ca.crt
     postgres_id_crt:
         file: ./secrets/postgres/id.crt
     postgres_id_key:
