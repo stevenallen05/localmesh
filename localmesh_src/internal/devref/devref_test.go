@@ -141,9 +141,9 @@ func TestRenderDoc_ingressZeroServicesEmitsHeaderOnly(t *testing.T) {
 		t.Errorf("missing Ingress heading; got:\n%s", got)
 	}
 	// Tail of the document from `## Ingress` onward must not contain
-	// any placeholder text. (At Task 3 time there is no `## Plugins`
-	// section yet, so scoping the assertion to "tail from heading"
-	// avoids brittle slicing on a non-existent next-heading index.)
+	// any placeholder text. Scoped to the tail (rather than just the
+	// Ingress subsection) so a `_None_` placeholder inadvertently
+	// emitted by any later section still fails this test.
 	tail := got[strings.Index(got, "## Ingress"):]
 	for _, placeholder := range []string{"_None_", "_no ingress_", "_none_"} {
 		if strings.Contains(tail, placeholder) {
