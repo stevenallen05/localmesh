@@ -9,6 +9,71 @@ import (
 	"github.com/stevenallen05/localmesh/internal/manifest"
 )
 
+func TestRenderDoc_projectAllFields(t *testing.T) {
+	proj := &manifest.Project{
+		Name:           "metrics-collector",
+		Namespace:      "laptop",
+		TechLead:       "sallen@amberstyle.ca",
+		ExternalDomain: "metrics.example.com",
+		LocalDomain:    "lvh.me",
+	}
+	got := renderDoc(proj, nil)
+	wantRows := []string{
+		"| project_name      | metrics-collector              |",
+		"| project_namespace | laptop                         |",
+		"| tech_lead_email   | sallen@amberstyle.ca           |",
+		"| external_domain   | metrics.example.com            |",
+		"| local_domain      | lvh.me                         |",
+	}
+	for _, row := range wantRows {
+		if !strings.Contains(got, row) {
+			t.Errorf("missing row %q in output:\n%s", row, got)
+		}
+	}
+	if !strings.Contains(got, "_To change any of these, edit `project.toml` and re-run `localmesh build`._") {
+		t.Errorf("missing footer note; got:\n%s", got)
+	}
+	// Order: project_name MUST appear before project_namespace, etc.
+	idxs := []int{
+		strings.Index(got, "project_name"),
+		strings.Index(got, "project_namespace"),
+		strings.Index(got, "tech_lead_email"),
+		strings.Index(got, "external_domain"),
+		strings.Index(got, "local_domain"),
+	}
+	for i := 1; i < len(idxs); i++ {
+		if idxs[i] <= idxs[i-1] {
+			t.Errorf("field order wrong; indices = %v", idxs)
+			break
+		}
+	}
+}
+
+func TestRenderDoc_projectOmitsEmptyOptionalFields(t *testing.T) {
+	proj := &manifest.Project{
+		Name:        "p",
+		LocalDomain: "lvh.me",
+		// Namespace, TechLead, ExternalDomain all empty.
+	}
+	got := renderDoc(proj, nil)
+	if strings.Contains(got, "project_namespace") {
+		t.Errorf("project_namespace row should be omitted; got:\n%s", got)
+	}
+	if strings.Contains(got, "tech_lead_email") {
+		t.Errorf("tech_lead_email row should be omitted; got:\n%s", got)
+	}
+	if strings.Contains(got, "external_domain") {
+		t.Errorf("external_domain row should be omitted; got:\n%s", got)
+	}
+	// Required fields must still render.
+	if !strings.Contains(got, "project_name") {
+		t.Errorf("project_name row missing; got:\n%s", got)
+	}
+	if !strings.Contains(got, "local_domain") {
+		t.Errorf("local_domain row missing; got:\n%s", got)
+	}
+}
+
 func TestWrite_createsFileWithHeader(t *testing.T) {
 	repoRoot := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(repoRoot, "localmesh"), 0o755); err != nil {
