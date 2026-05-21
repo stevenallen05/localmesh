@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -167,5 +168,29 @@ func writeProject(t *testing.T, root string, plugins []string) {
 	body := fmt.Sprintf("project_name = \"sample\"\nlocal_domain = \"lvh.me\"\nplugins = [%s]\n", strings.Join(quoted, ", "))
 	if err := os.WriteFile(filepath.Join(root, "project.toml"), []byte(body), 0o600); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLoadAll_transitiveFlattenDedup(t *testing.T) {
+	root := t.TempDir()
+	// base requires [auth, security]; security requires [auth]; postgres16 is a leaf.
+	// Project selects [base, postgres16]. Auth must appear once, depth-first post-order.
+	writePlugin(t, root, "auth", nil)
+	writePlugin(t, root, "security", []string{"auth"})
+	writePlugin(t, root, "base", []string{"auth", "security"})
+	writePlugin(t, root, "postgres16", nil)
+	writeProject(t, root, []string{"base", "postgres16"})
+
+	_, plugins, err := LoadAll(filepath.Join(root, "project.toml"), root)
+	if err != nil {
+		t.Fatalf("LoadAll: %v", err)
+	}
+	got := make([]string, len(plugins))
+	for i, p := range plugins {
+		got[i] = p.Name
+	}
+	want := []string{"auth", "security", "base", "postgres16"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("flatten order = %v, want %v", got, want)
 	}
 }
