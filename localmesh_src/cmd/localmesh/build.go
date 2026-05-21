@@ -21,7 +21,7 @@ func newBuildCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("getcwd: %w", err)
 			}
-			proj, plugins, err := manifest.LoadAll("project.toml", "service_catalog")
+			proj, plugins, err := manifest.LoadAll("project.toml", "localmesh/service_catalog")
 			if err != nil {
 				return err
 			}
@@ -31,7 +31,7 @@ func newBuildCmd() *cobra.Command {
 				return err
 			}
 			composePath := filepath.Join("localmesh", "bundled.compose.yaml")
-			return render.RunWith(proj, plugins, "service_catalog", composePath)
+			return render.RunWith(proj, plugins, "localmesh/service_catalog", composePath)
 		},
 	}
 }
