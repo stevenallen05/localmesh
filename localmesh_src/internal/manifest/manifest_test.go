@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -131,5 +132,40 @@ func TestLoadAll_sampleCatalog(t *testing.T) {
 	}
 	if plugins[0].Name != "alpha" || plugins[1].Name != "beta" {
 		t.Errorf("plugin names = %v, want [alpha beta]", []string{plugins[0].Name, plugins[1].Name})
+	}
+}
+
+// writePlugin writes a minimal plugin.toml in <root>/<name>/plugin.toml.
+// plugins is the value of the new `plugins = [...]` array; nil omits the key.
+func writePlugin(t *testing.T, root, name string, plugins []string) {
+	t.Helper()
+	dir := filepath.Join(root, name)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := fmt.Sprintf("[identity]\nmodule_name = %q\nowned_by    = %q\n", name, name+"@example.com")
+	if plugins != nil {
+		quoted := make([]string, len(plugins))
+		for i, p := range plugins {
+			quoted[i] = fmt.Sprintf("%q", p)
+		}
+		body += fmt.Sprintf("plugins = [%s]\n", strings.Join(quoted, ", "))
+	}
+	if err := os.WriteFile(filepath.Join(dir, "plugin.toml"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// writeProject writes a minimal project.toml at <root>/project.toml selecting
+// the given plugin names.
+func writeProject(t *testing.T, root string, plugins []string) {
+	t.Helper()
+	quoted := make([]string, len(plugins))
+	for i, p := range plugins {
+		quoted[i] = fmt.Sprintf("%q", p)
+	}
+	body := fmt.Sprintf("project_name = \"sample\"\nlocal_domain = \"lvh.me\"\nplugins = [%s]\n", strings.Join(quoted, ", "))
+	if err := os.WriteFile(filepath.Join(root, "project.toml"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
 	}
 }
