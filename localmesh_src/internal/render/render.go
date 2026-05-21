@@ -31,10 +31,10 @@ func Run(projectFile, catalogRoot, outputPath string) error {
 //
 // Two-pass: pass 1 renders every plugin with an empty Workloads list so
 // the merged compose surfaces every container name + its mesh.exempt
-// label. The mesh plugin's compose uses .Workloads, so on pass 1 it
+// label. The security plugin's compose uses .Workloads, so on pass 1 it
 // emits only the role services (ingress-mesh, egress-mesh) and no
 // sidecar blocks. Pass 2 re-renders any plugin whose template depends
-// on .Workloads with the populated list. Today only the mesh plugin
+// on .Workloads with the populated list. Today only the security plugin
 // qualifies, so the second pass re-renders just that one and swaps it
 // into the rendered slice before the final merge.
 func RunWith(proj *manifest.Project, plugins []*manifest.Plugin, catalogRoot, outputPath string) error {
@@ -42,7 +42,7 @@ func RunWith(proj *manifest.Project, plugins []*manifest.Plugin, catalogRoot, ou
 	outputDir := filepath.Dir(outputPath)
 	rendered := make([]*yaml.Node, 0, len(plugins))
 	sources := make([]string, 0, len(plugins))
-	meshIdx := -1
+	securityIdx := -1
 	for i, p := range plugins {
 		node, err := renderPluginCompose(proj, p, env, nil, catalogRoot, outputDir)
 		if err != nil {
@@ -51,14 +51,14 @@ func RunWith(proj *manifest.Project, plugins []*manifest.Plugin, catalogRoot, ou
 		rendered = append(rendered, node)
 		sources = append(sources, p.Name)
 		if p.Name == "security" {
-			meshIdx = i
+			securityIdx = i
 		}
 	}
 	// Discover workloads from pass-1 rendered nodes + project-tier services
 	// (proj.Services declares app containers like www, server that live in
-	// the root docker-compose.yml, not in any plugin compose). Mesh's
+	// the root docker-compose.yml, not in any plugin compose). Security's
 	// pass-1 output is filtered out — its ingress-mesh + egress-mesh are
-	// roles, not workloads, and the mesh template never iterates itself.
+	// roles, not workloads, and the security template never iterates itself.
 	//
 	// Filter the result to registry-known containers: only services with a
 	// declared [[services]] entry have port/scheme metadata, which the
@@ -66,15 +66,15 @@ func RunWith(proj *manifest.Project, plugins []*manifest.Plugin, catalogRoot, ou
 	// containers like database-collector with no plugin.toml entry) are
 	// dropped here so we don't emit a sidecar compose block without a
 	// matching envoy YAML.
-	if meshIdx >= 0 {
+	if securityIdx >= 0 {
 		workloads := workloadsFromNodes(rendered, sources)
 		workloads = appendProjectWorkloads(workloads, proj)
 		workloads = filterRegistryKnown(workloads, proj, plugins)
-		node, err := renderPluginCompose(proj, plugins[meshIdx], env, workloads, catalogRoot, outputDir)
+		node, err := renderPluginCompose(proj, plugins[securityIdx], env, workloads, catalogRoot, outputDir)
 		if err != nil {
 			return err
 		}
-		rendered[meshIdx] = node
+		rendered[securityIdx] = node
 	}
 	merged, err := Merge(rendered, sources)
 	if err != nil {
@@ -176,9 +176,9 @@ func appendProjectWorkloads(existing []tmpl.WorkloadCtx, proj *manifest.Project)
 }
 
 // workloadsFromNodes extracts every services.<name> + its mesh.exempt
-// label from the pass-1 rendered plugin compose nodes. The mesh plugin's
+// label from the pass-1 rendered plugin compose nodes. The security plugin's
 // own pass-1 output (ingress-mesh, egress-mesh) is excluded — those are
-// roles, not workloads, and the mesh template never iterates itself.
+// roles, not workloads, and the security template never iterates itself.
 // Services appearing in multiple plugins (additive blocks across plugins
 // for the same container) are deduped: a service is mesh-exempt if any
 // contributing plugin marks it exempt. Result is sorted by name for
