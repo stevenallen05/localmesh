@@ -1,4 +1,4 @@
-# Consumer wiring — `database/`
+# Consumer wiring — `postgres16/`
 
 ## Overview
 

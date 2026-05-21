@@ -1,5 +1,5 @@
 [identity]
-module_name = "database"
+module_name = "postgres16"
 owned_by    = "sre@example.com"
 
 [[services]]

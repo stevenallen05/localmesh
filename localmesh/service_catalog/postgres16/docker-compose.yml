@@ -30,7 +30,7 @@ services:
       # via the file mount anyway, so the generated default is irrelevant;
       # setting trust here just satisfies the entrypoint's check.
       POSTGRES_HOST_AUTH_METHOD: trust
-      OTEL_RESOURCE_ATTRIBUTES: "module_name=database,owned_by=sre@example.com"
+      OTEL_RESOURCE_ATTRIBUTES: "module_name=postgres16,owned_by=sre@example.com"
       OTEL_SERVICE_NAME: postgres
     # Wrap the image's entrypoint: copy cert files (delivered via docker
     # compose secrets at /run/postgres/) into a postgres-owned location
@@ -112,7 +112,7 @@ services:
       # an already-TLS connection. See chart/Plan notes.
       mesh.exempt: "true"
       metrics.service_name: postgres
-      metrics.module_name: database
+      metrics.module_name: postgres16
       metrics.owned_by: sre@example.com
 
   # Postgres infra + pg_stat_statements metrics. Scraped by the per-module
@@ -177,7 +177,7 @@ services:
       # cluster-health uses. Not the same channel as module_name/owned_by on
       # the scraped series (that's Task 3.3, the sidecar collector).
       metrics.service_name: postgres
-      metrics.module_name: database
+      metrics.module_name: postgres16
       metrics.owned_by: sre@example.com
 
   grafana:
@@ -202,7 +202,7 @@ services:
       # attribution follows where the service is declared, not its functional
       # role; the two lenses are intentionally different on this service.
       metrics.service_name: observability
-      metrics.module_name: database
+      metrics.module_name: postgres16
       metrics.owned_by: sre@example.com
 
 configs:
@@ -237,7 +237,7 @@ configs:
               value: postgres
               action: upsert
             - key: module_name
-              value: database
+              value: postgres16
               action: upsert
             - key: owned_by
               value: sre@example.com
