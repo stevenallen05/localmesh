@@ -11,6 +11,7 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: admin
     volumes:
       - ./provisioning:/etc/grafana/provisioning:ro
+      - ./dashboards:/etc/grafana/dashboards:ro
     tmpfs:
       - /var/lib/grafana:mode=0777
     restart: unless-stopped
