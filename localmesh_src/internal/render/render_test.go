@@ -99,12 +99,20 @@ func TestSecurityTemplate_emitsSidecarsAndRoutes(t *testing.T) {
 		"www-mesh:", "server-mesh:", `network_mode: "service:www"`,
 		"localmesh-bootstrap:", "ingress:",
 		"ingress-route-www", "www.proj.lvh.me",
+		// HTTPS-terminating ingress gateway (Task 4): the four shapes
+		// that, if silently dropped by a template-substitution or
+		// indentation drift, would still let the existing structural
+		// assertions pass while leaving the listener as plain HTTP.
+		"protocol: HTTPS",
+		"mode: TERMINATE",
+		"secret: ingress-tls",
+		"port: https-ingress",
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("missing %q in:\n%s", want, s)
 		}
 	}
-	for _, bad := range []string{"postgres-mesh:", "mesh.exempt", "ProjectName"} {
+	for _, bad := range []string{"postgres-mesh:", "mesh.exempt", "ProjectName", "port: http-ingress"} {
 		if strings.Contains(s, bad) {
 			t.Errorf("unexpected %q in output", bad)
 		}
