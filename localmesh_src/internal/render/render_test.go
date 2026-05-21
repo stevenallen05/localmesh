@@ -12,7 +12,7 @@ var update = flag.Bool("update", false, "rewrite golden files")
 
 func TestRun_sampleCatalog(t *testing.T) {
 	tmp := t.TempDir()
-	out := filepath.Join(tmp, "localmesh.compose.yaml")
+	out := filepath.Join(tmp, "bundled.compose.yaml")
 	root := filepath.Join("..", "..", "testdata", "sample_catalog")
 	if err := Run(filepath.Join(root, "project.toml"), root, out); err != nil {
 		t.Fatalf("Run: %v", err)
@@ -42,7 +42,7 @@ func TestRun_sampleCatalog(t *testing.T) {
 
 func TestRun_idempotent(t *testing.T) {
 	tmp := t.TempDir()
-	out := filepath.Join(tmp, "localmesh.compose.yaml")
+	out := filepath.Join(tmp, "bundled.compose.yaml")
 	root := filepath.Join("..", "..", "testdata", "sample_catalog")
 	if err := Run(filepath.Join(root, "project.toml"), root, out); err != nil {
 		t.Fatal(err)
