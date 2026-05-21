@@ -3,9 +3,8 @@ name: obs-cleanroom
 include:
   - ./alloy/docker-compose.yml
   - ./prometheus/docker-compose.yml
-  - ./tempo/docker-compose.yml
+  - ./jaeger/docker-compose.yml
   - ./loki/docker-compose.yml
   - ./pyroscope/docker-compose.yml
   - ./cadvisor/docker-compose.yml
-  - ./grafana/docker-compose.yml
   - ./noise-generator/docker-compose.yml

@@ -5,7 +5,7 @@ services:
     container_name: pyroscope
     command: ["-config.file=/etc/pyroscope/pyroscope.yaml"]
     ports:
-      - "4040:4040"
+      - "14040:4040"
     volumes:
       - ./pyroscope.yaml:/etc/pyroscope/pyroscope.yaml:ro
       - pyroscope-data:/data

@@ -1,8 +1,10 @@
-# observability_cleanroom
+# observability_cleanroom (Jaeger experiment)
 
-Parallel exploration of a unified observability suite: Grafana + Alloy + Prometheus + Tempo + Loki + Pyroscope + cadvisor, driven by a synthetic noise generator (`telemetrygen`). Side-by-side with the LocalMesh `service_catalog/observability/` and `service_catalog/logging/` plugins. Does not replace them.
+Experiment branch: Jaeger replaces Grafana as the UI. Stack is Jaeger + Alloy + Prometheus + Loki + Pyroscope + cadvisor, driven by a synthetic noise generator (`telemetrygen`). Side-by-side with the LocalMesh `service_catalog/observability/` and `service_catalog/logging/` plugins. Does not replace them.
 
-Localdev only. No auth, no TLS, no retention. Spec: `docs/superpowers/specs/2026-05-20-observability-cleanroom-design.md`.
+Jaeger is trace-first. It views traces and, via its SPM "Monitor" tab, RED metrics read from Prometheus. It has no UI for logs or profiles. Loki and Pyroscope still ingest, but there is no pane of glass for them in this variant. That gap is the experiment's main finding.
+
+Localdev only. No auth, no TLS, no retention. Spec: `docs/superpowers/specs/2026-05-21-jaeger-ui-swap-design.md`.
 
 ## Run
 
@@ -15,35 +17,39 @@ Compose v2.20+ required (native `include:`).
 
 ## Endpoints
 
+Host ports are "1"-prefixed to avoid collisions with other dockerized workloads. The two 5-digit UIs (Alloy, Jaeger) keep native ports because a "1" prefix overflows 65535.
+
 | Service | URL | Notes |
 |---|---|---|
-| Grafana | http://localhost:3001 | admin/admin |
+| Jaeger UI | http://localhost:16686 | Traces + Monitor (SPM) tab |
 | Alloy UI | http://localhost:12345 | Pipeline graph, debug |
-| Prometheus | http://localhost:9090 | PromQL |
-| Pyroscope | http://localhost:4040 | Native UI |
-| OTLP gRPC | localhost:4317 | External app push |
-| OTLP HTTP | localhost:4318 | External app push |
+| Prometheus | http://localhost:19090 | PromQL |
+| Pyroscope | http://localhost:14040 | Native UI (no Jaeger pane) |
+| OTLP gRPC | localhost:14317 | External app push |
+| OTLP HTTP | localhost:14318 | External app push |
 
 ## Architecture
 
-Alloy is the only collection agent. It terminates OTLP from the noise generator, runs spanmetrics + servicegraph connectors, tails container logs into Loki, scrapes its embedded host + blackbox exporters and cadvisor into Prometheus, and runs the eBPF profiler into Pyroscope.
+Alloy is the only collection agent. Only its trace exporter changed (Tempo → Jaeger). Everything else is unchanged from the suite variant.
 
 ```
-noise-gen (OTLP) ─▶ Alloy ─┬─▶ Tempo      (traces)
-                           ├─▶ Prometheus (metrics + span/servicegraph + host + cadvisor + blackbox)
-                           ├─▶ Loki       (logs: container stdout + OTLP)
-                           └─▶ Pyroscope  (eBPF profiles)
-                                  │
-                                  ▼
-                               Grafana
+noise-gen (OTLP) ─▶ Alloy ─┬─▶ Jaeger      (traces; own memory store; UI :16686)
+                           ├─▶ Prometheus  (metrics + spanmetrics + servicegraph + host + cadvisor + blackbox)
+                           ├─▶ Loki        (logs; ingesting, no UI)
+                           └─▶ Pyroscope   (eBPF profiles; ingesting, no UI)
+
+Jaeger Monitor tab ──reads RED (calls_total / duration_*)── Prometheus
 ```
+
+Alloy's spanmetrics connector runs with an empty namespace so series are `calls_total` / `duration_*` — the names Jaeger SPM queries (with `normalize_calls` / `normalize_duration`).
 
 ## Smoke check
 
-1. `docker compose ps` — all 9 services up.
+1. `docker compose ps` — 9 services up (no grafana, no tempo; jaeger present).
 2. http://localhost:12345 — Alloy UI, no red component nodes.
-3. http://localhost:3001 → Connections → Data sources — Prometheus, Tempo, Loki, Pyroscope all green.
-4. Grafana → Explore → each datasource → run any query → returns data within 30s.
+3. http://localhost:16686 → Search → service `noisegen-traces` returns traces.
+4. http://localhost:16686 → Monitor tab → RED panels populate for `noisegen-traces`.
+5. Logs (headless): `curl 'http://localhost:19090/...'` shows spanmetrics; Loki still ingests via Alloy.
 
 ## Tear down
 
@@ -53,9 +59,9 @@ docker compose down -v
 
 Volumes are not preserved. Each run starts fresh.
 
-## What this proves
+## What this experiment shows
 
-One Grafana Alloy process replaces the split agent topology (otel-collector + Vector + standalone exporters) and feeds a Grafana-stack backend with all four signals plus host/container/synthetic metrics. The cleanroom evaluates the stack, not a realistic workload. The noise generator emits synthetic OTLP data with no inter-service correlation.
+Jaeger covers traces and RED (via SPM from Prometheus) with a trace-first UI. It does not cover logs or profiles — those backends keep ingesting but have no viewer here. So Jaeger can stand in for the trace-and-RED slice of Grafana, but not for the unified four-signal pane. Swapping Grafana for Jaeger is a trade, not a drop-in.
 
 ## GPU metrics
 

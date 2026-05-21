@@ -8,9 +8,9 @@ services:
       - --stability.level=experimental
       - /etc/alloy/config.alloy
     ports:
-      - "4317:4317"
-      - "4318:4318"
-      - "12345:12345"
+      - "14317:4317"
+      - "14318:4318"
+      - "12345:12345"  # 5-digit; "1"-prefix overflows 65535, left native
     volumes:
       - ./config.alloy:/etc/alloy/config.alloy:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro

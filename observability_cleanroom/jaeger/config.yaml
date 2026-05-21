@@ -1,0 +1,47 @@
+# Jaeger v2 all-in-one config. OTel-collector-style.
+# Traces: OTLP in -> memory store -> UI. SPM Monitor tab reads RED from Prometheus.
+service:
+  extensions: [jaeger_storage, jaeger_query]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [jaeger_storage_exporter]
+  telemetry:
+    logs:
+      level: info
+
+extensions:
+  jaeger_query:
+    storage:
+      traces: trace_storage
+      metrics: metrics_storage
+
+  jaeger_storage:
+    backends:
+      trace_storage:
+        memory:
+          max_traces: 100000
+    metric_backends:
+      metrics_storage:
+        prometheus:
+          endpoint: http://prometheus:9090
+          # Alloy's spanmetrics connector emits calls_total + duration_* (namespace
+          # set empty in config.alloy). normalize_* lets Jaeger match those names.
+          normalize_calls: true
+          normalize_duration: true
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+
+exporters:
+  jaeger_storage_exporter:
+    trace_storage: trace_storage
