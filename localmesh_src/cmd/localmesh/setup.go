@@ -60,13 +60,16 @@ func newSetupCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("manifest: %w", err)
 			}
-			fmt.Println("==> Minting per-service leaf certs (7d)")
+			fmt.Println("==> Minting per-service leaf certs (7d) + ingress edge TLS")
 			minter, err := mtls.New(repoRoot, proj.Name, proj.LocalDomain)
 			if err != nil {
 				return fmt.Errorf("mtls new: %w", err)
 			}
 			if err := minter.MintAll(collectMeshContainers(proj, plugins)); err != nil {
 				return fmt.Errorf("mtls mint: %w", err)
+			}
+			if err := minter.MintIngressEdge(); err != nil {
+				return fmt.Errorf("mtls mint ingress edge: %w", err)
 			}
 
 			// Step 6: render .env first, then bundled.compose.yaml.
