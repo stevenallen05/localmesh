@@ -18,19 +18,19 @@ func TestRewriteRelativePaths(t *testing.T) {
 			name:   "build context string form",
 			input:  "services:\n  app:\n    build: ./app\n",
 			prefix: "service_catalog/x",
-			want:   "build: service_catalog/x/app",
+			want:   "build: ./service_catalog/x/app",
 		},
 		{
 			name:   "build context mapping form",
 			input:  "services:\n  app:\n    build:\n      context: ./app\n      dockerfile: Dockerfile\n",
 			prefix: "service_catalog/x",
-			want:   "context: service_catalog/x/app",
+			want:   "context: ./service_catalog/x/app",
 		},
 		{
 			name:   "short-form volume with mode suffix",
 			input:  "services:\n  app:\n    volumes:\n      - ./data:/var/lib/data:ro\n",
 			prefix: "service_catalog/x",
-			want:   "- service_catalog/x/data:/var/lib/data:ro",
+			want:   "- ./service_catalog/x/data:/var/lib/data:ro",
 		},
 		{
 			name:   "absolute volume left alone",
@@ -49,19 +49,35 @@ func TestRewriteRelativePaths(t *testing.T) {
 			name:   "configs file rewritten",
 			input:  "configs:\n  cfg:\n    file: ./cfg.yml\n",
 			prefix: "service_catalog/x",
-			want:   "file: service_catalog/x/cfg.yml",
+			want:   "file: ./service_catalog/x/cfg.yml",
 		},
 		{
 			name:   "secrets file rewritten",
 			input:  "secrets:\n  s1:\n    file: ./secret.txt\n",
 			prefix: "service_catalog/x",
-			want:   "file: service_catalog/x/secret.txt",
+			want:   "file: ./service_catalog/x/secret.txt",
 		},
 		{
 			name:   "dotdot parent path rewritten",
 			input:  "services:\n  app:\n    volumes:\n      - ../shared:/run/shared:ro\n",
 			prefix: "service_catalog/x",
-			want:   "- service_catalog/shared:/run/shared:ro",
+			want:   "- ./service_catalog/shared:/run/shared:ro",
+		},
+		{
+			// Regression: plugin dir below the bundle dir → relPrefix has no
+			// "../", so the joined source must keep a "./" prefix or compose
+			// reads it as a named volume.
+			name:   "below-bundle bind mount keeps ./ prefix",
+			input:  "services:\n  app:\n    volumes:\n      - ./initdb:/docker-entrypoint-initdb.d:ro\n",
+			prefix: "service_catalog/postgres16",
+			want:   "- ./service_catalog/postgres16/initdb:/docker-entrypoint-initdb.d:ro",
+			unwant: "- service_catalog/postgres16/initdb:",
+		},
+		{
+			name:   "deep parent stays a bind mount without extra ./",
+			input:  "services:\n  app:\n    volumes:\n      - ../../../shared:/run/shared:ro\n",
+			prefix: "service_catalog/x",
+			want:   "- ../shared:/run/shared:ro",
 		},
 	}
 	for _, tt := range tests {

@@ -136,5 +136,13 @@ func prefixIfRelative(p, relPrefix string) string {
 	if !isRelativePath(p) {
 		return p
 	}
-	return filepath.Join(relPrefix, p)
+	joined := filepath.Join(relPrefix, p)
+	// filepath.Join cleans the result, stripping any leading "./". A compose
+	// short-form volume whose source lacks a "./" or "../" prefix is parsed
+	// as a NAMED volume, not a bind mount — so when the plugin dir sits below
+	// the bundle dir (relPrefix has no "../"), re-add "./" to keep it a path.
+	if !strings.HasPrefix(joined, "./") && !strings.HasPrefix(joined, "../") {
+		joined = "./" + joined
+	}
+	return joined
 }
