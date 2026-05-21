@@ -365,6 +365,46 @@ func TestWrite_sidecarUnparseableErrors(t *testing.T) {
 	}
 }
 
+func TestWrite_byteStableAcrossRuns(t *testing.T) {
+	repoRoot := t.TempDir()
+	mustMkdir(t, filepath.Join(repoRoot, "localmesh"))
+	catalogRoot := t.TempDir()
+	writeSidecar(t, catalogRoot, "auth", `description = "Description for auth."`)
+	writeSidecar(t, catalogRoot, "postgres16", `description = "Description for postgres16."
+extras = "more"`)
+	proj := &manifest.Project{
+		Name:           "metrics-collector",
+		Namespace:      "laptop",
+		TechLead:       "x@example.com",
+		ExternalDomain: "x.example.com",
+		LocalDomain:    "lvh.me",
+		Services: []manifest.Service{
+			{Container: "www", Port: 3443, Scheme: "https", ExposeViaIngress: true},
+		},
+	}
+	plugins := []*manifest.Plugin{
+		{Name: "auth", Services: []manifest.Service{{Container: "dex", Port: 5556, Scheme: "http", ExposeViaIngress: true}}},
+		{Name: "postgres16"},
+	}
+	if err := Write(repoRoot, catalogRoot, proj, plugins); err != nil {
+		t.Fatal(err)
+	}
+	first, err := os.ReadFile(filepath.Join(repoRoot, "localmesh", "developer_reference.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Write(repoRoot, catalogRoot, proj, plugins); err != nil {
+		t.Fatal(err)
+	}
+	second, err := os.ReadFile(filepath.Join(repoRoot, "localmesh", "developer_reference.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(first) != string(second) {
+		t.Errorf("output not byte-stable across runs:\nfirst:\n%s\n\nsecond:\n%s", first, second)
+	}
+}
+
 // Helpers — keep at the bottom of devref_test.go.
 
 func mustMkdir(t *testing.T, path string) {
