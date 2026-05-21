@@ -1,0 +1,43 @@
+# observability_cleanroom/noise-generator/docker-compose.yml
+services:
+  noise-gen-traces:
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest
+    container_name: noise-gen-traces
+    command:
+      - traces
+      - --otlp-endpoint=alloy:4317
+      - --otlp-insecure
+      - --rate=10
+      - --duration=24h
+      - --service=noisegen-traces
+    restart: unless-stopped
+    depends_on:
+      - alloy
+
+  noise-gen-metrics:
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest
+    container_name: noise-gen-metrics
+    command:
+      - metrics
+      - --otlp-endpoint=alloy:4317
+      - --otlp-insecure
+      - --rate=20
+      - --duration=24h
+      - --service=noisegen-metrics
+    restart: unless-stopped
+    depends_on:
+      - alloy
+
+  noise-gen-logs:
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest
+    container_name: noise-gen-logs
+    command:
+      - logs
+      - --otlp-endpoint=alloy:4317
+      - --otlp-insecure
+      - --rate=50
+      - --duration=24h
+      - --service=noisegen-logs
+    restart: unless-stopped
+    depends_on:
+      - alloy

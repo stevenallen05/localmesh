@@ -1,0 +1,13 @@
+# observability_cleanroom/pyroscope/docker-compose.yml
+services:
+  pyroscope:
+    image: grafana/pyroscope:1.10.0
+    container_name: pyroscope
+    command: ["-config.file=/etc/pyroscope/pyroscope.yaml"]
+    ports:
+      - "14040:4040"
+    volumes:
+      - ./pyroscope.yaml:/etc/pyroscope/pyroscope.yaml:ro
+    tmpfs:
+      - /data:mode=0777
+    restart: unless-stopped
