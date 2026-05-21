@@ -40,6 +40,12 @@ otelcol.connector.spanmetrics "default" {
     explicit {}
   }
 
+  // Attach trace_id exemplars to the duration histogram so latency panels can
+  // jump to an exact trace. Prometheus needs --enable-feature=exemplar-storage.
+  exemplars {
+    enabled = true
+  }
+
   output {
     metrics = [otelcol.exporter.prometheus.spanmetrics.input]
   }

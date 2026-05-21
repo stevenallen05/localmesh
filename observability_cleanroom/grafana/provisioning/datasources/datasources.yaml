@@ -8,6 +8,11 @@ datasources:
     url: http://prometheus:9090
     isDefault: true
     editable: false
+    jsonData:
+      # Exemplar dots on latency panels link to the trace in Tempo.
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo
 
   - name: Tempo
     uid: tempo
@@ -18,6 +23,26 @@ datasources:
     jsonData:
       serviceMap:
         datasourceUid: prom
+      # Span -> its logs. Both the trace-id pivot and the service_name-scoped
+      # pivot work (Loki indexes service_name and carries trace_id).
+      tracesToLogsV2:
+        datasourceUid: loki
+        filterByTraceID: true
+        filterBySpanID: false
+        tags:
+          - key: service.name
+            value: service_name
+      # Span -> RED metrics from the spanmetrics connector.
+      tracesToMetrics:
+        datasourceUid: prom
+        tags:
+          - key: service.name
+            value: service_name
+        queries:
+          - name: Request rate
+            query: 'sum(rate(traces_span_metrics_calls_total{$$__tags}[5m]))'
+          - name: p95 latency
+            query: 'histogram_quantile(0.95, sum(rate(traces_span_metrics_duration_milliseconds_bucket{$$__tags}[5m])) by (le))'
 
   - name: Loki
     uid: loki
