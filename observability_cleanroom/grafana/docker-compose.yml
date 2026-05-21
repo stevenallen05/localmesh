@@ -3,7 +3,7 @@ services:
     image: grafana/grafana:12.0.0
     container_name: grafana
     ports:
-      - "3001:3000"
+      - "13000:3000"
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer

@@ -15,14 +15,16 @@ Compose v2.20+ required (native `include:`).
 
 ## Endpoints
 
+Host ports are "1"-prefixed to avoid collisions with other dockerized workloads. The 5-digit Alloy UI keeps its native port because a "1" prefix overflows 65535.
+
 | Service | URL | Notes |
 |---|---|---|
-| Grafana | http://localhost:3001 | admin/admin |
+| Grafana | http://localhost:13000 | admin/admin |
 | Alloy UI | http://localhost:12345 | Pipeline graph, debug |
-| Prometheus | http://localhost:9090 | PromQL |
-| Pyroscope | http://localhost:4040 | Native UI |
-| OTLP gRPC | localhost:4317 | External app push |
-| OTLP HTTP | localhost:4318 | External app push |
+| Prometheus | http://localhost:19090 | PromQL |
+| Pyroscope | http://localhost:14040 | Native UI |
+| OTLP gRPC | localhost:14317 | External app push |
+| OTLP HTTP | localhost:14318 | External app push |
 
 ## Architecture
 
@@ -42,7 +44,7 @@ noise-gen (OTLP) ─▶ Alloy ─┬─▶ Tempo      (traces)
 
 1. `docker compose ps` — all 9 services up.
 2. http://localhost:12345 — Alloy UI, no red component nodes.
-3. http://localhost:3001 → Connections → Data sources — Prometheus, Tempo, Loki, Pyroscope all green.
+3. http://localhost:13000 → Connections → Data sources — Prometheus, Tempo, Loki, Pyroscope all green.
 4. Grafana → Explore → each datasource → run any query → returns data within 30s.
 
 ## Tear down
