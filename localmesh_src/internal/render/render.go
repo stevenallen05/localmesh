@@ -1,5 +1,5 @@
 // Package render merges rendered plugin compose files into a single
-// .localmesh/localmesh.compose.yaml per spec §2.5.
+// localmesh/bundled.compose.yaml per spec §2.5.
 package render
 
 import (
