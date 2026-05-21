@@ -144,7 +144,7 @@ func writePlugin(t *testing.T, root, name string, plugins []string) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	body := fmt.Sprintf("[identity]\nmodule_name = %q\nowned_by    = %q\n", name, name+"@example.com")
+	body := ""
 	if plugins != nil {
 		quoted := make([]string, len(plugins))
 		for i, p := range plugins {
@@ -152,6 +152,7 @@ func writePlugin(t *testing.T, root, name string, plugins []string) {
 		}
 		body += fmt.Sprintf("plugins = [%s]\n", strings.Join(quoted, ", "))
 	}
+	body += fmt.Sprintf("[identity]\nmodule_name = %q\nowned_by    = %q\n", name, name+"@example.com")
 	if err := os.WriteFile(filepath.Join(dir, "plugin.toml"), []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
