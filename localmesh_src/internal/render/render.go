@@ -96,7 +96,7 @@ func RunWith(proj *manifest.Project, plugins []*manifest.Plugin, catalogRoot, ou
 
 // renderPluginCompose renders one plugin's docker-compose template + parses
 // the output + rewrites relative paths. Factored out so RunWith can call it
-// twice (the second pass repopulates .Workloads for the mesh plugin).
+// twice (the second pass repopulates .Workloads for the security plugin).
 func renderPluginCompose(proj *manifest.Project, p *manifest.Plugin, env map[string]string, workloads []tmpl.WorkloadCtx, catalogRoot, outputDir string) (*yaml.Node, error) {
 	composePath := pluginComposePath(catalogRoot, p.Name)
 	ctx := &tmpl.Context{Project: proj, Plugin: p, Env: env, Workloads: workloads}
