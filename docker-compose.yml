@@ -4,7 +4,7 @@
 name: ${PROJECT_NAME}
 
 include:
-  - path: localmesh/localmesh.compose.yaml
+  - path: localmesh/bundled.compose.yaml
 
 services:
   server:
