@@ -50,7 +50,7 @@ func RunWith(proj *manifest.Project, plugins []*manifest.Plugin, catalogRoot, ou
 		}
 		rendered = append(rendered, node)
 		sources = append(sources, p.Name)
-		if p.Name == "mesh" {
+		if p.Name == "security" {
 			meshIdx = i
 		}
 	}
@@ -186,7 +186,7 @@ func appendProjectWorkloads(existing []tmpl.WorkloadCtx, proj *manifest.Project)
 func workloadsFromNodes(nodes []*yaml.Node, sources []string) []tmpl.WorkloadCtx {
 	byName := map[string]tmpl.WorkloadCtx{}
 	for i, n := range nodes {
-		if sources[i] == "mesh" {
+		if sources[i] == "security" {
 			continue
 		}
 		if n.Kind != yaml.DocumentNode || len(n.Content) == 0 {
