@@ -8,6 +8,7 @@ port               = 5681
 scheme             = "http"
 ingress            = false
 expose_via_ingress = false
+needs_mtls_sidecar = false
 
 [[services]]
 container          = "ingress"
@@ -15,3 +16,4 @@ port               = 8443
 scheme             = "https"
 ingress            = true
 expose_via_ingress = false
+needs_mtls_sidecar = false

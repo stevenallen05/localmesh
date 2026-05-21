@@ -35,7 +35,6 @@ services:
       timeout: 3s
       retries: 5
     labels:
-      mesh.exempt: "true"
       katenary.v3/ports: |-
         - 5556
       metrics.service_name: dex

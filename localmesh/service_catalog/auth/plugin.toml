@@ -8,3 +8,4 @@ port               = 5556
 scheme             = "http"
 expose_via_ingress = true       # browser hits dex.${PROJECT_NAME}.${LOCAL_DOMAIN} for the OIDC handshake
 requires_auth      = false      # IdP can't gate itself
+needs_mtls_sidecar = false
