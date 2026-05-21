@@ -270,9 +270,9 @@ words>` at the relevant call site so they're greppable.
   for every `[[services]]` entry uniformly. The mesh-exempt label
   carve-out (skip cert minting for observability / logging / dex /
   postgres containers) is not yet ported into `mtls mint`. Cert minting
-  for exempt containers is wasted work today but harmless. The
-  `internal/mesh/edges` derivation already reads `mesh.exempt: "true"`;
-  share that with the cert path. `TODO: needs_prod_decisions
+  for exempt containers is wasted work today but harmless. Detect
+  `mesh.exempt: "true"` from each service's compose labels and skip the
+  cert path for those containers. `TODO: needs_prod_decisions
   mesh.exempt detection from compose labels`.
 - **Long-form volume rewrite in render.** `internal/render/rewrite.go`
   rewrites relative paths for `build.context`, short-form volumes,
@@ -285,7 +285,7 @@ words>` at the relevant call site so they're greppable.
 
 The default-dashboard set ships three files:
 
-- `localmesh/service_catalog/database/postgres.json` — postgres health, query rates, pg_stat_statements
+- `localmesh/service_catalog/postgres16/postgres.json` — postgres health, query rates, pg_stat_statements
 - `localmesh/service_catalog/observability/apm.json` — RED panels, traces waterfall, RPC server panels
 - `localmesh/service_catalog/observability/cluster-health.json` — cadvisor container resource panels
 

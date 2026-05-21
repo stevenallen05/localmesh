@@ -34,7 +34,7 @@ services:
       # ignores this — when an RPC lands that needs it, the env is ready.
       # LocalMesh mTLS to postgres: cert auth via CN=server (the SPIFFE
       # workload name matches the postgres role declared in
-      # localmesh/service_catalog/database/initdb/00-roles.sql).
+      # localmesh/service_catalog/postgres16/initdb/00-roles.sql).
       DATABASE_URL: postgres://server@postgres:5432/app?sslmode=verify-full&sslrootcert=/run/server/trust.ca.crt&sslcert=/run/server/id.crt&sslkey=/run/server/id.key
     secrets:
       # LocalMesh cert material for the server workload. App uses it for
