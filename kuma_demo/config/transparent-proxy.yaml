@@ -1,0 +1,5 @@
+kumaDPUser: kuma-data-plane-proxy
+redirect:
+  dns:
+    enabled: true
+verbose: true

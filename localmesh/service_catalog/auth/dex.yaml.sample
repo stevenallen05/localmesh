@@ -1,6 +1,6 @@
-# Dex config sample — copied to .localmesh/dex.yaml on first `make certs`.
-# Dev-owned: edit .localmesh/dex.yaml to add/remove users. The .sample is
-# the seed; the Makefile target won't overwrite an existing .localmesh
+# Dex config sample — copied to localmesh/dex.yaml on first `make certs`.
+# Dev-owned: edit localmesh/dex.yaml to add/remove users. The .sample is
+# the seed; the Makefile target won't overwrite an existing localmesh/dex.yaml
 # copy.
 #
 # Env vars ($PROJECT_NAME, $LOCAL_DOMAIN, $LOCALMESH_OIDC_CLIENT_SECRET)

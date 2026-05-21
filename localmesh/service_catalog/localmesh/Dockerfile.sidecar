@@ -1,0 +1,22 @@
+ARG KUMA_VERSION=2.13.6
+
+FROM kumahq/kuma-dp:${KUMA_VERSION}  AS kumadp
+FROM kumahq/kumactl:${KUMA_VERSION}  AS kumactl
+
+FROM debian:bookworm-slim
+RUN apt-get update \
+ && apt-get install --yes --no-install-recommends iptables curl ca-certificates \
+ && rm -rf /var/lib/apt/lists/* \
+ && useradd --uid 5678 --user-group kuma-data-plane-proxy
+
+COPY --from=kumadp  /usr/bin/kuma-dp  /usr/local/bin/kuma-dp
+COPY --from=kumadp  /usr/bin/envoy    /usr/local/bin/envoy
+COPY --from=kumadp  /usr/bin/coredns  /usr/local/bin/coredns
+COPY --from=kumactl /usr/bin/kumactl  /usr/local/bin/kumactl
+
+COPY bin/sidecar-init.sh           /usr/local/bin/sidecar-init.sh
+COPY bin/bootstrap.sh              /usr/local/bin/bootstrap.sh
+COPY config/transparent-proxy.yaml /etc/kuma/transparent-proxy.yaml
+COPY dataplane/workload.yaml       /etc/kuma/dataplane.yaml
+
+ENTRYPOINT ["/bin/bash", "/usr/local/bin/sidecar-init.sh"]

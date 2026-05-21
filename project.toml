@@ -15,7 +15,7 @@ tech_lead_email   = "sallen@amberstyle.ca"        # point person for questions
 external_domain   = "metrics.example.com"
 local_domain      = "lvh.me"               # dev DNS suffix; TODO: needs_prod_decisions real internal DNS
 
-# Plugins the team consumes. Paths resolve to service_catalog/<name>/.
+# Plugins the team consumes. Paths resolve to localmesh/service_catalog/<name>/.
 # TODO: needs_prod_decisions service_catalog distribution
 plugins = ["postgres", "localmesh"]
 

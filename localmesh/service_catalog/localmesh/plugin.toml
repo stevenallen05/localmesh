@@ -15,10 +15,3 @@ port               = 8443
 scheme             = "https"
 ingress            = true
 expose_via_ingress = false
-
-[[services]]
-container          = "egress"
-port               = 15001
-scheme             = "tcp"
-ingress            = false
-expose_via_ingress = false

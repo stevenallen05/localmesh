@@ -1,10 +1,10 @@
-# `service_catalog/` is inlined in this repo for demo legibility. In a real
+# `localmesh/service_catalog/` is inlined in this repo for demo legibility. In a real
 # org this would arrive from a git owned by ops
 
 name: ${PROJECT_NAME}
 
 include:
-  - path: .localmesh/localmesh.compose.yaml
+  - path: localmesh/localmesh.compose.yaml
 
 services:
   server:
@@ -34,7 +34,7 @@ services:
       # ignores this — when an RPC lands that needs it, the env is ready.
       # LocalMesh mTLS to postgres: cert auth via CN=server (the SPIFFE
       # workload name matches the postgres role declared in
-      # service_catalog/database/initdb/00-roles.sql).
+      # localmesh/service_catalog/database/initdb/00-roles.sql).
       DATABASE_URL: postgres://server@postgres:5432/app?sslmode=verify-full&sslrootcert=/run/server/trust.ca.crt&sslcert=/run/server/id.crt&sslkey=/run/server/id.key
     secrets:
       # LocalMesh cert material for the server workload. App uses it for
@@ -68,7 +68,7 @@ services:
       katenary.v3/ports: |-
         - 50051
       # Identity for the `service` label on cadvisor metrics + Loki logs.
-      # See service_catalog/observability/docker-compose.yml's cadvisor
+      # See localmesh/service_catalog/observability/docker-compose.yml's cadvisor
       # metric_relabel_configs for the propagation rule. Same value as
       # OTEL_SERVICE_NAME above so metrics + traces + logs all agree.
       metrics.service_name: server
@@ -129,8 +129,8 @@ services:
 
 secrets:
   server_id_crt:
-    file: ./.localmesh/secrets/server/id.crt
+    file: ./localmesh/secrets/server/id.crt
   server_id_key:
-    file: ./.localmesh/secrets/server/id.key
+    file: ./localmesh/secrets/server/id.key
   server_trust_ca:
-    file: ./.localmesh/secrets/server/trust.ca.crt
+    file: ./localmesh/secrets/server/trust.ca.crt

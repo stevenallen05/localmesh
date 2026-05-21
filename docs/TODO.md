@@ -119,7 +119,7 @@ resolution is context-dependent.
   automatic rotation. Whichever cert-delivery mechanism prod picks
   (cert-manager vs SPIRE Workload API vs Vault PKI) sets the rotation
   cadence.
-- **CA key handling.** Dev's `.localmesh/secrets/root_ca/rootCA-key.pem`
+- **CA key handling.** Dev's `localmesh/secrets/root_ca/rootCA-key.pem`
   lives on the host filesystem. Prod never has CA key in any workload
   pod; it's locked in the chosen issuer (SPIRE / Vault / cert-manager
   backend).
@@ -262,10 +262,10 @@ words>` at the relevant call site so they're greppable.
   `TODO: needs_prod_decisions install verb for production deployment`.
 - **`.env` location.** Stays at repo root today because compose's
   default lookup expects it there. Aspirational move under
-  `.localmesh/` once `docker compose --env-file` / config-loading tools
+  `localmesh/` once `docker compose --env-file` / config-loading tools
   improve enough that the relocation doesn't break the
   no-flag-needed path. `TODO: needs_prod_decisions .env move under
-  .localmesh once config-loading tools improve`.
+  localmesh once config-loading tools improve`.
 - **mesh-exempt enforcement in `mtls mint`.** The Go CLI mints leaves
   for every `[[services]]` entry uniformly. The mesh-exempt label
   carve-out (skip cert minting for observability / logging / dex /
@@ -285,9 +285,9 @@ words>` at the relevant call site so they're greppable.
 
 The default-dashboard set ships three files:
 
-- `service_catalog/database/postgres.json` — postgres health, query rates, pg_stat_statements
-- `service_catalog/observability/apm.json` — RED panels, traces waterfall, RPC server panels
-- `service_catalog/observability/cluster-health.json` — cadvisor container resource panels
+- `localmesh/service_catalog/database/postgres.json` — postgres health, query rates, pg_stat_statements
+- `localmesh/service_catalog/observability/apm.json` — RED panels, traces waterfall, RPC server panels
+- `localmesh/service_catalog/observability/cluster-health.json` — cadvisor container resource panels
 
 A mesh-ingress dashboard against envoy's native `:15090/stats/prometheus`
 surface + JSON access logs is `TODO: needs_prod_decisions ingress
@@ -337,7 +337,7 @@ then it is dead UI that invites picker-blindness.
   let the `namespace` picker stand as a cross-dashboard convention
   placeholder; document the asymmetry in the picker description.
 - **The cadvisor `service` label is set by `metric_relabel_configs`** in
-  `service_catalog/observability/docker-compose.yml`. It promotes
+  `localmesh/service_catalog/observability/docker-compose.yml`. It promotes
   `container_label_metrics_service_name` (and falls back to the container
   `name`) so cadvisor series can pivot on the same identity vocabulary as
   OTel-emitted series. The picker query is

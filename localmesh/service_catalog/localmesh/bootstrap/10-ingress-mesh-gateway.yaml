@@ -1,0 +1,13 @@
+# TODO: needs_prod_decisions ingress port mirrored from plugin.toml
+type: MeshGateway
+mesh: default
+name: ingress
+selectors:
+  - match:
+      kuma.io/service: ingress
+conf:
+  listeners:
+    - port: 8443
+      protocol: HTTP
+      tags:
+        port: http-ingress

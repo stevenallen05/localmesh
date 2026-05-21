@@ -7,9 +7,11 @@ container          = "postgres"
 port               = 5432
 scheme             = "tcp"        # mesh-exempt anyway; declared for validation
 expose_via_ingress = false        # east-west only
+needs_mtls_sidecar = false
 
 [[services]]
 container          = "postgres-exporter"
 port               = 9187
 scheme             = "http"
 expose_via_ingress = false        # scraped internally; never via ingress
+needs_mtls_sidecar = false

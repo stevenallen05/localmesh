@@ -2,10 +2,10 @@
 
 .PHONY: setup chart chart-lint certs build trust-ca untrust-ca demo-auth dex-config oauth2-secrets
 
-CERTS_DIR       := .localmesh/secrets
-DEX_LOCAL       := .localmesh/dex.yaml
-DEX_SAMPLE      := service_catalog/auth/dex.yaml.sample
-OAUTH2_SDS_DIR  := .localmesh/secrets/ingress-mesh
+CERTS_DIR       := localmesh/secrets
+DEX_LOCAL       := localmesh/dex.yaml
+DEX_SAMPLE      := localmesh/service_catalog/auth/dex.yaml.sample
+OAUTH2_SDS_DIR  := localmesh/secrets/ingress-mesh
 
 # TODO: standardize how contributors install pipx; pending prod infra & provider choices.
 setup:
@@ -22,18 +22,18 @@ setup:
 	@$(MAKE) certs
 	@echo "==> Setup complete. Run 'docker compose up -d --build' to start the stack."
 
-# TODO: detect OS/arch — tools/ binaries hardcoded to linux-amd64; pending prod infra & provider choices.
+# TODO: detect OS/arch — localmesh/bin/ binaries hardcoded to linux-amd64; pending prod infra & provider choices.
 chart:
-	./tools/katenary-3.0.0-rc6-linux-amd64 convert --force
+	./localmesh/bin/katernary convert --force
 
 chart-lint:
-	./tools/helm-v4.1.4-linux-amd64 lint chart
+	./localmesh/bin/helm lint chart
 
 # Bootstrap the LocalMesh dev environment.
 # Chains: Go CLI (CA + leaves + .env + compose) -> envsubst (dex.yaml
 # seed) -> SDS files (oauth2 secrets).
 certs: untrust-ca
-	@rm -rf .localmesh/secrets
+	@rm -rf localmesh/secrets
 	@go run ./localmesh_src/cmd/localmesh ca mint --force
 	@go run ./localmesh_src/cmd/localmesh ca install
 	@go run ./localmesh_src/cmd/localmesh mtls mint
@@ -41,7 +41,7 @@ certs: untrust-ca
 	@$(MAKE) dex-config
 	@$(MAKE) oauth2-secrets
 
-# Seed .localmesh/dex.yaml from the sample on first run; never clobber an
+# Seed localmesh/dex.yaml from the sample on first run; never clobber an
 # edited copy. Expand $PROJECT_NAME / $LOCAL_DOMAIN /
 # $LOCALMESH_OIDC_CLIENT_SECRET at copy time — dex's own runtime env
 # expansion has been unreliable across versions. Done via python

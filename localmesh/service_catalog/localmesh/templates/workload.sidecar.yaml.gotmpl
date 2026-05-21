@@ -1,0 +1,20 @@
+{{- range .Services }}
+{{ .Container }}-mesh:
+  image: localmesh-sidecar:dev
+  network_mode: "service:{{ .Container }}"
+  cap_add:
+    - NET_ADMIN
+    - NET_RAW
+  depends_on:
+    {{ .Container }}:
+      condition: service_started
+    kuma-cp:
+      condition: service_started
+    localmesh-bootstrap:
+      condition: service_completed_successfully
+  environment:
+    WORKLOAD_NAME: {{ .Container }}
+    APP_PORT: "{{ .Port }}"
+    CP_HOST: kuma-cp:5678
+  restart: unless-stopped
+{{- end }}

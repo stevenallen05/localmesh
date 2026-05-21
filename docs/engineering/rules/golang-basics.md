@@ -26,7 +26,7 @@ localmesh_src/
 ├── internal/
 │   ├── manifest/                   # plugin.toml + project.toml load/validate
 │   ├── template/                   # sprig wrapper + custom helpers
-│   ├── render/                     # compose merger; writes .localmesh/*.yaml
+│   ├── render/                     # compose merger; writes localmesh/*.yaml
 │   ├── ca/                         # root CA (mkcert wrapper)
 │   ├── mtls/                       # leaf cert mint via crypto/x509
 │   └── envwriter/                  # .env managed-section roundtrip
@@ -122,7 +122,7 @@ func newRootCmd() *cobra.Command {
 func newBuildCmd() *cobra.Command {
     return &cobra.Command{
         Use:   "build",
-        Short: "Render .localmesh/localmesh.compose.yaml from plugin templates",
+        Short: "Render localmesh/localmesh.compose.yaml from plugin templates",
         RunE: func(cmd *cobra.Command, args []string) error {
             return render.Run(cmd.Context())
         },
@@ -206,11 +206,11 @@ type LeafSpec struct {
 }
 
 func (m *Minter) Mint(ctx context.Context, spec LeafSpec) error {
-    // Load CA from .localmesh/secrets/root_ca/
+    // Load CA from localmesh/secrets/root_ca/
     // Generate a new ECDSA key (or RSA; match mkcert default)
     // Build x509.Certificate template with SANs
     // x509.CreateCertificate signed by CA
-    // Write id.crt, id.key, trust.ca.crt to .localmesh/secrets/<container>/
+    // Write id.crt, id.key, trust.ca.crt to localmesh/secrets/<container>/
 }
 ```
 
@@ -263,7 +263,7 @@ logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 }))
 slog.SetDefault(logger)
 
-slog.Info("rendered compose", "plugins", len(plugins), "out", ".localmesh/localmesh.compose.yaml")
+slog.Info("rendered compose", "plugins", len(plugins), "out", "localmesh/localmesh.compose.yaml")
 slog.Warn("template helper used deprecated syntax", "plugin", name, "file", path)
 ```
 
@@ -320,7 +320,7 @@ func TestRender(t *testing.T) {
 //go:build integration
 package render_test
 func TestRealCatalog(t *testing.T) {
-    cmd := exec.Command("docker", "compose", "-f", ".localmesh/localmesh.compose.yaml", "config")
+    cmd := exec.Command("docker", "compose", "-f", "localmesh/localmesh.compose.yaml", "config")
     if err := cmd.Run(); err != nil { t.Fatal(err) }
 }
 ```

@@ -2,7 +2,7 @@
 # envoy (mesh plugin) is the OIDC client and drives the dance via its
 # envoy.filters.http.oauth2 + jwt_authn filters.
 #
-# Dex's config lives in .localmesh/dex.yaml, copied from dex.yaml.sample
+# Dex's config lives in localmesh/dex.yaml, copied from dex.yaml.sample
 # on first run (see Makefile's certs target). The dev edits the local
 # copy to set staticPasswords.
 #
@@ -26,9 +26,9 @@ services:
       LOCALMESH_OIDC_CLIENT_SECRET: ${LOCALMESH_OIDC_CLIENT_SECRET}
     volumes:
       # Dev-owned. Bootstrapped from dex.yaml.sample by `make certs`.
-      # Path is relative to this file (service_catalog/auth/); .localmesh/
-      # lives at the repo root.
-      - ../../.localmesh/dex.yaml:/etc/dex/config.yaml:ro
+      # Path is relative to this file (localmesh/service_catalog/auth/);
+      # dex.yaml lives at the localmesh/ root.
+      - ../../dex.yaml:/etc/dex/config.yaml:ro
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:5556/healthz"]
       interval: 10s

@@ -256,17 +256,17 @@ configs:
 
 secrets:
   postgres_id_crt:
-    file: ../../.localmesh/secrets/postgres/id.crt
+    file: ../../secrets/postgres/id.crt
   postgres_id_key:
-    file: ../../.localmesh/secrets/postgres/id.key
+    file: ../../secrets/postgres/id.key
   postgres_trust_ca:
-    file: ../../.localmesh/secrets/postgres/trust.ca.crt
+    file: ../../secrets/postgres/trust.ca.crt
   postgres-exporter_id_crt:
-    file: ../../.localmesh/secrets/postgres-exporter/id.crt
+    file: ../../secrets/postgres-exporter/id.crt
   postgres-exporter_id_key:
-    file: ../../.localmesh/secrets/postgres-exporter/id.key
+    file: ../../secrets/postgres-exporter/id.key
   postgres-exporter_trust_ca:
-    file: ../../.localmesh/secrets/postgres-exporter/trust.ca.crt
+    file: ../../secrets/postgres-exporter/trust.ca.crt
 
 volumes:
   postgres-data: {}

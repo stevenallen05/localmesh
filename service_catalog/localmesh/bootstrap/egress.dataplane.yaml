@@ -1,9 +1,0 @@
-type: Dataplane
-mesh: default
-name: egress
-networking:
-  address: 0.0.0.0
-  inbound:
-    - port: 15001
-      tags:
-        kuma.io/service: egress
