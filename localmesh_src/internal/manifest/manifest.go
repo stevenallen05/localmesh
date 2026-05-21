@@ -160,7 +160,7 @@ func flatten(catalogRoot, name string, out []*Plugin, seen map[string]bool, stac
 	if err != nil {
 		return nil, err
 	}
-	newStack := append(stack, name)
+	newStack := append(slices.Clone(stack), name) // own backing array per frame; parent prefix never aliased
 	for _, child := range p.Plugins {
 		out, err = flatten(catalogRoot, child, out, seen, newStack)
 		if err != nil {

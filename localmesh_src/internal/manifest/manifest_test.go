@@ -229,3 +229,18 @@ func TestLoadAll_unknownMember(t *testing.T) {
 		t.Errorf("error %q should mention the missing plugin name", err.Error())
 	}
 }
+
+func TestLoadAll_selfCycle(t *testing.T) {
+	root := t.TempDir()
+	writePlugin(t, root, "a", []string{"a"})
+	writeProject(t, root, []string{"a"})
+
+	_, _, err := LoadAll(filepath.Join(root, "project.toml"), root)
+	var cyc *CycleError
+	if !errors.As(err, &cyc) {
+		t.Fatalf("got %v, want *CycleError", err)
+	}
+	if !strings.Contains(err.Error(), "a -> a") {
+		t.Errorf("error message %q missing self-cycle path", err.Error())
+	}
+}
