@@ -1,0 +1,6 @@
+// Grown across chunks.
+
+logging {
+  level  = "info"
+  format = "logfmt"
+}

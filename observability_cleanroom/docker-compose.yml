@@ -1,0 +1,5 @@
+name: obs-cleanroom
+
+include:
+  - ./alloy/docker-compose.yml
+  - ./grafana/docker-compose.yml
