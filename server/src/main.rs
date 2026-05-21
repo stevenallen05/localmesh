@@ -22,12 +22,14 @@ async fn main() -> Result<(), BoxError> {
 
     tracing::info!("server starting");
 
-    // Plaintext on the parent's loopback. Sidecar `server-inbound`
-    // (ghostunnel) terminates mTLS on :50051 and forwards plain TCP
-    // here. App + sidecar share the same network namespace via
-    // `network_mode: "service:server"`.
+    // Bind the declared gRPC port on all interfaces. The kuma-dp sidecar
+    // shares this netns (`network_mode: "service:server"`); its
+    // transparent-proxy iptables intercept inbound on :50051, terminate
+    // mTLS, and forward here. Bind 0.0.0.0 (not loopback) so the sidecar's
+    // inbound listener — which forwards to this container's pod IP — can
+    // reach the app.
     let addr: SocketAddr = std::env::var("SERVER_BIND_ADDR")
-        .unwrap_or_else(|_| "127.0.0.1:50052".to_string())
+        .unwrap_or_else(|_| "0.0.0.0:50051".to_string())
         .parse()?;
 
     // Postgres first: fail-fast if the pool can't connect or migrations
