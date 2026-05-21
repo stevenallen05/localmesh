@@ -33,6 +33,7 @@ type Project struct {
 type Plugin struct {
 	Name     string    `toml:"-"` // populated from directory name
 	Identity Identity  `toml:"identity"`
+	Plugins  []string  `toml:"plugins"` // meta-package dependencies; nil for leaf plugins
 	Services []Service `toml:"services"`
 }
 
