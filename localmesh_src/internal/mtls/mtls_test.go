@@ -196,8 +196,18 @@ func TestMintIngressEdge_certSANs(t *testing.T) {
 	if !reflect.DeepEqual(cert.DNSNames, wantDNS) {
 		t.Errorf("DNSNames = %v, want %v", cert.DNSNames, wantDNS)
 	}
-	if len(cert.IPAddresses) != len(IPSANs) {
-		t.Errorf("IPAddresses len = %d, want %d (IPSANs)", len(cert.IPAddresses), len(IPSANs))
+	// Compare IPs by string form — sidesteps net.IP's 4-byte-vs-16-byte
+	// encoding ambiguity across the x509 round-trip.
+	wantIPs := make([]string, len(IPSANs))
+	for i, ip := range IPSANs {
+		wantIPs[i] = ip.String()
+	}
+	gotIPs := make([]string, len(cert.IPAddresses))
+	for i, ip := range cert.IPAddresses {
+		gotIPs[i] = ip.String()
+	}
+	if !reflect.DeepEqual(gotIPs, wantIPs) {
+		t.Errorf("IPAddresses = %v, want %v", gotIPs, wantIPs)
 	}
 	if len(cert.URIs) != 0 {
 		t.Errorf("URIs len = %d, want 0 (edge TLS has no SPIFFE URI)", len(cert.URIs))
