@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -152,10 +153,8 @@ func flatten(catalogRoot, name string, out []*Plugin, seen map[string]bool, stac
 	if seen[name] {
 		return out, nil
 	}
-	for _, s := range stack {
-		if s == name {
-			return nil, &CycleError{Path: append(append([]string{}, stack...), name)}
-		}
+	if slices.Contains(stack, name) {
+		return nil, &CycleError{Path: append(append([]string{}, stack...), name)}
 	}
 	p, err := LoadPlugin(catalogRoot, name)
 	if err != nil {
