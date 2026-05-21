@@ -153,3 +153,58 @@ pyroscope.write "default" {
     url = "http://pyroscope:4040"
   }
 }
+
+// ---- Host metrics ----
+
+prometheus.exporter.unix "host" {
+  procfs_path = "/host/proc"
+  sysfs_path  = "/host/sys"
+  rootfs_path = "/rootfs"
+}
+
+prometheus.scrape "host_metrics" {
+  targets         = prometheus.exporter.unix.host.targets
+  forward_to      = [prometheus.remote_write.default.receiver]
+  scrape_interval = "15s"
+}
+
+// ---- Container metrics (cadvisor) ----
+
+prometheus.scrape "cadvisor" {
+  targets = [
+    { __address__ = "cadvisor:8080", job = "cadvisor" },
+  ]
+  forward_to      = [prometheus.remote_write.default.receiver]
+  scrape_interval = "15s"
+}
+
+// ---- Synthetics (blackbox-exporter, embedded in Alloy) ----
+
+prometheus.exporter.blackbox "default" {
+  config = "modules:\n  http_2xx:\n    prober: http\n    timeout: 5s\n    http:\n      method: GET\n      preferred_ip_protocol: ip4\n"
+
+  target {
+    name    = "grafana_self"
+    address = "http://grafana:3000/api/health"
+    module  = "http_2xx"
+  }
+}
+
+prometheus.scrape "blackbox" {
+  targets         = prometheus.exporter.blackbox.default.targets
+  forward_to      = [prometheus.remote_write.default.receiver]
+  scrape_interval = "30s"
+}
+
+// ---- GPU metrics (scaffolded, disabled by default) ----
+// Uncomment on a host with NVIDIA GPUs + the NVIDIA Container Toolkit.
+// Also add `runtime: nvidia` to alloy/docker-compose.yml.
+// TODO: needs_prod_decisions gpu exporter default-on
+//
+// prometheus.exporter.dcgm "default" {}
+//
+// prometheus.scrape "gpu" {
+//   targets         = prometheus.exporter.dcgm.default.targets
+//   forward_to      = [prometheus.remote_write.default.receiver]
+//   scrape_interval = "15s"
+// }
