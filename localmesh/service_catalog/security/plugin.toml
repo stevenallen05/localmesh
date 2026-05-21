@@ -1,5 +1,5 @@
 [identity]
-module_name = "localmesh"
+module_name = "security"
 owned_by    = "sre@example.com"
 
 [[services]]
