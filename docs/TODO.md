@@ -86,7 +86,7 @@ matching `__name__=~"container_.+"` instead of the empty-string trick).
   hand-added to cadvisor / node-exporter compose today (envoy roles
   already carry them, emitted by the mesh plugin's template). A future
   localmesh CLI pass will gain `[[exports.metrics]]` in `plugin.toml`;
-  localmesh will write the labels into `localmesh.compose.yaml`'s
+  localmesh will write the labels into `bundled.compose.yaml`'s
   overlay block. Hand-added labels migrate to declarations at that
   point. `TODO: needs_prod_decisions localmesh emits prometheus.io/*
   labels`.

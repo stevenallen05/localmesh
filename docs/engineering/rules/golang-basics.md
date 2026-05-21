@@ -122,7 +122,7 @@ func newRootCmd() *cobra.Command {
 func newBuildCmd() *cobra.Command {
     return &cobra.Command{
         Use:   "build",
-        Short: "Render localmesh/localmesh.compose.yaml from plugin templates",
+        Short: "Render localmesh/bundled.compose.yaml from plugin templates",
         RunE: func(cmd *cobra.Command, args []string) error {
             return render.Run(cmd.Context())
         },
@@ -263,7 +263,7 @@ logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 }))
 slog.SetDefault(logger)
 
-slog.Info("rendered compose", "plugins", len(plugins), "out", "localmesh/localmesh.compose.yaml")
+slog.Info("rendered compose", "plugins", len(plugins), "out", "localmesh/bundled.compose.yaml")
 slog.Warn("template helper used deprecated syntax", "plugin", name, "file", path)
 ```
 
@@ -320,7 +320,7 @@ func TestRender(t *testing.T) {
 //go:build integration
 package render_test
 func TestRealCatalog(t *testing.T) {
-    cmd := exec.Command("docker", "compose", "-f", "localmesh/localmesh.compose.yaml", "config")
+    cmd := exec.Command("docker", "compose", "-f", "localmesh/bundled.compose.yaml", "config")
     if err := cmd.Run(); err != nil { t.Fatal(err) }
 }
 ```
