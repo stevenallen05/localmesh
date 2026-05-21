@@ -30,6 +30,8 @@ services:
     configs:
       - source: mesh_defaults
         target: /etc/localmesh/bootstrap/00-mesh-defaults.yaml
+      - source: ingress_tls_secret
+        target: /etc/localmesh/bootstrap/05-ingress-tls.yaml
       - source: ingress_gateway
         target: /etc/localmesh/bootstrap/10-ingress-mesh-gateway.yaml
       - source: allow_all
@@ -98,8 +100,29 @@ services:
 configs:
   mesh_defaults:
     file: ./bootstrap/00-mesh-defaults.yaml
+  # Rendered inline (not file:) so the listener `hostname` field can use
+  # template substitution. Adopts the same pattern as ingress_routes.
   ingress_gateway:
-    file: ./bootstrap/10-ingress-mesh-gateway.yaml
+    content: |
+      type: MeshGateway
+      mesh: default
+      name: ingress
+      selectors:
+        - match:
+            kuma.io/service: ingress
+      conf:
+        listeners:
+          - port: 8443
+            protocol: HTTPS
+            hostname: '*.{{ .Project.Name }}.{{ .Project.LocalDomain }}'
+            tls:
+              mode: TERMINATE
+              certificates:
+                - secret: ingress-tls
+            tags:
+              port: https-ingress
+  ingress_tls_secret:
+    file: ../../secrets/ingress-tls/secret.yaml
   allow_all:
     file: ./bootstrap/20-allow-all.yaml
   ingress_dataplane:
@@ -136,7 +159,7 @@ configs:
           kind: MeshGateway
           name: ingress
           tags:
-            port: http-ingress
+            port: https-ingress
         to:
           - targetRef:
               kind: Mesh
