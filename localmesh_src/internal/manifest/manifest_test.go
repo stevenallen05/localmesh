@@ -195,3 +195,37 @@ func TestLoadAll_transitiveFlattenDedup(t *testing.T) {
 		t.Errorf("flatten order = %v, want %v", got, want)
 	}
 }
+
+func TestLoadAll_cycle(t *testing.T) {
+	root := t.TempDir()
+	writePlugin(t, root, "a", []string{"b"})
+	writePlugin(t, root, "b", []string{"a"})
+	writeProject(t, root, []string{"a"})
+
+	_, _, err := LoadAll(filepath.Join(root, "project.toml"), root)
+	var cyc *CycleError
+	if !errors.As(err, &cyc) {
+		t.Fatalf("got %v, want *CycleError", err)
+	}
+	want := []string{"a", "b", "a"}
+	if !reflect.DeepEqual(cyc.Path, want) {
+		t.Errorf("cycle path = %v, want %v", cyc.Path, want)
+	}
+	if !strings.Contains(err.Error(), "a -> b -> a") {
+		t.Errorf("error message %q missing path", err.Error())
+	}
+}
+
+func TestLoadAll_unknownMember(t *testing.T) {
+	root := t.TempDir()
+	writePlugin(t, root, "base", []string{"nonexistent"})
+	writeProject(t, root, []string{"base"})
+
+	_, _, err := LoadAll(filepath.Join(root, "project.toml"), root)
+	if err == nil {
+		t.Fatal("expected error for unknown plugin, got nil")
+	}
+	if !strings.Contains(err.Error(), "nonexistent") {
+		t.Errorf("error %q should mention the missing plugin name", err.Error())
+	}
+}
