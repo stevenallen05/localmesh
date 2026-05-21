@@ -1,0 +1,3 @@
+# Meta-package — pulls in auth + security + observability + logging via
+# plugin.toml's plugins = [...]. No services of its own.
+services: {}
