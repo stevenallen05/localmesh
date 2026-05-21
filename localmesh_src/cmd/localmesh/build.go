@@ -18,7 +18,7 @@ import (
 func newBuildCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "build",
-		Short: "Regenerate .env managed section + render .localmesh/localmesh.compose.yaml from plugin templates",
+		Short: "Regenerate .env managed section + render localmesh/bundled.compose.yaml from plugin templates",
 		RunE: func(*cobra.Command, []string) error {
 			repoRoot, err := os.Getwd()
 			if err != nil {
@@ -33,7 +33,7 @@ func newBuildCmd() *cobra.Command {
 			if err := envwriter.WriteManaged(repoRoot, proj, plugins); err != nil {
 				return err
 			}
-			composePath := filepath.Join(".localmesh", "localmesh.compose.yaml")
+			composePath := filepath.Join("localmesh", "bundled.compose.yaml")
 			if err := render.RunWith(proj, plugins, "service_catalog", composePath); err != nil {
 				return err
 			}
@@ -50,7 +50,7 @@ func newBuildCmd() *cobra.Command {
 	}
 }
 
-// parseMergedCompose reads the rendered .localmesh/localmesh.compose.yaml and
+// parseMergedCompose reads the rendered localmesh/bundled.compose.yaml and
 // extracts the slim ComposeAggregate view mesh.RenderAll needs: per-service
 // depends_on + labels.
 //
