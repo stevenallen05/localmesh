@@ -14,12 +14,31 @@ A plugin or tool reads only the inputs explicitly designated for it. Compose fil
 
 This rule is repeated in `CLAUDE.md`, `docs/engineering/rules/golang-basics.md`, and `docs/engineering/rules/rust-basics.md`.
 
-## 1. Identity tuple
+## 1. Bare-minimum plugin contents
+
+Every plugin in `localmesh/service_catalog/<plugin>/` ships three files:
+
+- `docker-compose.yml` (or `docker-compose.yaml.gotmpl` — see §5 for the templating rules).
+- `plugin.toml` (the manifest — see §4 for the schema, §2 for the identity tuple it carries).
+- `README.md` (the consumer-wiring template — see §3).
+
+Meta-packages — plugins that declare a `plugins = [...]` dependency list but no `[[services]]` of their own — still ship all three. Their compose is the stub:
+
+```yaml
+# Meta-package — services come from the plugins listed in plugin.toml.
+services: {}
+```
+
+`base/` is the canonical meta-package; its `plugins = [...]` is flattened transitively by `localmesh build`. One TOML trap: `plugins = [...]` must precede the `[identity]` table header, or it is parsed as `identity.plugins` and the loader never sees it.
+
+This rule is documented, not currently CLI-linted.
+
+## 2. Identity tuple
 
 Every service in this project — app-tier or catalog plugin — declares an **identity tuple** of three values: `service_name`, `module_name`, `owned_by`. The tuple already exists in the compose files; this rule binds it.
 
 - `service_name` — the OTel `service.name` for the running service. One per container role (`server`, `www`, `postgres`, `otel-collector`, ...). Matches whatever the OTel SDK reports.
-- `module_name` — the LocalMesh namespace axis. `app` for app-tier services. `<plugin-slug>` for catalog-plugin services, where the slug matches the `localmesh/service_catalog/<plugin>/` directory name (`database`, `observability`, `logging`, `localmesh`, `auth`). The single value `app` is reserved for app-tier services. Plugin slugs cannot be `app`.
+- `module_name` — the LocalMesh namespace axis. `app` for app-tier services. `<plugin-slug>` for catalog-plugin services, where the slug matches the `localmesh/service_catalog/<plugin>/` directory name (`postgres16`, `observability`, `logging`, `security`, `auth`, `base`). The single value `app` is reserved for app-tier services. Plugin slugs cannot be `app`.
 - `owned_by` — contact email for ownership. App-tier uses `${TECH_LEAD_EMAIL}` (sourced from `.env`, mirroring `project.toml`'s `tech_lead_email`). Plugins use the platform team's email.
 
 Each value lives in two places. `plugin.toml` is now the source of truth for the per-plugin halves; the `.env` interpolation bridge written by `localmesh build` (`internal/envwriter`) is the working substitute for a proper compose-extension (tracked as the *Identity source consolidation* Open item in [`../../stakeholder/DESIGN_DECISIONS.md`](../../stakeholder/DESIGN_DECISIONS.md)). The two channels carrying identity:
@@ -42,20 +61,20 @@ server:
     metrics.owned_by: ${TECH_LEAD_EMAIL}
 ```
 
-### Example — catalog plugin service (`database/`)
+### Example — catalog plugin service (`postgres16/`)
 
 ```yaml
 postgres:
   environment:
     OTEL_SERVICE_NAME: postgres
-    OTEL_RESOURCE_ATTRIBUTES: "module_name=database,owned_by=sre@example.com"
+    OTEL_RESOURCE_ATTRIBUTES: "module_name=postgres16,owned_by=sre@example.com"
   labels:
     metrics.service_name: postgres
-    metrics.module_name: database
+    metrics.module_name: postgres16
     metrics.owned_by: sre@example.com
 ```
 
-## 2. Consumer wiring (`README.md`)
+## 3. Consumer wiring (`README.md`)
 
 Every catalog plugin with a consumer-facing surface ships a `README.md` next to its `docker-compose.yml`. The file follows this strict template. Consumer apps include the plugin, read `README.md`, copy-paste the wiring into the relevant app-tier service.
 
@@ -82,7 +101,7 @@ List of volume mounts the consumer must add to its service. `None` if not applic
 The exact YAML block to paste. `None` if the plugin does not need to be up before the consumer.
 
 ## Labels
-`metrics.*` and `katenary.v3/*` labels the consumer must add specifically for this plugin. Identity-tuple labels the app already declares (per §1 above) are mentioned only if the plugin needs a specific value.
+`metrics.*` and `katenary.v3/*` labels the consumer must add specifically for this plugin. Identity-tuple labels the app already declares (per §2 above) are mentioned only if the plugin needs a specific value.
 
 ## k8s rendering
 katenary labels for secret promotion / `values-from` references. `None` if the plugin exposes no sensitive env.
@@ -96,18 +115,42 @@ Drop-in YAML composing every section above into one consumer service definition.
 
 Sections that do not apply for a given plugin write `None` rather than being omitted — the dev's eye lands at a predictable spot every time.
 
-Worked example for the `database/` plugin lives at [`../../../service_catalog/database/README.md`](../../../service_catalog/database/README.md).
+Worked example for the `postgres16/` plugin lives at [`../../../localmesh/service_catalog/postgres16/README.md`](../../../localmesh/service_catalog/postgres16/README.md).
 
-## 3. Overlap with `plugin.toml`
+## 4. Overlap with `plugin.toml`
 
-`plugin.toml` owns identity (`module_name`, `owned_by`), service definitions (`container`, `port`, `scheme`), exposure (`expose_via_ingress`, `ingress`), and auth gating (`requires_auth`, default `true` — services that opt out of the ingress auth gate set `requires_auth = false`; the IdP itself is the canonical opt-out). `README.md` cites these values by reference (link to §1 above or to `plugin.toml` itself) and never redeclares them. Plugin-internal env vars derived from `plugin.toml` by `localmesh build` do not appear in `README.md`'s Environment table:
+`plugin.toml` owns identity (`module_name`, `owned_by`), service definitions (`container`, `port`, `scheme`), exposure (`expose_via_ingress`, `ingress`), and auth gating (`requires_auth`, default `true` — services that opt out of the ingress auth gate set `requires_auth = false`; the IdP itself is the canonical opt-out). `README.md` cites these values by reference (link to §2 above or to `plugin.toml` itself) and never redeclares them. Plugin-internal env vars derived from `plugin.toml` by `localmesh build` do not appear in `README.md`'s Environment table:
 
 - From `[identity]`, keyed by **plugin slug**: `<PLUGIN>_MODULE_NAME`, `<PLUGIN>_OWNED_BY`.
 - From `[[services]]`, keyed by **container slug**: `<CONTAINER>_PORT`, `<CONTAINER>_EXPOSE_VIA_INGRESS`, `<CONTAINER>_INGRESS`.
 
-Mesh-exempt status (`mesh.exempt: "true"` compose label) is declared on each service's compose `labels:` block, not in `plugin.toml`. The localmesh CLI's `internal/mesh/` package parses each plugin's compose to derive the per-container exempt set, which drives cert-skip in `mtls mint` (TODO; see `docs/TODO.md`) and edge filtering in the envoy render path.
+Mesh-exempt status (`mesh.exempt: "true"` compose label) is declared on each service's compose `labels:` block, not in `plugin.toml`. The label marks services that opt out of the mesh data plane (the observability and logging sinks, postgres's native mTLS). It is consumed at runtime by the `security/` plugin's kuma sidecar wiring, not at build time by the CLI.
 
 `README.md`'s Environment table is for env vars the **consumer app** sets, not values exported into the platform's `.env`.
+
+## 5. Template author reference
+
+`.gotmpl`-suffixed plugin files are rendered through Go's `text/template` with the [Masterminds/sprig](https://masterminds.github.io/sprig/) function library. Plain `.yaml` / `.yml` files pass through verbatim — no templating, no substitution. The renderer runs with `Option("missingkey=error")`: referencing a key that doesn't exist fails the build loudly instead of emitting `<no value>`.
+
+### Render context
+
+Templates receive a `*Context` (`localmesh_src/internal/template/template.go`) with four fields:
+
+- `.Project` — the typed `project.toml` view. Fields: `.Project.Name`, `.Project.Namespace`, `.Project.TechLead`, `.Project.ExternalDomain`, `.Project.LocalDomain`, `.Project.Plugins`, `.Project.Services` (the app-tier `[[services]]`).
+- `.Plugin` — this plugin's own typed `plugin.toml`. Fields: `.Plugin.Name` (the directory-derived slug), `.Plugin.Identity.ModuleName`, `.Plugin.Identity.OwnedBy`, `.Plugin.Plugins` (meta-dependencies; empty for leaf plugins), `.Plugin.Services`.
+- `.Env` — `map[string]string` of the `.env`-managed values the CLI emitted (`internal/envwriter`). This carries CA / OIDC / SDS material, not the per-plugin `<PLUGIN>_*` vars from §4 — those reach compose through `${}` interpolation at runtime, not the template map.
+- `.Workloads` — `[]WorkloadCtx` (`.Name`, `.MeshExempt`) of every workload in the merged compose surface. Populated only on the second render pass, for plugins whose template iterates workloads (today: just `security/`). `nil` on the first pass.
+
+### Custom functions
+
+Two functions are registered on top of sprig (`localmesh_src/internal/template/funcs.go`):
+
+- `spiffeURI <container> <project> <local_domain>` → `spiffe://<container>.<project>.<local_domain>`. Built from the container name, never the plugin slug — renames like `database` → `postgres16` do not move the SPIFFE identity.
+- `identityLabels <plugin> <service_name>` → a three-key YAML block (`metrics.service_name`, `metrics.module_name`, `metrics.owned_by`) drawn from the plugin's identity tuple. The caller indents the result.
+
+### Data-source discipline
+
+A template may only read from the context fields above. Reaching into a sibling plugin's files, scraping a runtime artifact, or parsing labels meant for another consumer is forbidden (§0). If the value you need isn't on the context, stop and ask — do not invent an ingestion path.
 
 ## See also
 
