@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -114,22 +115,60 @@ func LoadPlugin(catalogRoot, name string) (*Plugin, error) {
 	return &p, nil
 }
 
-// LoadAll loads project.toml from projectFile + every plugin.toml listed
-// in project.Plugins, resolved relative to catalogRoot. In the real repo
-// project.toml lives at the repo root and plugins under service_catalog/;
-// in test fixtures both live in the same directory.
+// CycleError indicates a cycle in the plugin dependency graph. Path is
+// rendered as "a -> b -> a" so the operator can find the offending link.
+type CycleError struct {
+	Path []string
+}
+
+func (e *CycleError) Error() string {
+	return "manifest LoadAll: plugin cycle: " + strings.Join(e.Path, " -> ")
+}
+
+// LoadAll loads project.toml from projectFile + every plugin.toml reachable
+// from project.Plugins (transitively, via each plugin's own plugins = [...]
+// field). Returns a depth-first post-order, first-occurrence-wins deduped
+// list. Cycles return *CycleError. Unknown plugin names propagate the
+// LoadPlugin error.
 func LoadAll(projectFile, catalogRoot string) (*Project, []*Plugin, error) {
 	proj, err := LoadProject(projectFile)
 	if err != nil {
 		return nil, nil, err
 	}
-	plugins := make([]*Plugin, 0, len(proj.Plugins))
+	out := make([]*Plugin, 0, len(proj.Plugins))
+	seen := map[string]bool{}
 	for _, name := range proj.Plugins {
-		p, err := LoadPlugin(catalogRoot, name)
+		out, err = flatten(catalogRoot, name, out, seen, []string{})
 		if err != nil {
 			return nil, nil, err
 		}
-		plugins = append(plugins, p)
 	}
-	return proj, plugins, nil
+	return proj, out, nil
+}
+
+// flatten walks the dep graph from `name`, appending plugins in post-order.
+// `seen` dedupes; `stack` detects cycles.
+func flatten(catalogRoot, name string, out []*Plugin, seen map[string]bool, stack []string) ([]*Plugin, error) {
+	if seen[name] {
+		return out, nil
+	}
+	for _, s := range stack {
+		if s == name {
+			return nil, &CycleError{Path: append(append([]string{}, stack...), name)}
+		}
+	}
+	p, err := LoadPlugin(catalogRoot, name)
+	if err != nil {
+		return nil, err
+	}
+	newStack := append(stack, name)
+	for _, child := range p.Plugins {
+		out, err = flatten(catalogRoot, child, out, seen, newStack)
+		if err != nil {
+			return nil, err
+		}
+	}
+	out = append(out, p)
+	seen[name] = true
+	return out, nil
 }
