@@ -16,7 +16,6 @@ COPY --from=kumactl /usr/bin/kumactl  /usr/local/bin/kumactl
 
 COPY bin/sidecar-init.sh           /usr/local/bin/sidecar-init.sh
 COPY bin/bootstrap.sh              /usr/local/bin/bootstrap.sh
-COPY config/transparent-proxy.yaml /etc/kuma/transparent-proxy.yaml
 COPY dataplane/workload.yaml       /etc/kuma/dataplane.yaml
 
 ENTRYPOINT ["/bin/bash", "/usr/local/bin/sidecar-init.sh"]
