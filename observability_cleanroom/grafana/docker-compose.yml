@@ -9,15 +9,18 @@ services:
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
+      # Installed at boot. /var/lib/grafana is tmpfs, so it reinstalls each
+      # start (needs network) — fine for a disposable cleanroom.
+      GF_INSTALL_PLUGINS: grafana-llm-app 1.0.8
     volumes:
       - ./provisioning:/etc/grafana/provisioning:ro
-      - grafana-data:/var/lib/grafana
+    tmpfs:
+      # exec required: GF_INSTALL_PLUGINS lands grafana-llm-app's backend binary
+      # under /var/lib/grafana/plugins, and tmpfs defaults to noexec.
+      - /var/lib/grafana:mode=0777,exec
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
       interval: 10s
       timeout: 3s
       retries: 5
-
-volumes:
-  grafana-data: {}

@@ -6,8 +6,6 @@ services:
     command: ["-config.file=/etc/tempo/tempo.yaml"]
     volumes:
       - ./tempo.yaml:/etc/tempo/tempo.yaml:ro
-      - tempo-data:/var/tempo
+    tmpfs:
+      - /var/tempo:mode=0777
     restart: unless-stopped
-
-volumes:
-  tempo-data: {}

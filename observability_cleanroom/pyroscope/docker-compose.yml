@@ -8,8 +8,6 @@ services:
       - "14040:4040"
     volumes:
       - ./pyroscope.yaml:/etc/pyroscope/pyroscope.yaml:ro
-      - pyroscope-data:/data
+    tmpfs:
+      - /data:mode=0777
     restart: unless-stopped
-
-volumes:
-  pyroscope-data: {}

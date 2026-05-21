@@ -5,8 +5,6 @@ services:
     command: ["-config.file=/etc/loki/loki.yaml"]
     volumes:
       - ./loki.yaml:/etc/loki/loki.yaml:ro
-      - loki-data:/loki
+    tmpfs:
+      - /loki:mode=0777
     restart: unless-stopped
-
-volumes:
-  loki-data: {}
