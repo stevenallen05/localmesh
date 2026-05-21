@@ -209,6 +209,13 @@ func (m *Minter) MintIngressEdge() error {
 // emits a kuma `Secret` YAML containing the base64-encoded concatenation.
 // Production code path uses fmt.Sprintf (4-line file, not worth a YAML
 // library dep); tests parse with gopkg.in/yaml.v3 to verify the shape.
+//
+// File mode is 0644 even though the body encodes the private key. The
+// file is a transient bootstrap artifact: docker compose mounts it as a
+// config into the localmesh-bootstrap container, which kumactl-applies
+// it once and exits. It is not on a long-lived mount path. The id.key
+// PEM written alongside (mode 0600) remains the canonical key file for
+// any consumer that needs strict perms.
 func writeIngressEdgeSecretYAML(outDir, certPath, keyPath string) error {
 	certPEM, err := os.ReadFile(certPath)
 	if err != nil {
