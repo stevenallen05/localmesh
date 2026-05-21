@@ -87,10 +87,14 @@ services:
     image: metrics-stack/www:0.1.0  # Rule 1
     restart: unless-stopped
     environment:
-      # gRPC dials the peer's plain docker name. The www-mesh sidecar's
-      # transparent proxy redirects outbound :50051 to its Envoy, which
-      # applies mTLS to the server peer. The app stays mesh-agnostic.
-      SERVER_ADDR: server:50051
+      # gRPC dials the platform-supplied peer address. The kuma DP DNS
+      # resolves this mesh DNS form to the server MeshService VIP, and
+      # the www-mesh sidecar's outbound cluster mTLS-upgrades the dial.
+      # Apps treat this as an opaque address; the platform owns the mesh
+      # naming scheme. (Bare docker name `server:50051` would resolve via
+      # docker DNS to the pod IP, miss the mesh cluster, and be refused
+      # by server's STRICT mTLS inbound — see DESIGN_DECISIONS.)
+      SERVER_ADDR: server.svc.mesh.local:50051
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
       OTEL_SERVICE_NAME: www

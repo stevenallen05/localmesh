@@ -1,11 +1,12 @@
 type: Mesh
 name: default
-# Everywhere = both legacy `kuma.io/service` original-dst clusters AND
-# MeshService VIPs. Apps dial peers by plain docker name (resolves to
-# the pod IP via docker DNS); the legacy original-dst cluster mTLS-
-# upgrades that path. Keeps apps mesh-agnostic.
+# Exclusive = MeshService model only. MeshIdentity issues SPIFFE certs
+# and applies mTLS to MeshService-keyed clusters (the VIPs that kuma DP
+# DNS hands out for `<svc>.svc.mesh.local`). Verified during live bring-
+# up: Everywhere mode dropped the auto-mTLS transport_socket on these
+# clusters; Exclusive is what carries mTLS reliably under MeshIdentity.
 meshServices:
-  mode: Everywhere
+  mode: Exclusive
 ---
 type: MeshIdentity
 mesh: default
