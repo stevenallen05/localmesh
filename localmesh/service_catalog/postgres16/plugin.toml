@@ -5,7 +5,7 @@ owned_by    = "sre@example.com"
 [[services]]
 container          = "postgres"
 port               = 5432
-scheme             = "tcp"        # declared for validation; postgres is needs_mtls_sidecar=false (native pg mTLS)
+scheme             = "postgresql" # declared for validation; postgres is needs_mtls_sidecar=false (native pg mTLS)
 expose_via_ingress = false        # east-west only
 needs_mtls_sidecar = false
 

@@ -62,7 +62,7 @@ port      = 1234
 }
 
 func TestLoadPlugin_SchemeValid(t *testing.T) {
-	valid := []string{"grpc", "http", "https", "tcp"}
+	valid := []string{"grpc", "http", "https", "tcp", "postgresql"}
 	for _, s := range valid {
 		t.Run(s, func(t *testing.T) {
 			dir := t.TempDir()

@@ -47,7 +47,7 @@ type Identity struct {
 type Service struct {
 	Container        string `toml:"container"`
 	Port             int    `toml:"port"`
-	Scheme           string `toml:"scheme"` // grpc | http | https | tcp — app's loopback bind protocol
+	Scheme           string `toml:"scheme"` // grpc | http | https | tcp | postgresql — app's loopback bind protocol
 	ExposeViaIngress bool   `toml:"expose_via_ingress"`
 	Ingress          bool   `toml:"ingress"`
 	RequiresAuth     *bool  `toml:"requires_auth"`      // pointer: default true unless explicit false
@@ -60,7 +60,7 @@ type Service struct {
 func (s Service) Meshed() bool { return s.NeedsMTLSSidecar == nil || *s.NeedsMTLSSidecar }
 
 // validSchemes is the closed set of supported [[services]].scheme values.
-var validSchemes = map[string]bool{"grpc": true, "http": true, "https": true, "tcp": true}
+var validSchemes = map[string]bool{"grpc": true, "http": true, "https": true, "tcp": true, "postgresql": true}
 
 // validateServiceSchemes checks every service has a valid scheme. path is
 // used in the error message so callers don't need to wrap.
@@ -70,7 +70,7 @@ func validateServiceSchemes(path string, services []Service) error {
 			return fmt.Errorf("%s: scheme required on container %q: %w", path, s.Container, ErrMalformed)
 		}
 		if !validSchemes[s.Scheme] {
-			return fmt.Errorf("%s: container %q has invalid scheme %q (want grpc|http|https|tcp): %w", path, s.Container, s.Scheme, ErrMalformed)
+			return fmt.Errorf("%s: container %q has invalid scheme %q (want grpc|http|https|tcp|postgresql): %w", path, s.Container, s.Scheme, ErrMalformed)
 		}
 	}
 	return nil
