@@ -25,12 +25,13 @@ func newSetupCmd() *cobra.Command {
 				return fmt.Errorf("getcwd: %w", err)
 			}
 			ctx := cmd.Context()
+			rootCA := ca.New(repoRoot)
 
 			// Step 1: clear any previously-trusted CA on the host.
 			// First-run safe: mkcert -uninstall errors when nothing is
 			// trusted; we swallow that and move on.
 			fmt.Println("==> Removing existing CA from host trust store")
-			_ = ca.New(repoRoot).Uninstall(ctx)
+			_ = rootCA.Uninstall(ctx)
 
 			// Step 2: sledgehammer the local cert tree.
 			fmt.Println("==> Wiping localmesh/secrets/")
@@ -40,13 +41,13 @@ func newSetupCmd() *cobra.Command {
 
 			// Step 3: mint a fresh LocalMesh root CA.
 			fmt.Println("==> Minting LocalMesh root CA")
-			if err := ca.New(repoRoot).Mint(ctx, true); err != nil {
+			if err := rootCA.Mint(ctx, true); err != nil {
 				return fmt.Errorf("ca mint: %w", err)
 			}
 
 			// Step 4: install the root CA into the host trust store.
 			fmt.Println("==> Installing CA into host trust store")
-			if err := ca.New(repoRoot).Install(ctx); err != nil {
+			if err := rootCA.Install(ctx); err != nil {
 				return fmt.Errorf("ca install: %w", err)
 			}
 
@@ -67,9 +68,12 @@ func newSetupCmd() *cobra.Command {
 				return fmt.Errorf("mtls mint: %w", err)
 			}
 
-			// Step 6: render .env (then bundled.compose.yaml).
-			// Order is load-bearing: .env carries the once-preserved
-			// LOCALMESH_OIDC_CLIENT_SECRET that dexseed reads in step 7.
+			// Step 6: render .env first, then bundled.compose.yaml.
+			// Order is load-bearing for two reasons: .env carries the once-
+			// preserved LOCALMESH_OIDC_CLIENT_SECRET that dexseed reads in
+			// step 7; AND compose interpolation at `docker compose up` time
+			// reads .env, so the render output must reflect the same managed
+			// section the env file just received.
 			fmt.Println("==> Rendering .env + bundled.compose.yaml")
 			if err := envwriter.WriteManaged(repoRoot, proj, plugins); err != nil {
 				return fmt.Errorf("envwriter: %w", err)
