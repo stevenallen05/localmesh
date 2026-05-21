@@ -1,6 +1,11 @@
 services:
   kuma-cp:
     image: docker.io/kumahq/kuma-cp:2.13.6
+    # kuma-cp's auto-generated TLS cert SANs are derived from the container
+    # hostname; sidecars dial https://kuma-cp:5678 and reject the cert
+    # without a matching SAN.
+    hostname: kuma-cp
+    command: ["run"]
     environment:
       KUMA_MODE: standalone
       KUMA_ENVIRONMENT: universal
@@ -40,8 +45,11 @@ services:
     image: localmesh-sidecar:dev
     # BUILTIN gateway dataplane. Gateways don't transparent-proxy, so no
     # NET_ADMIN; kuma fills the dataplane address var via --dataplane-var.
+    # entrypoint:[] overrides the image's sidecar-init.sh ENTRYPOINT so
+    # the command below runs kuma-dp directly (no workload init).
     # `$$` is Compose's variable-escape (renders to `$` at runtime); `\$$1`
     # reaches awk as `$1`.
+    entrypoint: []
     command:
       - /bin/bash
       - -c

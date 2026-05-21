@@ -1,7 +1,11 @@
 type: Mesh
 name: default
+# Everywhere = both legacy `kuma.io/service` original-dst clusters AND
+# MeshService VIPs. Apps dial peers by plain docker name (resolves to
+# the pod IP via docker DNS); the legacy original-dst cluster mTLS-
+# upgrades that path. Keeps apps mesh-agnostic.
 meshServices:
-  mode: Exclusive
+  mode: Everywhere
 ---
 type: MeshIdentity
 mesh: default
