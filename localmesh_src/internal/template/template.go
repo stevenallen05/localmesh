@@ -32,7 +32,7 @@ type Context struct {
 	Project  *manifest.Project
 	Plugin   *manifest.Plugin
 	Env      map[string]string
-	Services []ServiceCtx // all registry-known services; nil for the plugins that ignore it
+	Services []ServiceCtx // all registry-known services; plugins that don't need it ignore it
 }
 
 // Render reads a .gotmpl file and returns its rendered output.
