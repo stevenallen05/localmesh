@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/stevenallen05/localmesh/internal/ca"
+	"github.com/stevenallen05/localmesh/internal/devref"
 	"github.com/stevenallen05/localmesh/internal/dexseed"
 	"github.com/stevenallen05/localmesh/internal/envwriter"
 	"github.com/stevenallen05/localmesh/internal/manifest"
@@ -79,8 +80,13 @@ func newSetupCmd() *cobra.Command {
 				return fmt.Errorf("envwriter: %w", err)
 			}
 			composePath := filepath.Join("localmesh", "bundled.compose.yaml")
-			if err := render.RunWith(proj, plugins, "localmesh/service_catalog", composePath); err != nil {
+			catalogRoot := "localmesh/service_catalog"
+			if err := render.RunWith(proj, plugins, catalogRoot, composePath); err != nil {
 				return fmt.Errorf("render: %w", err)
+			}
+			fmt.Println("==> Writing localmesh/developer_reference.md")
+			if err := devref.Write(repoRoot, catalogRoot, proj, plugins); err != nil {
+				return fmt.Errorf("devref: %w", err)
 			}
 
 			// Step 7: seed localmesh/dex.yaml from the sample on first run.
