@@ -128,3 +128,28 @@ otelcol.exporter.otlphttp "loki" {
     endpoint = "http://loki:3100/otlp"
   }
 }
+
+// ---- Profiles ----
+
+// Drop pyroscope itself from the profile target set — otherwise the
+// profiler profiles its own destination, generating feedback noise.
+discovery.relabel "profile_targets" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/pyroscope"
+    action        = "drop"
+  }
+}
+
+pyroscope.ebpf "default" {
+  targets    = discovery.relabel.profile_targets.output
+  forward_to = [pyroscope.write.default.receiver]
+}
+
+pyroscope.write "default" {
+  endpoint {
+    url = "http://pyroscope:4040"
+  }
+}
