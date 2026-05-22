@@ -1,0 +1,54 @@
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  # Default grpc recv limit is 4 MiB. Alloy's loki.write batches docker
+  # container logs and can exceed it during catch-up. Raise to 16 MiB so a
+  # cold start against a dev box with hours of accumulated container logs
+  # doesn't ResourceExhausted-loop.
+  grpc_server_max_recv_msg_size: 16777216
+  grpc_server_max_send_msg_size: 16777216
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2024-04-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  allow_structured_metadata: true
+  # Distributor-side: don't reject by absolute entry age.
+  reject_old_samples: false
+
+ingester:
+  # Ingester-side: rejected entries with the "too far behind" message come
+  # from this knob, not reject_old_samples_max_age. Default 2h means a
+  # cold start that tails accumulated docker logs drops most of the
+  # history. 168h covers a week of dev-box backlog.
+  max_chunk_age: 168h
+
+distributor:
+  otlp_config:
+    default_resource_attributes_as_index_labels:
+      - service.name
+      - service.namespace
+      - service.instance.id
+      - deployment.environment.name
+      - container_id
+      - level

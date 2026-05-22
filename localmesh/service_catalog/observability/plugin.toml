@@ -1,0 +1,14 @@
+[identity]
+module_name = "observability"
+owned_by    = "sre@example.com"
+
+# Observability is self-contained. The six containers it ships are not
+# meshed (they handle their own TLS or run as local-dev infrastructure),
+# do not surface tunables, and do not publish consumer-facing env vars.
+# All cross-stack wiring lives in the OTel SDK + alloy config.
+#
+# Env injection into user services (OTEL_SERVICE_NAME, OTEL_EXPORTER_OTLP_*)
+# is emitted by this plugin's docker-compose.yml.gotmpl by iterating
+# .Project.Services. The CLI's existing merger absorbs it; docker compose
+# include-merges it with the user's authoritative service definition at
+# runtime.
