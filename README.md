@@ -1,4 +1,4 @@
-# Tensorwave take-home
+# Take-home
 
 > **LocalMesh** is a deployment pattern I designed for this take-home and am bootstrapping through a small Rust + Next.js metrics service.
 
