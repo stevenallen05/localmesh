@@ -1,0 +1,26 @@
+
+include:
+  - path: localmesh/bundled.compose.yaml
+
+services:
+  www:
+    # Same reason as server: proto/ must be in the build context.
+    build:
+      context: .
+      dockerfile: www/Dockerfile
+    image: metrics-stack/www:0.1.0  # Rule 1
+    restart: unless-stopped
+    environment:
+      REDIS_URL: ${CACHE_URL}        # delivered by the redis plugin's connection_url export
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # Plaintext loopback probe against the app's declared port. Loopback
+      # is not intercepted by the sidecar's inbound redirect. (Confirm
+      # during bring-up; see plan §3.)
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3443/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+

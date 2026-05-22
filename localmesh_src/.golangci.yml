@@ -1,0 +1,24 @@
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - govet
+    - errcheck
+    - staticcheck   # subsumes gosimple as of golangci-lint v1.59+
+    - unused
+    - ineffassign
+    - gofumpt
+    - misspell
+    - revive
+  disable:
+    - exhaustruct
+
+linters-settings:
+  errcheck:
+    check-blank: true
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters: [errcheck]

@@ -1,0 +1,27 @@
+# project.toml — top of the project.
+#
+# The identity block at the top is real: it feeds the helm chart and
+# names the point person. The section headings below are a sketch —
+# what this file could grow into once the platform reads them.
+#
+# Rule of thumb for any flag that could change here: a legal assistant
+# or accountant pinged on the diff should understand it in three
+# seconds, cold. Anything that needs explanation belongs elsewhere —
+# in the catalogue or a deploy file.
+
+project_name      = "metrics-collector"
+project_namespace = "laptop"                      # OTel service.namespace + compose isolation
+tech_lead_email   = "sallen@amberstyle.ca"        # point person for questions
+external_domain   = "metrics.example.com"
+local_domain      = "lvh.me"               # dev DNS suffix; TODO: needs_prod_decisions real internal DNS
+
+# Plugins the team consumes. Paths resolve to localmesh/service_catalog/<name>/.
+# TODO: needs_prod_decisions service_catalog distribution
+plugins = ["redis"]
+
+
+[[services]]
+container          = "www"
+port               = 3443
+scheme             = "https"
+expose_via_ingress = true                          # https://www.${PROJECT_NAME}.${LOCAL_DOMAIN}:8443 → www:3443

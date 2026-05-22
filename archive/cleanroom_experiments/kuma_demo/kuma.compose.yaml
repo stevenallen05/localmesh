@@ -1,0 +1,90 @@
+name: kuma-demo
+
+services:
+  kuma-cp:
+    image: docker.io/kumahq/kuma-cp:2.13.6
+    hostname: kuma-cp
+    command: ["run"]
+    environment:
+      KUMA_MODE: standalone
+      KUMA_ENVIRONMENT: universal
+      KUMA_STORE_TYPE: memory
+      KUMA_DP_SERVER_AUTHN_DP_PROXY_TYPE: none
+    ports:
+      - "25681:5681"
+    networks: [mesh]
+
+  bootstrap:
+    image: docker.io/debian:bookworm-slim
+    depends_on:
+      - kuma-cp
+    volumes:
+      - tokens:/shared
+      - ../localmesh/bin/kumactl:/usr/local/bin/kumactl:ro
+      - ./bin/bootstrap.sh:/usr/local/bin/bootstrap.sh:ro
+    entrypoint: ["/bin/bash", "/usr/local/bin/bootstrap.sh"]
+    networks: [mesh]
+    restart: "no"
+
+  kv:
+    image: ghcr.io/kumahq/kuma-counter-demo:debian-slim
+    hostname: kv
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      WORKLOAD_NAME: kv
+      APP_PORT: "5050"
+      CP_HOST: kuma-cp:5678
+      KUMA_VERSION: "2.13.6"
+      TOKEN_DIR: /shared
+    volumes:
+      - ../localmesh/bin/kuma-dp:/usr/local/bin/kuma-dp:ro
+      - ../localmesh/bin/kumactl:/usr/local/bin/kumactl:ro
+      - ../localmesh/bin/envoy:/usr/local/bin/envoy:ro
+      - ../localmesh/bin/coredns:/usr/local/bin/coredns:ro
+      - ./bin/app-init.sh:/usr/local/bin/app-init.sh:ro
+      - ./dataplanes/dataplane.yaml:/etc/kuma/dataplane.yaml:ro
+      - ./config/transparent-proxy.yaml:/etc/kuma/transparent-proxy.yaml:ro
+    entrypoint: ["/bin/bash", "/usr/local/bin/app-init.sh"]
+    networks: [mesh]
+
+  demo-app:
+    image: ghcr.io/kumahq/kuma-counter-demo:debian-slim
+    hostname: demo-app
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+      kv:
+        condition: service_started
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      WORKLOAD_NAME: demo-app
+      APP_PORT: "5050"
+      CP_HOST: kuma-cp:5678
+      KUMA_VERSION: "2.13.6"
+      TOKEN_DIR: /shared
+      KV_URL: http://kv.svc.mesh.local:5050
+      APP_VERSION: v1
+    volumes:
+      - ../localmesh/bin/kuma-dp:/usr/local/bin/kuma-dp:ro
+      - ../localmesh/bin/kumactl:/usr/local/bin/kumactl:ro
+      - ../localmesh/bin/envoy:/usr/local/bin/envoy:ro
+      - ../localmesh/bin/coredns:/usr/local/bin/coredns:ro
+      - ./bin/app-init.sh:/usr/local/bin/app-init.sh:ro
+      - ./dataplanes/dataplane.yaml:/etc/kuma/dataplane.yaml:ro
+      - ./config/transparent-proxy.yaml:/etc/kuma/transparent-proxy.yaml:ro
+    entrypoint: ["/bin/bash", "/usr/local/bin/app-init.sh"]
+    networks: [mesh]
+
+volumes:
+  tokens:
+
+networks:
+  mesh:
+    driver: bridge

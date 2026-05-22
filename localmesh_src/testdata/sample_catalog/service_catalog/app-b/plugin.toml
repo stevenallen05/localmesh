@@ -1,0 +1,8 @@
+[identity]
+module_name = "app"
+owned_by    = "test@example.com"
+
+[[services]]
+container = "app-b"
+port      = 50051
+scheme    = "grpc"

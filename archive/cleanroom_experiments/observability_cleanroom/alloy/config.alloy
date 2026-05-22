@@ -1,0 +1,216 @@
+// observability_cleanroom/alloy/config.alloy
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+// OTLP receiver — apps push traces, metrics, logs here.
+otelcol.receiver.otlp "default" {
+  grpc { endpoint = "0.0.0.0:4317" }
+  http { endpoint = "0.0.0.0:4318" }
+
+  output {
+    traces  = [otelcol.processor.batch.default.input]
+    metrics = [otelcol.processor.batch.default.input]
+    logs    = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.batch "default" {
+  output {
+    traces  = [
+      otelcol.connector.spanmetrics.default.input,
+      otelcol.connector.servicegraph.default.input,
+      otelcol.exporter.otlp.tempo.input,
+    ]
+    metrics = [otelcol.exporter.prometheus.appmetrics.input]
+    logs    = [otelcol.exporter.otlphttp.loki.input]
+  }
+}
+
+otelcol.exporter.prometheus "appmetrics" {
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+
+// Span metrics: traces_spanmetrics_calls_total + duration histograms.
+// Output goes to a Prom remote-write that doesn't exist yet — that lands in
+// Chunk 3. The pipeline still validates and runs; data is dropped silently.
+otelcol.connector.spanmetrics "default" {
+  histogram {
+    explicit {}
+  }
+
+  // Attach trace_id exemplars to the duration histogram so latency panels can
+  // jump to an exact trace. Prometheus needs --enable-feature=exemplar-storage.
+  exemplars {
+    enabled = true
+  }
+
+  output {
+    metrics = [otelcol.exporter.prometheus.spanmetrics.input]
+  }
+}
+
+otelcol.connector.servicegraph "default" {
+  output {
+    metrics = [otelcol.exporter.prometheus.servicegraph.input]
+  }
+}
+
+otelcol.exporter.prometheus "spanmetrics" {
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+
+otelcol.exporter.prometheus "servicegraph" {
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+
+// Tempo exporter — gRPC, plaintext, no TLS for localdev.
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls { insecure = true }
+  }
+}
+
+prometheus.remote_write "default" {
+  endpoint {
+    url = "http://prometheus:9090/api/v1/write"
+  }
+}
+
+// ---- Container log tailing ----
+
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+
+  filter {
+    name   = "label"
+    values = ["com.docker.compose.project=obs-cleanroom"]
+  }
+}
+
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.docker.containers.targets
+  forward_to = [loki.process.containers.receiver]
+  labels = {
+    job = "docker",
+  }
+}
+
+loki.process "containers" {
+  forward_to = [loki.write.default.receiver]
+
+  stage.json {
+    expressions = {
+      level   = "level",
+      message = "message",
+    }
+  }
+
+  stage.labels {
+    values = {
+      level = "",
+    }
+  }
+
+  stage.match {
+    selector = "{level!~\"trace|debug|info|warn|error|fatal|\"}"
+    action   = "drop"
+  }
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+// ---- OTLP logs to Loki ----
+// telemetrygen --logs (and any SDK push) lands here.
+otelcol.exporter.otlphttp "loki" {
+  client {
+    endpoint = "http://loki:3100/otlp"
+  }
+}
+
+// ---- Profiles ----
+
+// Drop pyroscope itself from the profile target set — otherwise the
+// profiler profiles its own destination, generating feedback noise.
+discovery.relabel "profile_targets" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/pyroscope"
+    action        = "drop"
+  }
+}
+
+pyroscope.ebpf "default" {
+  targets    = discovery.relabel.profile_targets.output
+  forward_to = [pyroscope.write.default.receiver]
+}
+
+pyroscope.write "default" {
+  endpoint {
+    url = "http://pyroscope:4040"
+  }
+}
+
+// ---- Host metrics ----
+
+prometheus.exporter.unix "host" {
+  procfs_path = "/host/proc"
+  sysfs_path  = "/host/sys"
+  rootfs_path = "/rootfs"
+}
+
+prometheus.scrape "host_metrics" {
+  targets         = prometheus.exporter.unix.host.targets
+  forward_to      = [prometheus.remote_write.default.receiver]
+  scrape_interval = "15s"
+}
+
+// ---- Container metrics (cadvisor) ----
+
+prometheus.scrape "cadvisor" {
+  targets = [
+    { __address__ = "cadvisor:8080", job = "cadvisor" },
+  ]
+  forward_to      = [prometheus.remote_write.default.receiver]
+  scrape_interval = "15s"
+}
+
+// ---- Synthetics (blackbox-exporter, embedded in Alloy) ----
+
+prometheus.exporter.blackbox "default" {
+  config = "modules:\n  http_2xx:\n    prober: http\n    timeout: 5s\n    http:\n      method: GET\n      preferred_ip_protocol: ip4\n"
+
+  target {
+    name    = "grafana_self"
+    address = "http://grafana:3000/api/health"
+    module  = "http_2xx"
+  }
+}
+
+prometheus.scrape "blackbox" {
+  targets         = prometheus.exporter.blackbox.default.targets
+  forward_to      = [prometheus.remote_write.default.receiver]
+  scrape_interval = "30s"
+}
+
+// ---- GPU metrics (scaffolded, disabled by default) ----
+// Uncomment on a host with NVIDIA GPUs + the NVIDIA Container Toolkit.
+// Also add `runtime: nvidia` to alloy/docker-compose.yml.
+// TODO: needs_prod_decisions gpu exporter default-on
+//
+// prometheus.exporter.dcgm "default" {}
+//
+// prometheus.scrape "gpu" {
+//   targets         = prometheus.exporter.dcgm.default.targets
+//   forward_to      = [prometheus.remote_write.default.receiver]
+//   scrape_interval = "15s"
+// }

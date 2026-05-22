@@ -1,0 +1,29 @@
+type: Mesh
+name: default
+# Exclusive = MeshService model only. MeshIdentity issues SPIFFE certs
+# and applies mTLS to MeshService-keyed clusters (the VIPs that kuma DP
+# DNS hands out for `<svc>.svc.mesh.local`). Verified during live bring-
+# up: Everywhere mode dropped the auto-mTLS transport_socket on these
+# clusters; Exclusive is what carries mTLS reliably under MeshIdentity.
+meshServices:
+  mode: Exclusive
+---
+type: MeshIdentity
+mesh: default
+name: default-identity
+spec:
+  selector:
+    dataplane:
+      matchLabels: {}
+  spiffeID:
+    trustDomain: "{{ .Mesh }}.mesh.local"
+    path: "/workload/{{ .Workload }}"
+  provider:
+    type: Bundled
+    bundled:
+      meshTrustCreation: Enabled
+      insecureAllowSelfSigned: true
+      autogenerate:
+        enabled: true
+      certificateParameters:
+        expiry: 24h

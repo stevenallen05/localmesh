@@ -1,0 +1,5 @@
+project_name      = "sample"
+project_namespace = "test"
+tech_lead_email   = "test@example.invalid"
+local_domain      = "lvh.me"
+plugins           = ["alpha", "beta"]

@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    katenary.v3/compose-hash: 7254d38a3901f929396e016f1e161398870c9378
+    katenary.v3/version: 3.0.0-rc6
+  labels:
+    {{- include "challenge.labels" . | nindent 4 }}
+    katenary.v3/component: node_exporter
+  name: '{{ include "challenge.fullname" . }}-node-exporter'
+spec:
+  ports:
+  - name: port-9100
+    port: 9100
+    protocol: TCP
+    targetPort: 9100
+  selector:
+    {{- include "challenge.selectorLabels" . | nindent 4 }}
+    katenary.v3/component: node_exporter

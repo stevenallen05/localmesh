@@ -1,0 +1,9 @@
+project_name      = "sample-mesh"
+project_namespace = "test"
+tech_lead_email   = "test@example.invalid"
+local_domain      = "lvh.me"
+plugins           = ["app-a", "app-b", "mesh"]
+
+# This fixture is the mesh-package's reference catalog: a project with
+# two apps (a depends on b) plus the mesh plugin (ingress + egress).
+# Chunk 2 of the envoy migration consumes this to exercise RenderAll.

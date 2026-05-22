@@ -1,0 +1,17 @@
+[identity]
+module_name = "mesh"
+owned_by    = "sre@example.com"
+
+[[services]]
+container          = "ingress-mesh"
+port               = 8443
+scheme             = "https"
+ingress            = true
+expose_via_ingress = false
+
+[[services]]
+container          = "egress-mesh"
+port               = 15001
+scheme             = "tcp"
+ingress            = false
+expose_via_ingress = false
