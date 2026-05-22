@@ -1,0 +1,12 @@
+type: Dataplane
+mesh: default
+name: ingress
+labels:
+  app: ingress
+  kuma.io/workload: ingress
+networking:
+  address: {{ address }}
+  gateway:
+    type: BUILTIN
+    tags:
+      kuma.io/service: ingress

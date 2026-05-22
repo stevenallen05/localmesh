@@ -1,0 +1,5 @@
+services:
+  alpha-svc:
+    image: alpha:dev
+    labels:
+{{ identityLabels .Plugin "alpha-svc" | indent 6 }}

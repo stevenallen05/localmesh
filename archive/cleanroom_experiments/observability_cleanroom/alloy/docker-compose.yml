@@ -1,0 +1,23 @@
+services:
+  alloy:
+    image: grafana/alloy:v1.5.1
+    container_name: alloy
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --stability.level=experimental
+      - /etc/alloy/config.alloy
+    ports:
+      - "14317:4317"
+      - "14318:4318"
+      - "12345:12345"  # 5-digit; "1"-prefix overflows 65535, left native
+    volumes:
+      - ./config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /:/rootfs:ro,rslave
+      - /proc:/host/proc:ro,rslave
+      - /sys:/host/sys:ro,rslave
+    privileged: true
+    pid: host
+    restart: unless-stopped

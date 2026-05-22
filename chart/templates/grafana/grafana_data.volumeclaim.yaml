@@ -1,0 +1,22 @@
+{{- if .Values.grafana.persistence.grafana_data.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    katenary.v3/compose-hash: 7254d38a3901f929396e016f1e161398870c9378
+    katenary.v3/version: 3.0.0-rc6
+  labels:
+    {{- include "challenge.labels" . | nindent 4 }}
+    katenary.v3/component: grafana
+  name: '{{ include "challenge.fullname" . }}-grafana-grafana-data'
+spec:
+  accessModes:
+  {{- .Values.grafana.persistence.grafana_data.accessMode | toYaml | nindent 2 }}
+  resources:
+    requests:
+      storage: {{ tpl .Values.grafana.persistence.grafana_data.size $ }}
+  {{- if ne .Values.grafana.persistence.grafana_data.storageClass "-" }}
+  storageClassName: '{{ .Values.grafana.persistence.grafana_data.storageClass }}'
+  {{- end }}
+
+{{- end }}

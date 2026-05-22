@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    katenary.v3/compose-hash: 7254d38a3901f929396e016f1e161398870c9378
+    katenary.v3/version: 3.0.0-rc6
+  labels:
+    {{- include "challenge.labels" . | nindent 4 }}
+    katenary.v3/component: server
+  name: '{{ include "challenge.fullname" . }}-server'
+spec:
+  replicas: {{ .Values.server.replicas }}
+  selector:
+    matchLabels:
+      {{- include "challenge.selectorLabels" . | nindent 6 }}
+      katenary.v3/component: server
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        {{- include "challenge.selectorLabels" . | nindent 8 }}
+        katenary.v3/component: server
+    spec:
+      containers:
+      - envFrom:
+        - configMapRef:
+            name: '{{ include "challenge.fullname" . }}-server'
+        image: '{{ tpl .Values.server.repository.image $ }}:{{ tpl .Values.server.repository.tag $ | default .Chart.AppVersion }}'
+        imagePullPolicy: {{ .Values.server.imagePullPolicy }}
+        livenessProbe:
+          exec:
+            command:
+            - bash
+            - -c
+            - </dev/tcp/localhost/50051
+          periodSeconds: 10
+        name: server
+        ports:
+        - containerPort: 50051
+          name: port-50051
+        {{- if .Values.server.resources }}
+        resources:
+          {{ .Values.server.resources | toYaml | nindent 10 }}
+        {{- end }}
+      {{- if .Values.pullSecrets }}
+      imagePullSecrets:
+      {{- .Values.pullSecrets | toYaml | nindent 6 }}
+      {{- end }}
+      {{- if .Values.server.nodeSelector }}
+      nodeSelector:
+        {{- .Values.server.nodeSelector | toYaml | nindent 8 }}
+      {{- end }}
+      {{- if ne .Values.server.serviceAccount "" }}
+      serviceAccountName: {{ .Values.server.serviceAccount | quote }}
+      {{- end }}

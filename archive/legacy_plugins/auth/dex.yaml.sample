@@ -1,0 +1,51 @@
+# Dex config sample — copied to localmesh/dex.yaml on first `make certs`.
+# Dev-owned: edit localmesh/dex.yaml to add/remove users. The .sample is
+# the seed; the Makefile target won't overwrite an existing localmesh/dex.yaml
+# copy.
+#
+# Env vars ($PROJECT_NAME, $LOCAL_DOMAIN, $LOCALMESH_OIDC_CLIENT_SECRET)
+# are expanded once at copy time by `make certs` (envsubst). Dex's own
+# runtime env-expansion has been unreliable across versions.
+#
+# Three dev users come pre-seeded (alice / bob / charlie), all sharing
+# the password "dev". Hash regenerated via:
+#   docker run --rm httpd:2.4-alpine htpasswd -bnBC 10 "" dev | cut -d: -f2
+#
+# TODO: needs_prod_decisions swap built-in local connector for real OIDC IdP
+
+issuer: http://dex:5556
+
+storage:
+  type: memory
+
+web:
+  http: 0.0.0.0:5556
+
+oauth2:
+  skipApprovalScreen: true       # dev UX: skip the "Approve" click after login
+
+# Built-in password DB. Issues ID tokens whose `preferred_username` claim
+# is the staticPasswords[].username — envoy's jwt_authn forwards that as
+# x-user-name to upstream workloads.
+enablePasswordDB: true
+
+staticClients:
+  - id:     localmesh-dev
+    name:   "LocalMesh"
+    secret: $LOCALMESH_OIDC_CLIENT_SECRET
+    redirectURIs:
+      - https://www.$PROJECT_NAME.$LOCAL_DOMAIN:18443/oauth2/callback
+
+staticPasswords:
+  - email:    alice@example.invalid
+    hash:     '$2y$10$N.b.upq/.fOOUGbkQ2uy8u7mCgjQJA6hUnedHSVy4zcL4c23Ug7R2'
+    username: "Alice Example"
+    userID:   alice
+  - email:    bob@example.invalid
+    hash:     '$2y$10$N.b.upq/.fOOUGbkQ2uy8u7mCgjQJA6hUnedHSVy4zcL4c23Ug7R2'
+    username: "Bob Tester"
+    userID:   bob
+  - email:    charlie@example.invalid
+    hash:     '$2y$10$N.b.upq/.fOOUGbkQ2uy8u7mCgjQJA6hUnedHSVy4zcL4c23Ug7R2'
+    username: "Charlie Demo"
+    userID:   charlie

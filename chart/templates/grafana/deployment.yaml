@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    katenary.v3/compose-hash: 7254d38a3901f929396e016f1e161398870c9378
+    katenary.v3/version: 3.0.0-rc6
+  labels:
+    {{- include "challenge.labels" . | nindent 4 }}
+    katenary.v3/component: grafana
+  name: '{{ include "challenge.fullname" . }}-grafana'
+spec:
+  replicas: {{ .Values.grafana.replicas }}
+  selector:
+    matchLabels:
+      {{- include "challenge.selectorLabels" . | nindent 6 }}
+      katenary.v3/component: grafana
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        {{- include "challenge.selectorLabels" . | nindent 8 }}
+        katenary.v3/component: grafana
+    spec:
+      containers:
+      - envFrom:
+        - configMapRef:
+            name: '{{ include "challenge.fullname" . }}-grafana'
+        image: '{{ tpl .Values.grafana.repository.image $ }}:{{ tpl .Values.grafana.repository.tag $ | default "latest" }}'
+        imagePullPolicy: {{ .Values.grafana.imagePullPolicy }}
+        livenessProbe:
+          exec:
+            command:
+            - wget
+            - -qO-
+            - http://localhost:3000/api/health
+          periodSeconds: 10
+        name: grafana
+        ports:
+        - containerPort: 3000
+          name: port-3000
+        {{- if .Values.grafana.resources }}
+        resources:
+          {{ .Values.grafana.resources | toYaml | nindent 10 }}
+        {{- end }}
+        volumeMounts:
+        {{- if .Values.grafana.persistence.grafana_data.enabled }}
+        - mountPath: /var/lib/grafana
+          name: grafana-data
+        {{- end }}
+      {{- if .Values.pullSecrets }}
+      imagePullSecrets:
+      {{- .Values.pullSecrets | toYaml | nindent 6 }}
+      {{- end }}
+      initContainers:
+      - command:
+        - /bin/sh
+        - -c
+        - |-
+          until nc -z {{ include "challenge.fullname" . }}-victoriametrics 8428; do
+            sleep 1;
+          done
+        image: busybox:latest
+        name: wait-for-victoriametrics
+        {{- if .Values.grafana.resources }}
+        resources:
+          {{ .Values.grafana.resources | toYaml | nindent 10 }}
+        {{- end }}
+      {{- if .Values.grafana.nodeSelector }}
+      nodeSelector:
+        {{- .Values.grafana.nodeSelector | toYaml | nindent 8 }}
+      {{- end }}
+      {{- if ne .Values.grafana.serviceAccount "" }}
+      serviceAccountName: {{ .Values.grafana.serviceAccount | quote }}
+      {{- end }}
+      volumes:
+      {{- if .Values.grafana.persistence.grafana_data.enabled }}
+      - name: grafana-data
+        persistentVolumeClaim:
+          claimName: '{{ include "challenge.fullname" . }}-grafana-grafana-data'
+      {{- end }}

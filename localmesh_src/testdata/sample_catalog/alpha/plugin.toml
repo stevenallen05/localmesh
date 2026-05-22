@@ -1,0 +1,23 @@
+[identity]
+module_name = "alpha"
+owned_by    = "alpha@example.invalid"
+
+[[services]]
+container          = "alpha-svc"
+port               = 8080
+scheme             = "http"
+expose_via_ingress = false
+
+# Fixture coverage for the inversion machinery. Loaded by manifest tests +
+# round-tripped through envwriter when those tests exercise the resolve step.
+[[config_vars]]
+name        = "timeout_ms"
+description = "Request timeout (ms) for upstream calls"
+value       = "5000"
+
+[[exports]]
+name        = "service_url"
+description = "HTTP base URL the consumer dials"
+template    = "http://{{ .Service.Container }}:{{ .Service.Port }}"
+env         = "{{ .ServiceName | upper }}_URL"
+required    = true

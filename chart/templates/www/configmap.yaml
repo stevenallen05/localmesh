@@ -1,0 +1,15 @@
+apiVersion: v1
+data:
+  HOSTNAME: ""
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  OTEL_SERVICE_NAME: www
+  SERVER_ADDR: '{{ .Release.Name }}-server:50051'
+kind: ConfigMap
+metadata:
+  annotations:
+    katenary.v3/compose-hash: 7254d38a3901f929396e016f1e161398870c9378
+    katenary.v3/version: 3.0.0-rc6
+  labels:
+    {{- include "challenge.labels" . | nindent 4 }}
+    katenary.v3/component: www
+  name: '{{ include "challenge.fullname" . }}-www'

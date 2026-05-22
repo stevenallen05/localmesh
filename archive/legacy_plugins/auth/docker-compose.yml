@@ -1,0 +1,49 @@
+# LocalMesh ingress auth plugin. Dex is the dev OIDC IdP; the ingress
+# envoy (mesh plugin) is the OIDC client and drives the dance via its
+# envoy.filters.http.oauth2 + jwt_authn filters.
+#
+# Dex's config lives in localmesh/dex.yaml, copied from dex.yaml.sample
+# on first run (see Makefile's certs target). The dev edits the local
+# copy to set staticPasswords.
+#
+# Mesh-exempt: dex sits outside the SPIFFE mesh (it fronts it). The
+# ingress envoy reaches it plaintext on the docker network.
+#
+# TODO: needs_prod_decisions swap dex for prod IdP via plugin replacement
+
+services:
+  dex:
+    image: ghcr.io/dexidp/dex:v2.41.1
+    container_name: dex
+    restart: unless-stopped
+    command:
+      - dex
+      - serve
+      - /etc/dex/config.yaml
+    environment:
+      PROJECT_NAME: ${PROJECT_NAME}
+      LOCAL_DOMAIN: ${LOCAL_DOMAIN}
+      LOCALMESH_OIDC_CLIENT_SECRET: ${LOCALMESH_OIDC_CLIENT_SECRET}
+    volumes:
+      # Dev-owned. Bootstrapped from dex.yaml.sample by `make certs`.
+      # Path is relative to this file (localmesh/service_catalog/auth/);
+      # dex.yaml lives at the localmesh/ root.
+      - ../../dex.yaml:/etc/dex/config.yaml:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5556/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    labels:
+      katenary.v3/ports: |-
+        - 5556
+      metrics.service_name: dex
+      metrics.module_name: ${AUTH_MODULE_NAME}
+      metrics.owned_by: ${AUTH_OWNED_BY}
+    # TODO: Aspirational, some kind of watcher that 
+    # auto-restarts certain containers on some env var changes? 
+    # develop:
+    #   watch:
+    #     - action: sync+restart
+    #       path: ./dex/config.yaml
+    #       target: /etc/dex/config.yaml

@@ -1,0 +1,30 @@
+[identity]
+module_name = "redis"
+owned_by    = "sre@example.com"
+
+[[services]]
+container          = "redis"
+port               = 6379
+scheme             = "tcp"
+expose_via_ingress = false
+
+# Knobs the consumer may tune. Resolved values become
+# <UPCASE plugin>_<UPCASE name> in .env (Phase 1, single-instance).
+[[config_vars]]
+name        = "maxmemory"
+description = "Memory cap before eviction kicks in"
+value       = "256mb"
+
+[[config_vars]]
+name        = "noevict"
+description = "Noevict policy"
+value       = "false"
+
+# What the plugin delivers. Template renders the value; env renders the
+# default destination env-var name (consumer renames via deploy.toml).
+[[exports]]
+name        = "connection_url"
+description = "Full redis:// connection string the consumer dials"
+template    = "redis://{{ .Service.Container }}:{{ .Service.Port }}"
+env         = "{{ .ServiceName | upper }}_URL"
+required    = true

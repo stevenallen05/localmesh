@@ -1,0 +1,27 @@
+# Per-instance orders for plugins that have consumer-tunable config or
+# exports. Plugins selected in project.toml that expose neither do not
+# need a [[plugins.<slug>]] block here.
+
+[plugins]
+
+[[plugins.redis]]
+  service_name = "cache"            # logical instance identity; defaults to slug
+  [plugins.redis.config]
+  maxmemory = "512mb"               # overrides the manifest default ("256mb")
+  [plugins.redis.exports]
+  connection_url = "CACHE_URL"      # overrides the rendered default destination
+
+# Phase 2 lifts the one-instance-per-slug cap. The shapes below document
+# what that will look like. Phase 1's ValidateDeploy rejects them.
+#
+# [[plugins.redis]]
+#   service_name = "async_handler"
+#   [plugins.redis.config]
+#   noevict = true
+#   [plugins.redis.exports]
+#   connection_url = "ASYNC_PUBSUB_URL"
+#
+# [[plugins.redis]]
+#   service_name = "redis"
+#   [plugins.redis.exports]
+#   connection_url = "REDIS_URL"

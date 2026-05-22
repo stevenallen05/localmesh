@@ -1,0 +1,7 @@
+services:
+  app-b:
+    image: alpine:3.20
+    labels:
+      metrics.service_name: app-b
+      metrics.module_name: app
+      metrics.owned_by: test@example.com

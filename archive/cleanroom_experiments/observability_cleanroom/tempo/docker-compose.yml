@@ -1,0 +1,11 @@
+# observability_cleanroom/tempo/docker-compose.yml
+services:
+  tempo:
+    image: grafana/tempo:2.10.0
+    container_name: tempo
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./tempo.yaml:/etc/tempo/tempo.yaml:ro
+    tmpfs:
+      - /var/tempo:mode=0777
+    restart: unless-stopped

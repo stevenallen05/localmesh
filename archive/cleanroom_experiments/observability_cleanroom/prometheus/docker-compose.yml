@@ -1,0 +1,18 @@
+# observability_cleanroom/prometheus/docker-compose.yml
+services:
+  prometheus:
+    image: prom/prometheus:v3.0.0
+    container_name: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-remote-write-receiver
+      - --enable-feature=exemplar-storage
+      - --web.listen-address=:9090
+    ports:
+      - "19090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    tmpfs:
+      - /prometheus:mode=0777
+    restart: unless-stopped
