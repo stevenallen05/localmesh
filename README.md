@@ -10,6 +10,14 @@ The take-home asked for a metrics monitoring system. The artifact here is two th
 
 **LocalMesh turns the `docker-compose.yaml` your teams already write for local dev, into a helm chart your k8s can use.** It borrows the [Rails "omakase" philosophy](https://rubyonrails.org/doctrine#omakase); opinionated curation of the boring infrastructure choices every project repeats, and applies it to the dev/prod gap. SRE assembles the catalogue; teams include one line per piece they need.
 
+## What every development environment gets
+
+| URL | Container | Source |
+|-----|-----------|--------|
+| https://www.metrics-collector.lvh.me:8443 | www | project |
+| https://grafana.metrics-collector.lvh.me:8443 | grafana | observability |
+
+
 ## What "omakase" means here
 
 Ruby on Rails is an opinionated web framework. It picks the ORM, the routing layer, the templating engine, and the dozen libraries every web app needs. Teams don't repeat those choices on every project. The trade-off is flexibility for not having to decide. Pre-picked defaults applied uniformly beat bespoke decisions each team makes in parallel.

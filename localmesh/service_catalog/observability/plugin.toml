@@ -12,3 +12,9 @@ owned_by    = "sre@example.com"
 # .Project.Services. The CLI's existing merger absorbs it; docker compose
 # include-merges it with the user's authoritative service definition at
 # runtime.
+
+[[services]]
+container          = "grafana"
+port               = 3000
+expose_via_ingress = true
+scheme = "http"

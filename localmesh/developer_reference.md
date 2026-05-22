@@ -20,6 +20,7 @@ _To change any of these, edit `project.toml` and re-run `localmesh build`._
 | URL | Container | Source |
 |-----|-----------|--------|
 | https://www.metrics-collector.lvh.me:8443 | www | project |
+| https://grafana.metrics-collector.lvh.me:8443 | grafana | observability |
 
 ## Plugins
 
