@@ -1,0 +1,5 @@
+plugins = ["observability"]   # MUST precede [identity] (conventions §1 TOML trap)
+
+[identity]
+module_name = "localmesh"
+owned_by    = "sre@example.com"
