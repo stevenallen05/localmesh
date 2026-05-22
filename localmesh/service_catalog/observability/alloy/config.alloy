@@ -25,9 +25,30 @@ otelcol.receiver.otlp "default" {
   http { endpoint = "0.0.0.0:4318" }
 
   output {
-    traces  = [otelcol.processor.filter.policy.input]
+    traces  = [otelcol.processor.transform.postgres_service_name.input]
     metrics = [otelcol.processor.filter.policy.input]
     logs    = [otelcol.processor.filter.policy.input]
+  }
+}
+
+// ──── postgres service.name rewrite ───────────────────────────────────
+// pg_tracing emits spans with the hard-coded resource value
+// `service.name=PostgreSQL_Server` regardless of the pg_tracing.service_name
+// GUC or OTEL_SERVICE_NAME env. DESIGN_DECISIONS row 33 prescribes the
+// canonical fix: rewrite at the collector so consumers see the
+// catalog-conventional `postgres` name. Traces only; metrics + logs bypass.
+otelcol.processor.transform "postgres_service_name" {
+  error_mode = "ignore"
+
+  trace_statements {
+    context = "resource"
+    statements = [
+      `set(attributes["service.name"], "postgres") where attributes["service.name"] == "PostgreSQL_Server"`,
+    ]
+  }
+
+  output {
+    traces = [otelcol.processor.filter.policy.input]
   }
 }
 

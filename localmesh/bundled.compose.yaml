@@ -128,6 +128,66 @@ services:
             metrics.service_name: loki
             metrics.module_name: observability
             metrics.owned_by: sre@example.com
+    postgres:
+        build:
+            context: ./service_catalog/postgres16
+            dockerfile: Dockerfile
+        image: metrics-stack/postgres-pgtracing:0.1.0
+        container_name: postgres
+        environment:
+            POSTGRES_DB: ${POSTGRES16_DATABASE}
+            POSTGRES_USER: ${POSTGRES16_USERNAME}
+            POSTGRES_PASSWORD: ${POSTGRES16_PASSWORD}
+            OTEL_RESOURCE_ATTRIBUTES: "module_name=postgres16,owned_by=sre@example.com"
+            OTEL_SERVICE_NAME: postgres
+        command:
+            - postgres
+            - -c
+            - config_file=/etc/postgresql/postgresql.conf
+            - -c
+            - hba_file=/etc/postgresql/pg_hba.conf
+            - -c
+            - shared_preload_libraries=pg_tracing,pg_stat_statements
+            - -c
+            - pg_stat_statements.track=all
+            - -c
+            - pg_stat_statements.max=10000
+            - -c
+            - pg_tracing.sample_rate=1.0
+            - -c
+            - pg_tracing.otel_endpoint=http://alloy:4318/v1/traces
+            - -c
+            - pg_tracing.otel_naptime=2000
+        volumes:
+            - postgres-data:/var/lib/postgresql/data
+            - ./service_catalog/postgres16/initdb:/docker-entrypoint-initdb.d:ro
+            - ./service_catalog/postgres16/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+            - ./service_catalog/postgres16/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U ${POSTGRES16_USERNAME} -d ${POSTGRES16_DATABASE}"]
+            interval: 10s
+            timeout: 3s
+            retries: 5
+        labels:
+            metrics.service_name: postgres
+            metrics.module_name: postgres16
+            metrics.owned_by: sre@example.com
+    postgres-exporter:
+        image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
+        container_name: postgres-exporter
+        environment:
+            DATA_SOURCE_NAME: "postgresql://${POSTGRES16_USERNAME}:${POSTGRES16_PASSWORD}@postgres:5432/${POSTGRES16_DATABASE}?sslmode=disable"
+            OTEL_RESOURCE_ATTRIBUTES: "module_name=postgres16,owned_by=sre@example.com"
+            OTEL_SERVICE_NAME: postgres-exporter
+        depends_on:
+            postgres:
+                condition: service_healthy
+        labels:
+            com.localmesh.scrape: "true"
+            com.localmesh.scrape.port: "9187"
+            metrics.service_name: postgres-exporter
+            metrics.module_name: postgres16
+            metrics.owned_by: sre@example.com
     # ──── prometheus: metrics store (Mimir stand-in for local dev) ──────
     # TODO: needs_prod_decisions retention + persistent volumes
     prometheus:
@@ -203,3 +263,5 @@ services:
             OTEL_SERVICE_NAME: "www"
             OTEL_EXPORTER_OTLP_ENDPOINT: "http://alloy:4317"
             OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+volumes:
+    postgres-data: {}

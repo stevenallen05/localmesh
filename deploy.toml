@@ -11,6 +11,10 @@
   [plugins.redis.exports]
   connection_url = "CACHE_URL"      # overrides the rendered default destination
 
+[[plugins.postgres16]]
+  [plugins.postgres16.exports]
+  connection_url = "DATABASE_URL"
+
 # Phase 2 lifts the one-instance-per-slug cap. The shapes below document
 # what that will look like. Phase 1's ValidateDeploy rejects them.
 #

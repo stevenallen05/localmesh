@@ -18,19 +18,7 @@ Touches:
 - Every `localmesh/service_catalog/*/plugin.toml` — drop `scheme = "…"` lines.
 - `localmesh_src/testdata/sample_catalog/**/plugin.toml` — drop `scheme = "…"` lines.
 
-### 2. Postgres plugin re-promotion with `config_vars` + `exports`
-
-Source: config-inversion §11.2.
-
-Rationale: the pre-inversion `postgres16/` plugin hardcoded `POSTGRES_DB`, `POSTGRES_USER`, `container_name`, and a README-documented `DATABASE_URL`. It was removed in the catalog reshape (recoverable from git history); when a postgres plugin returns, shape it with `config_vars` + `exports` from the start so the consumer names the destination. Held off because the mTLS connection string is gnarly (`postgresql://server@<host>:<port>/<db>?sslmode=verify-full&sslcert=…&sslkey=…`) and worth its own design pass.
-
-Touches (new path on re-introduction):
-
-- `localmesh/service_catalog/postgres/plugin.toml` — add `[[config_vars]]` (`database_name`, role names) + one `[[exports]]` (`connection_url`).
-- `localmesh/service_catalog/postgres/docker-compose.yml` — read `POSTGRES_DB` / `POSTGRES_USER` from `${POSTGRES_*}` interpolation.
-- `localmesh/service_catalog/postgres/README.md` — Environment row points at the `deploy.toml`-chosen destination.
-
-### 3. Per-plugin README Environment table
+### 2. Per-plugin README Environment table
 
 Source: config-inversion §11.3.
 
@@ -41,7 +29,7 @@ Touches:
 - `docs/engineering/rules/plugin-conventions.md` §3 — Environment subsection rules.
 - Every plugin's `README.md` — once §3 lands.
 
-### 4. `plugin-conventions.md` §4 env-var naming refresh
+### 3. `plugin-conventions.md` §4 env-var naming refresh
 
 Source: config-inversion §11.4.
 
@@ -49,7 +37,7 @@ Rationale: §4 documents `<PLUGIN>_*` and `<CONTAINER>_*` patterns for envwriter
 
 Touches: `docs/engineering/rules/plugin-conventions.md` §4.
 
-### 5. `project.toml` ↔ `deploy.toml` sync
+### 4. `project.toml` ↔ `deploy.toml` sync
 
 Source: config-inversion §11.5.
 
@@ -57,7 +45,7 @@ Rationale: a plugin's slug appears in both files (selection vs instantiation). P
 
 Touches: `localmesh_src/internal/manifest/manifest.go` cross-validation; eventually a `localmesh add` verb.
 
-### 6. Identity tuple rebind (Phase 2 trigger)
+### 5. Identity tuple rebind (Phase 2 trigger)
 
 Source: config-inversion §11.6 (and Phase 2 in §8).
 
@@ -69,7 +57,7 @@ Touches:
 - Every plugin's `docker-compose.yml` once it adopts per-instance rendering — moves from plain `.yml` to `.gotmpl` keyed by `service_name`.
 - Per-instance cert minting — `localmesh_src/internal/mtls/` iterates instances, not plugin slugs.
 
-### 7. Remove setup.go's auth-plugin coupling
+### 6. Remove setup.go's auth-plugin coupling
 
 Source: config-inversion §[catalog deletion].
 
@@ -85,6 +73,19 @@ Touches:
 - `localmesh_src/internal/dexseed/` — consider removing the package entirely once no caller remains.
 
 If a future auth plugin re-promotes from `archive/legacy_plugins/auth/`, those pieces come back together — but as a fresh design, not via a stub-restore.
+
+### 7. Postgres dashboard re-port
+
+Source: `docs/superpowers/specs/2026-05-22-postgres16-plugin-design.md` Out section.
+
+Rationale: the `postgres16/` plugin landed without its `postgres.json` dashboard contribution. The contribution path (per-plugin `configs:` attachment, mount target under `/etc/grafana/dashboards/<plugin>/<slug>.json`) requires the observability plugin to switch its dashboard provider to `foldersFromFilesStructure: true` and migrate the existing `./grafana/dashboards/*` bind mount to per-plugin `configs:` attachments. Sanctioned by DESIGN_DECISIONS row 30. Hold until that observability migration lands.
+
+Touches:
+- `localmesh/service_catalog/observability/grafana/provisioning/dashboards/dashboards.yaml` — flip `foldersFromFilesStructure` to `true`.
+- `localmesh/service_catalog/observability/docker-compose.yml.gotmpl` — drop the `./grafana/dashboards:/etc/grafana/dashboards:ro` bind mount in favor of per-plugin `configs:` attachments.
+- `localmesh/service_catalog/postgres16/postgres.json` — re-port from `git show 8b9feba:localmesh/service_catalog/postgres16/postgres.json` (patched community 9628 + slow-query panel).
+- `localmesh/service_catalog/postgres16/docker-compose.yml` — re-declare `grafana:` with `configs:` attachment for `postgres16_dashboard_postgres`.
+- `localmesh/service_catalog/postgres16/README.md` — note dashboard is shipped, location, default folder.
 
 ## Closed
 

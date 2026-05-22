@@ -1,0 +1,39 @@
+[identity]
+module_name = "postgres16"
+owned_by    = "sre@example.com"
+
+[[services]]
+container          = "postgres"
+port               = 5432
+scheme             = "postgresql"
+expose_via_ingress = false
+needs_mtls_sidecar = false             # native pg auth; no sidecar — matches §4 default-override list
+
+[[services]]
+container          = "postgres-exporter"
+port               = 9187
+scheme             = "http"
+expose_via_ingress = false
+needs_mtls_sidecar = false
+
+[[config_vars]]
+name        = "database"
+description = "Database to create on first init"
+value       = "app"
+
+[[config_vars]]
+name        = "username"
+description = "Login role granted ownership of the database"
+value       = "app"
+
+[[config_vars]]
+name        = "password"
+description = "scram-sha-256 password for the login role"
+value       = "app"
+
+[[exports]]
+name        = "connection_url"
+description = "libpq URL the consumer dials"
+template    = "postgresql://{{ .ConfigVars.username }}:{{ .ConfigVars.password }}@{{ .Service.Container }}:{{ .Service.Port }}/{{ .ConfigVars.database }}"
+env         = "{{ .ServiceName | upper }}_URL"
+required    = true
