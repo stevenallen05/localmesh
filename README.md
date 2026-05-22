@@ -12,10 +12,20 @@ The take-home asked for a metrics monitoring system. The artifact here is two th
 
 ## What every development environment gets
 
-| URL | Container | Source |
-|-----|-----------|--------|
-| https://www.metrics-collector.lvh.me:8443 | www | project |
-| https://grafana.metrics-collector.lvh.me:8443 | grafana | observability |
+The LocalMesh base plugin bundles four layers: ingress + egress security, mesh-wide mTLS, an OIDC IdP, and the full observability suite. All `*.metrics-collector.lvh.me` subdomains route through the `ingress` gateway on `:8443`. Hostnames are the docker DNS names neighbours dial directly on the project network.
+
+| Service | Purpose | Hostname | FQDN |
+|---|---|---|---|
+| `ingress` | Envoy BUILTIN gateway. Terminates TLS for `*.metrics-collector.lvh.me:8443`. Drives OIDC via `oauth2` + `jwt_authn` filters. | `ingress` | — |
+| `kuma-cp` | Mesh control plane. Mints SPIFFE certs. Distributes policy to dataplanes. | `kuma-cp` | https://kuma.metrics-collector.lvh.me:8443 |
+| `localmesh-bootstrap` | One-shot job. Applies `MeshGateway`, `MeshHTTPRoute`, and `MeshTrafficPermission` on `kuma-cp` startup. | `localmesh-bootstrap` | — |
+| `dex` | Dev OIDC IdP. Three seeded users (`alice` / `bob` / `charlie`, password `dev`). | `dex` | https://dex.metrics-collector.lvh.me:8443 |
+| `alloy` | OTel collector. OTLP on `:4317` / `:4318`. Scrapes containers labelled `com.localmesh.scrape="true"`. | `alloy` | https://alloy.metrics-collector.lvh.me:8443 |
+| `grafana` | Dashboards. Tempo, Loki, and Prometheus datasources pre-wired. | `grafana` | https://grafana.metrics-collector.lvh.me:8443 |
+| `prometheus` | Metrics store (Mimir-shaped) and remote-write receiver on `:9090`. | `prometheus` | https://prometheus.metrics-collector.lvh.me:8443 |
+| `tempo` | Trace store. OTLP receiver on `:4317`. | `tempo` | — |
+| `loki` | Log store. OTLP receiver on `:3100`. | `loki` | — |
+| `cadvisor` | Container-metrics exporter on `:8080`. Scrape target for `alloy`. | `cadvisor` | — |
 
 
 ## What "omakase" means here
