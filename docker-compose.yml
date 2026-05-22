@@ -32,23 +32,24 @@ services:
       timeout: 3s
       retries: 5
 
-  db-probe:
-    image: postgres:16-alpine
-    container_name: db-probe
-    command:
-      - sh
-      - -c
-      - |
-        psql "$$DATABASE_URL" -c \
-          "INSERT INTO hello_messages (message, jwt_issuer, jwt_subject) \
-           VALUES ('probe-ok', 'dev-probe', 'smoke-test') RETURNING id;"
+  devcontainer:
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile
+    image: metrics-collector-devcontainer
+
+    profiles:
+      - donotstart
+    volumes:
+      - .:/workspace:cached
+
+      # host docker access
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    working_dir: /workspace
+
+    command: sleep infinity
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: "no"
-    labels:
-      metrics.service_name: db-probe
-      metrics.module_name:  app
-      metrics.owned_by:     ${TECH_LEAD_EMAIL}
+      GOPATH: /go
+
+    tty: true

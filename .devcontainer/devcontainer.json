@@ -1,0 +1,54 @@
+{
+  "name": "go-dev",
+
+  "dockerComposeFile": [
+    "../docker-compose.yml"
+  ],
+
+  "service": "devcontainer",
+  "runServices": [
+    "devcontainer"
+  ],
+  "workspaceFolder": "/workspace",
+
+  "shutdownAction": "stopCompose",
+  "features": {
+      "ghcr.io/devcontainers/features/docker-in-docker:3": {
+          "moby": false
+      },
+      "ghcr.io/devcontainers/features/common-utils": {
+          "installZsh": true,
+          "installOhMyZsh": true,
+          "installOhMyZshConfig": true,
+          "configureZshAsDefaultShell": true
+      }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.Go",
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  },
+
+  "remoteUser": "vscode",
+  "forwardPorts": [
+    3000,
+    5432,
+    6379
+  ],
+
+  "portsAttributes": {
+    "3000": {
+      "label": "grafana"
+    },
+    "3443": {
+      "label": "app"
+    },
+    "6379": {
+      "label": "redis"
+    }
+  }
+}
