@@ -27,10 +27,10 @@ func identityLabels(plugin *manifest.Plugin, serviceName string) string {
 	)
 }
 
-// schemeProtocol maps a [[services]].scheme value to a Kuma kuma.io/protocol
+// SchemeProtocol maps a [[services]].scheme value to a Kuma kuma.io/protocol
 // dataplane inbound tag. Closed map; unknown scheme is a build error so a
 // new app-tier protocol doesn't fall back to a silent "tcp" default.
-func schemeProtocol(scheme string) (string, error) {
+func SchemeProtocol(scheme string) (string, error) {
 	switch scheme {
 	case "http", "https":
 		return "http", nil

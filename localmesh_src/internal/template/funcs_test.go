@@ -42,12 +42,12 @@ func TestSchemeProtocol(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.scheme, func(t *testing.T) {
-			got, err := schemeProtocol(tt.scheme)
+			got, err := SchemeProtocol(tt.scheme)
 			if (err != nil) != tt.wantErr {
-				t.Fatalf("schemeProtocol(%q) error = %v, wantErr %v", tt.scheme, err, tt.wantErr)
+				t.Fatalf("SchemeProtocol(%q) error = %v, wantErr %v", tt.scheme, err, tt.wantErr)
 			}
 			if got != tt.want {
-				t.Errorf("schemeProtocol(%q) = %q, want %q", tt.scheme, got, tt.want)
+				t.Errorf("SchemeProtocol(%q) = %q, want %q", tt.scheme, got, tt.want)
 			}
 		})
 	}
