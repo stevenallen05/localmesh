@@ -7,14 +7,12 @@ container          = "postgres"
 port               = 5432
 scheme             = "postgresql"
 expose_via_ingress = false
-needs_mtls_sidecar = false             # native pg auth; no sidecar — matches §4 default-override list
 
 [[services]]
 container          = "postgres-exporter"
 port               = 9187
 scheme             = "http"
 expose_via_ingress = false
-needs_mtls_sidecar = false
 
 [[config_vars]]
 name        = "database"
