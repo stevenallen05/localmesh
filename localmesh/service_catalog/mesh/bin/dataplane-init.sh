@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Runs inside the localmesh sidecar container, which joins the target
+# Runs inside the localmesh dataplane container, which joins the target
 # workload's network namespace via compose `network_mode: "service:<svc>"`.
 # Starts kuma-dp, waits for envoy listeners, then installs the
 # transparent-proxy iptables rules into the shared netns. The workload's
@@ -10,6 +10,7 @@ set -euo pipefail
 # Required env (set by the rendered compose):
 #   WORKLOAD_NAME   name as it appears on kuma.io/service
 #   APP_PORT        port the workload listens on
+#   APP_PROTOCOL    kuma.io/protocol tag (http|grpc|tcp)
 #   CP_HOST         control-plane host:port for the DP gRPC (e.g. kuma-cp:5678)
 
 DATAPLANE_FILE=/etc/kuma/dataplane.yaml
