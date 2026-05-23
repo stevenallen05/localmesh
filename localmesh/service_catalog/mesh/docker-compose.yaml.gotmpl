@@ -40,6 +40,8 @@ services:
         target: /etc/localmesh/bootstrap/10-ingress-mesh-gateway.yaml
       - source: allow_all
         target: /etc/localmesh/bootstrap/10-traffic-permission.yaml
+      - source: passthrough_policy
+        target: /etc/localmesh/bootstrap/15-passthrough.yaml
       - source: mesh_trace_policy
         target: /etc/localmesh/bootstrap/20-trace.yaml
       - source: ingress_routes
@@ -134,6 +136,20 @@ configs:
     file: ./bootstrap/10-traffic-permission.yaml
   mesh_trace_policy:
     file: ./bootstrap/20-trace.yaml
+  # Rendered inline so the appendMatch domain interpolates from project.toml.
+  passthrough_policy:
+    content: |
+      type: MeshPassthrough
+      mesh: default
+      name: allow-external-apex
+      spec:
+        targetRef:
+          kind: Mesh
+        default:
+          passthroughMode: Matched
+          appendMatch:
+            - type: Domain
+              value: "*.{{ .Project.ExternalDomain }}"
   ingress_dataplane:
     file: ./dataplane/ingress.yaml
   transparent_proxy:
