@@ -38,7 +38,10 @@ func Run(projectFile, catalogRoot, outputPath string) error {
 func RunWith(proj *manifest.Project, plugins []*manifest.Plugin, catalogRoot, outputPath string) error {
 	env := envMap()
 	outputDir := filepath.Dir(outputPath)
-	services := serviceList(proj, plugins)
+	services, err := serviceList(proj, plugins)
+	if err != nil {
+		return err
+	}
 	rendered := make([]*yaml.Node, 0, len(plugins))
 	sources := make([]string, 0, len(plugins))
 	for _, p := range plugins {
@@ -69,33 +72,44 @@ func RunWith(proj *manifest.Project, plugins []*manifest.Plugin, catalogRoot, ou
 
 // serviceList collects every registry-known service (project [[services]] +
 // every plugin [[services]]) into the template context shape. Project services
-// first, then plugins in load order; deduped by container (first wins); sorted
-// by name for deterministic output.
-func serviceList(proj *manifest.Project, plugins []*manifest.Plugin) []tmpl.ServiceCtx {
+// first (slug "app"), then plugins in load order (slug = plugin name); deduped
+// by container (first wins); sorted by name for deterministic output. Returns
+// an error if any service's scheme has no kuma.io/protocol mapping.
+func serviceList(proj *manifest.Project, plugins []*manifest.Plugin) ([]tmpl.ServiceCtx, error) {
 	seen := map[string]bool{}
 	out := []tmpl.ServiceCtx{}
-	add := func(s manifest.Service) {
+	add := func(s manifest.Service, pluginSlug string) error {
 		if seen[s.Container] {
-			return
+			return nil
 		}
 		seen[s.Container] = true
+		protocol, err := tmpl.SchemeProtocol(s.Scheme)
+		if err != nil {
+			return fmt.Errorf("plugin %q service %q: %w", pluginSlug, s.Container, err)
+		}
 		out = append(out, tmpl.ServiceCtx{
 			Name:             s.Container,
 			Port:             s.Port,
-			Meshed:           s.Meshed(),
+			Protocol:         protocol,
+			Plugin:           pluginSlug,
 			ExposeViaIngress: s.ExposeViaIngress,
 		})
+		return nil
 	}
 	for _, s := range proj.Services {
-		add(s)
+		if err := add(s, "app"); err != nil {
+			return nil, err
+		}
 	}
 	for _, p := range plugins {
 		for _, s := range p.Services {
-			add(s)
+			if err := add(s, p.Name); err != nil {
+				return nil, err
+			}
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
-	return out
+	return out, nil
 }
 
 // renderPluginCompose renders one plugin's docker-compose template + parses
