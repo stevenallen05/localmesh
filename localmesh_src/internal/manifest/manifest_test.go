@@ -788,3 +788,35 @@ service_name = "x"
 	}
 }
 
+
+// TestLoadPlugin_RejectsDeprecatedNeedsMtlsSidecar guards against silent
+// reintroduction of the dropped per-service `needs_mtls_sidecar` flag.
+// strict-decode on LoadPlugin should surface it as an unknown field.
+func TestLoadPlugin_RejectsDeprecatedNeedsMtlsSidecar(t *testing.T) {
+	root := t.TempDir()
+	pluginDir := filepath.Join(root, "stale")
+	if err := os.MkdirAll(pluginDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	body := []byte(`
+[identity]
+module_name = "stale"
+owned_by    = "test@example.com"
+
+[[services]]
+container          = "x"
+port               = 1234
+scheme             = "http"
+needs_mtls_sidecar = false
+`)
+	if err := os.WriteFile(filepath.Join(pluginDir, "plugin.toml"), body, 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	_, err := LoadPlugin(root, "stale")
+	if err == nil {
+		t.Fatal("expected LoadPlugin to reject needs_mtls_sidecar, got nil")
+	}
+	if !strings.Contains(err.Error(), "needs_mtls_sidecar") && !strings.Contains(err.Error(), "unknown") {
+		t.Fatalf("err = %v, want substring 'needs_mtls_sidecar' or 'unknown'", err)
+	}
+}

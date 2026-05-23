@@ -199,8 +199,16 @@ func LoadPlugin(catalogRoot, name string) (*Plugin, error) {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
 	var p Plugin
-	if err := toml.Unmarshal(data, &p); err != nil {
+	md, err := toml.Decode(string(data), &p)
+	if err != nil {
 		return nil, fmt.Errorf("parse %s: %w", path, ErrMalformed)
+	}
+	if undec := md.Undecoded(); len(undec) > 0 {
+		keys := make([]string, len(undec))
+		for i, k := range undec {
+			keys[i] = k.String()
+		}
+		return nil, fmt.Errorf("%s: unknown field(s) %v (deprecated or misspelled?): %w", path, keys, ErrMalformed)
 	}
 	p.Name = name
 	if p.Identity.ModuleName == "" {
