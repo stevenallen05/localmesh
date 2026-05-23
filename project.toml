@@ -17,7 +17,7 @@ local_domain      = "lvh.me"               # dev DNS suffix; TODO: needs_prod_de
 
 # Plugins the team consumes. Paths resolve to localmesh/service_catalog/<name>/.
 # TODO: needs_prod_decisions service_catalog distribution
-plugins = ["localmesh", "redis", "postgres16"]
+plugins = ["localmesh", "redis", "postgres16", "mesh"]
 
 
 [[services]]
