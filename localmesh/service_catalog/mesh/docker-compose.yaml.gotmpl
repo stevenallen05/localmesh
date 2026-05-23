@@ -137,6 +137,8 @@ configs:
   mesh_trace_policy:
     file: ./bootstrap/20-trace.yaml
   # Rendered inline so the appendMatch domain interpolates from project.toml.
+  # type: Domain requires an explicit protocol (tcp is invalid for Domain);
+  # the wildcard + port: 443 covers browser-visible egress over HTTPS.
   passthrough_policy:
     content: |
       type: MeshPassthrough
@@ -150,6 +152,8 @@ configs:
           appendMatch:
             - type: Domain
               value: "*.{{ .Project.ExternalDomain }}"
+              protocol: tls
+              port: 443
   ingress_dataplane:
     file: ./dataplane/ingress.yaml
   transparent_proxy:
