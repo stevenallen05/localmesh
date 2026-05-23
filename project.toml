@@ -23,5 +23,5 @@ plugins = ["localmesh", "redis", "postgres16"]
 [[services]]
 container          = "www"
 port               = 3443
-scheme             = "https"
+scheme             = "http"                        # mesh dataplane terminates browser-visible TLS at the ingress
 expose_via_ingress = true                          # https://www.${PROJECT_NAME}.${LOCAL_DOMAIN}:8443 → www:3443
