@@ -36,16 +36,16 @@ services:
         target: /etc/localmesh/bootstrap/00-mesh-and-identity.yaml
       - source: ingress_tls_secret
         target: /etc/localmesh/bootstrap/05-ingress-tls.yaml
-      - source: ingress_gateway
-        target: /etc/localmesh/bootstrap/10-ingress-mesh-gateway.yaml
       - source: allow_all
         target: /etc/localmesh/bootstrap/10-traffic-permission.yaml
       - source: passthrough_policy
         target: /etc/localmesh/bootstrap/15-passthrough.yaml
       - source: mesh_trace_policy
         target: /etc/localmesh/bootstrap/20-trace.yaml
+      - source: ingress_gateway
+        target: /etc/localmesh/bootstrap/30-ingress-mesh-gateway.yaml
       - source: ingress_routes
-        target: /etc/localmesh/bootstrap/30-ingress-routes.yaml
+        target: /etc/localmesh/bootstrap/40-ingress-routes.yaml
     restart: "no"
 
   ingress:
