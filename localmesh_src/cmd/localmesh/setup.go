@@ -19,7 +19,7 @@ import (
 func newSetupCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "setup",
-		Short: "Run the full LocalMesh bootstrap chain (uninstall → wipe → mint CA → install → mint leaves → build → dex-seed)",
+		Short: "Run the full LocalMesh bootstrap chain (uninstall → wipe → mint CA → install → mint ingress edge → build → dex-seed)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			repoRoot, err := os.Getwd()
 			if err != nil {
@@ -60,13 +60,10 @@ func newSetupCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("manifest: %w", err)
 			}
-			fmt.Println("==> Minting per-service leaf certs (7d) + ingress edge TLS")
+			fmt.Println("==> Minting ingress edge TLS")
 			minter, err := mtls.New(repoRoot, proj.Name, proj.LocalDomain)
 			if err != nil {
 				return fmt.Errorf("mtls new: %w", err)
-			}
-			if err := minter.MintAll(collectMeshContainers(proj, plugins)); err != nil {
-				return fmt.Errorf("mtls mint: %w", err)
 			}
 			if err := minter.MintIngressEdge(); err != nil {
 				return fmt.Errorf("mtls mint ingress edge: %w", err)
@@ -115,19 +112,3 @@ func newSetupCmd() *cobra.Command {
 	}
 }
 
-// collectMeshContainers returns every container declared in project.toml
-// [[services]] (app tier) plus every plugin.toml [[services]] entry.
-// For v0 we mint for every declared service and let the workload ignore
-// the mount when it doesn't need mTLS.
-func collectMeshContainers(proj *manifest.Project, plugins []*manifest.Plugin) []string {
-	out := []string{}
-	for _, s := range proj.Services {
-		out = append(out, s.Container)
-	}
-	for _, p := range plugins {
-		for _, s := range p.Services {
-			out = append(out, s.Container)
-		}
-	}
-	return out
-}
