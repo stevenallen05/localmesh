@@ -23,6 +23,19 @@ LocalMesh gives you:
 * A compiler from local environment → Helm charts
 
 You don’t maintain separate dev and prod infrastructure. You define one system and run it in both places.
+---
+
+## Important terminology
+
+service mesh
+A unified system for service-to-service communication in distributed systems, including routing, discovery, load balancing, TLS, identity, retries, and observability.
+
+dataplane
+The runtime layer that handles traffic between services.
+
+control plane
+The system that configures routing, identity, and policies across services.
+
 
 ---
 
@@ -163,19 +176,4 @@ It defines:
 
 Example: Redis behaves the same from the service’s perspective in both environments.
 
----
-
-## Glossary
-
-service mesh
-A unified system for service-to-service communication in distributed systems, including routing, discovery, load balancing, TLS, identity, retries, and observability.
-
-dataplane
-The runtime layer that handles traffic between services.
-
-control plane
-The system that configures routing, identity, and policies across services.
-
-plugin
-A reusable infrastructure module that works in both local and production environments.
 
