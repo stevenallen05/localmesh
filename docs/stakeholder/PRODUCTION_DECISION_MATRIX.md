@@ -14,7 +14,7 @@ Visual shape for the kind of decision-framework needed once production context i
 
 ## Example: Secrets backend
 
-Replaces the dev `secrets/` directory and `make mtls` keys. Pairs with the **Local mTLS (mutual TLS) setup** and **Secrets injection** rows in [`DESIGN_DECISIONS.md`](./DESIGN_DECISIONS.md). See [`PRODUCTION_DISCUSSIONS.md`](./PRODUCTION_DISCUSSIONS.md) §Security.
+Replaces the dev `secrets/` directory and `localmesh ca mint` keys. Pairs with the **Local mTLS (mutual TLS) setup** and **Secrets injection** rows in [`DESIGN_DECISIONS.md`](./DESIGN_DECISIONS.md). See [`PRODUCTION_DISCUSSIONS.md`](./PRODUCTION_DISCUSSIONS.md).
 
 **Candidates** (a mix of self-hosted strategies and managed vendors): Vault, External Secrets Operator (ESO), Sealed Secrets, AWS Secrets Manager (AWS SM), Doppler.
 

@@ -4,7 +4,7 @@
 
 Do not invent an ingestion path to bridge a gap. Do not parse a sibling artifact, do not scrape a label meant for another consumer, do not couple build-time tooling to runtime configuration. Stop, surface the question, and wait for direction.
 
-This rule is repeated in `CLAUDE.md`, `docs/engineering/rules/golang-basics.md`, `docs/engineering/rules/plugin-conventions.md`, and `docs/engineering/rules/rust-basics.md`.
+This rule is repeated in `CLAUDE.md`, `docs/engineering/rules/golang-basics.md`, `docs/engineering/rules/rust-basics.md`, `docs/engineering/rules/plugin-conventions.md`, `docs/engineering/rules/logging-platform.md`, and `docs/engineering/rules/katenary-top-seven.md`.
 
 ---
 

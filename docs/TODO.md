@@ -23,19 +23,21 @@ by ops. The dev env version is just to provide fidelity and give the same
 observability DX between prod and 'my machine'
 
 Fourth, revisit cadvisor's project-filter regex (`'${PROJECT_NAME}|'` with
-the empty alternative) introduced when prometheus moved to docker_sd
-discovery. The empty branch is load-bearing: it lets non-cadvisor series
-through the shared `discovered` job because they don't carry
-`container_label_com_docker_compose_project`. Worth re-reading once muscle
-memory on Prometheus relabel semantics is back — there might be a cleaner
-way to scope the filter to cadvisor's series only (e.g., job split, or
-matching `__name__=~"container_.+"` instead of the empty-string trick).
+the empty alternative) in Alloy's scrape config (see
+`localmesh/service_catalog/observability/alloy/config.alloy`). The empty
+branch is load-bearing: it lets non-cadvisor series through because they
+don't carry `container_label_com_docker_compose_project`. Worth re-reading
+once muscle memory on Prometheus relabel semantics is back. There might be
+a cleaner way to scope the filter to cadvisor's series only (e.g., a
+separate scrape, or matching `__name__=~"container_.+"` instead of the
+empty-string trick).
 
 ## Cross-cutting conventions
 
 - **`metrics.*` compose-label namespace.** Inhabitants are
-  `metrics.service_name` (cadvisor metric label + Vector log enrichment),
-  `metrics.module_name` and `metrics.owned_by` (Vector log enrichment).
+  `metrics.service_name` (cadvisor metric label + Alloy's log pipeline,
+  see `localmesh/service_catalog/observability/alloy/config.alloy`),
+  `metrics.module_name` and `metrics.owned_by` (same log pipeline).
   Future infra-facing labels (trace sampling overrides, log-routing
   hints, etc.) should follow the same `<subsystem>.<purpose>` shape;
   document the rule alongside the katenary label conventions in
@@ -60,47 +62,23 @@ matching `__name__=~"container_.+"` instead of the empty-string trick).
 ## Logging follow-ups
 
 - **Migrate Grafana Loki's `trace_id` derived field from body-regex to
-  structured-metadata reference.** Body-regex still works post-Vector
-  (Vector ships `trace_id` in the JSON body for app events, and as
-  structured metadata via the loki sink). The cleaner field-based pivot
-  in Grafana 11 / Loki 3.x needs verification — `matcherType: label`
-  matches stream labels, not structured metadata; the path is probably
-  an `internalLink` with raw LogQL on the linked side.
-
-## OTel collector
-
-- **OTTL `transform/database` logs an auto-correct warning at startup.**
-  Statements like `set(attributes["x"], ...)` in `context: resource` get
-  rewritten to `set(resource.attributes["x"], ...)` automatically.
-  Functional but noisy — rewrite the statements to the prefixed form.
-- **Deprecated component aliases.** Collector 0.152 wants `otlp_grpc`,
-  `otlp_http`, `file_log` instead of `otlp`, `otlphttp`, `filelog`.
-  Rename now, before the aliases get removed.
-- **docker socket scope.** otel-collector mounts
-  `/var/run/docker.sock:ro` for `docker_sd_configs` discovery. It also
-  runs as `user: "0:0"` for socket-group access. cadvisor sets the
-  precedent for privileged-socket access. Prod uses
-  `kubernetes_sd_configs` reading pod labels — no socket. `TODO:
-  needs_prod_decisions docker socket scope`.
-- **localmesh integration for `prometheus.io/*` labels.** Labels are
-  hand-added to cadvisor / node-exporter compose today (envoy roles
-  already carry them, emitted by the mesh plugin's template). A future
-  localmesh CLI pass will gain `[[exports.metrics]]` in `plugin.toml`;
-  localmesh will write the labels into `bundled.compose.yaml`'s
-  overlay block. Hand-added labels migrate to declarations at that
-  point. `TODO: needs_prod_decisions localmesh emits prometheus.io/*
-  labels`.
+  structured-metadata reference.** Body-regex still works against the logs
+  Alloy ships to Loki (see
+  `localmesh/service_catalog/observability/alloy/config.alloy`). The
+  cleaner field-based pivot in Grafana 11 / Loki 3.x needs verification.
+  `matcherType: label` matches stream labels, not structured metadata. The
+  path is probably an `internalLink` with raw LogQL on the linked side.
 
 ## LocalMesh follow-ups
 
-Items deferred from the service-mesh and envoy-migration deliveries —
+Items deferred from the service-mesh and kuma-migration deliveries —
 all flagged inline as `TODO: needs_prod_decisions <≤10 words>` at the
 relevant call site so they're greppable. Listed here for visibility;
 resolution is context-dependent.
 
 - **PII enforcement, downstream layer.** No `setAttributes('enduser.*')`
   call sites exist downstream of the ingress envoy. Per-data-class regex
-  scrubbing at Vector / Tempo / Loki is still SRE's choice when real PII
+  scrubbing at Alloy / Tempo / Loki is still SRE's choice when real PII
   contracts settle.
 - **Default-deny mesh policy.** No `AuthorizationPolicy` enforcement in
   dev. Foundation-tier RBAC is allow-all-internal. The `mesh.exempt:
@@ -238,7 +216,7 @@ resolution is context-dependent.
 
 ## LocalMesh CLI follow-ups
 
-Items deferred from the localmesh Go CLI delivery and the envoy
+Items deferred from the localmesh Go CLI delivery and the kuma
 migration. All flagged inline as `TODO: needs_prod_decisions <≤10
 words>` at the relevant call site so they're greppable.
 
@@ -266,10 +244,11 @@ words>` at the relevant call site so they're greppable.
   improve enough that the relocation doesn't break the
   no-flag-needed path. `TODO: needs_prod_decisions .env move under
   localmesh once config-loading tools improve`.
-- **mesh-exempt enforcement in `mtls mint`.** The Go CLI mints leaves
-  for every `[[services]]` entry uniformly. The mesh-exempt label
-  carve-out (skip cert minting for observability / logging / dex /
-  postgres containers) is not yet ported into `mtls mint`. Cert minting
+- **mesh-exempt enforcement in leaf minting.** The `setup` verb's minter
+  (`internal/mtls/`) mints leaves for every `[[services]]` entry
+  uniformly. The mesh-exempt label carve-out (skip cert minting for
+  observability / logging / dex / postgres containers) is not yet ported
+  into the minter. Cert minting
   for exempt containers is wasted work today but harmless. Detect
   `mesh.exempt: "true"` from each service's compose labels and skip the
   cert path for those containers. `TODO: needs_prod_decisions
@@ -283,84 +262,25 @@ words>` at the relevant call site so they're greppable.
 
 ## Dashboards
 
-The default-dashboard set ships three files:
+The shipped Grafana dashboards are two files:
 
-- `localmesh/service_catalog/postgres16/postgres.json` — postgres health, query rates, pg_stat_statements
-- `localmesh/service_catalog/observability/apm.json` — RED panels, traces waterfall, RPC server panels
-- `localmesh/service_catalog/observability/cluster-health.json` — cadvisor container resource panels
+- `localmesh/service_catalog/observability/grafana/dashboards/cadvisor.json` — cadvisor container resource panels
+- `localmesh/service_catalog/observability/grafana/dashboards/node-exporter-full.json` — host metrics panels
 
-A mesh-ingress dashboard against envoy's native `:15090/stats/prometheus`
+An APM view comes from importing community dashboard
+[Grafana 22784](https://grafana.com/grafana/dashboards/22784), fed by the
+OTel telemetry Alloy emits (spanmetrics + servicegraph).
+
+A mesh-ingress dashboard against kuma-dp's envoy `:15090/stats/prometheus`
 surface + JSON access logs is `TODO: needs_prod_decisions ingress
-dashboard rewrite against envoy metrics`. APM already covers cross-
-service RPC RED via `tracing.http`, so the standalone ingress dashboard
+dashboard rewrite against envoy metrics`. The imported APM dashboard
+already covers cross-service RPC RED, so the standalone ingress dashboard
 isn't on the critical path.
 
-### Identity-pivot reconciliation
+### Content gaps (independent of the dashboard set)
 
-**Outcomes.**
-
-- **One identity-pivot vocabulary across every default dashboard.** Pickers
-  expose `namespace` and `service` (or `container_name`, where cadvisor labels
-  are the natural axis). No `environment` picker — dev only runs one
-  environment and multi-env promotion has its own separate design. The picker
-  shape mirrors the canonical identity tuple in
-  [`plugin-conventions.md`](../engineering/rules/plugin-conventions.md) §1,
-  so a dev who learns it on one dashboard reads every other dashboard the
-  same way.
-- **Every panel query respects the picker that drives it.** Identity-axis
-  label selectors (`service_namespace=~"$namespace"`,
-  `service_name=~"$service"`, or the cadvisor equivalent
-  `service=~"$container_name"`) appear on per-service / per-container panels.
-  Headline aggregate panels (cluster totals, "running containers", title
-  banners) stay unfiltered. If a panel cannot accept the filter cleanly
-  (mixed-source merges, metrics that don't carry the label), leave it alone
-  — the picker is allowed to be a no-op for that panel rather than break it.
-- **No stale `environment` references in non-picker sites.** Panel
-  descriptions, dashboard header markdown (`<h1>` blocks), and Tempo
-  trace-search `tags:` arrays sometimes carry
-  `${deployment_environment_name}` or equivalent. Drop these in the same
-  pass as the picker removal so the dashboard's UI text matches the
-  picker's surface.
-
-**Why.** A clean identity pivot across every default dashboard, aligned
-with the now-canonical identity tuple from `plugin-conventions.md`.
-Multi-env promotion reintroduces the environment dimension later; until
-then it is dead UI that invites picker-blindness.
-
-**Known constraints for the reconciliation.**
-
-- **cadvisor metrics don't carry `service_namespace` natively** — they are
-  scraped directly, not via the OTel-collector resource pipeline. A
-  `namespace` picker on a cadvisor-shaped dashboard (cluster-health,
-  ingress) will be informational unless joined with `target_info`.
-  Pragmatic call is to filter cadvisor panels by `service`/`name` only and
-  let the `namespace` picker stand as a cross-dashboard convention
-  placeholder; document the asymmetry in the picker description.
-- **The cadvisor `service` label is set by `metric_relabel_configs`** in
-  `localmesh/service_catalog/observability/docker-compose.yml`. It promotes
-  `container_label_metrics_service_name` (and falls back to the container
-  `name`) so cadvisor series can pivot on the same identity vocabulary as
-  OTel-emitted series. The picker query is
-  `label_values(container_last_seen, service)` (or whichever cadvisor
-  metric is canonical at the time of reconciliation).
-- **OTel-shaped identity labels are `service_namespace` / `service_name`**
-  (underscored — Prometheus mangles the dots in OTel attribute names).
-  Picker queries source from
-  `label_values(target_info, service_namespace)` /
-  `label_values(target_info, service_name)` when both vars are intended
-  for OTel panels. Avoid `label_values(<label>)` bare-form on Victoria
-  Metrics — it ignores the index hint that `target_info`-scoped form
-  provides.
-- **Mixed-target panels (`up` + `traces_spanmetrics_calls_total`)** will
-  accept the namespace filter on the traces target but not on `up`
-  (Prometheus self-scrape doesn't carry resource attrs). If such a panel
-  breaks under a global filter, leave it unfiltered rather than splitting
-  the targets.
-
-### Content gaps (independent of the pivot work)
-
-- **Outbound RPC client metrics (`rpc.client.duration`).** The imported
-  APM dashboard's "RPC outbound" panels query `rpc_client_duration_*`,
+- **Outbound RPC client metrics (`rpc.client.duration`).** Community
+  dashboard 22784's "RPC outbound" panels query `rpc_client_duration_*`,
   which only the *caller* emits. We instrument the Rust gRPC server via
   a Tower layer (`rpc.server.duration`); the www→server gRPC call from
   Node has no client-side gRPC instrumentation wired up. Add
@@ -375,19 +295,20 @@ then it is dead UI that invites picker-blindness.
   default boundaries `[0, 5, 10, 25, …, 10000]`, which are sized for ms.
   Recording in seconds makes every realistic latency fall into the
   `[0, 5]` bucket and clamps `histogram_quantile` to 5. Recording in ms
-  fits the default buckets and gives usable percentiles. The dashboard's
-  RPC server panels are also milliseconds-shaped (the upstream community
-  dashboard was written for ms). Revisit when the SDK honors custom
-  boundaries — at that point switch to seconds + explicit buckets and
-  flip the dashboard's RPC queries back to `_seconds_`.
+  fits the default buckets and gives usable percentiles. Community
+  dashboard 22784's RPC server panels are also milliseconds-shaped (it
+  was written for ms). Revisit when the SDK honors custom boundaries. At
+  that point switch to seconds + explicit buckets and flip the dashboard's
+  RPC queries back to `_seconds_`.
 
 ## Multi-environment portability
 
-- **k8s overlay for filelog `include:` path.** Compose tails
-  `/var/lib/docker/containers/*/*-json.log`; kubelet writes to
-  `/var/log/containers/*.log`. The k8s helm chart needs an override that
-  swaps the path. Document the override pattern alongside the receiver
-  config.
+- **k8s overlay for the container-log tail path.** In dev, Alloy tails
+  Docker container logs (see
+  `localmesh/service_catalog/observability/alloy/config.alloy`); kubelet
+  writes to `/var/log/containers/*.log`. The k8s helm chart needs an
+  override that swaps the path. Document the override pattern alongside
+  the Alloy log config.
 
 # Aspirational
 

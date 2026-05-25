@@ -6,7 +6,7 @@
 
 When data isn't where you expected (a missing field, an absent file, an empty struct), do not "fix" the gap by reaching for a different input — do not parse a sibling artifact, do not scrape a label meant for another consumer, do not invent a new ingestion path. Stop, surface the question, and wait for direction.
 
-This rule is repeated in `CLAUDE.md`, `docs/engineering/rules/golang-basics.md`, and `docs/engineering/rules/plugin-conventions.md`.
+This rule is repeated in `CLAUDE.md`, `docs/engineering/rules/golang-basics.md`, `docs/engineering/rules/rust-basics.md`, `docs/engineering/rules/plugin-conventions.md`, `docs/engineering/rules/logging-platform.md`, and `docs/engineering/rules/katenary-top-seven.md`.
 
 ---
 
