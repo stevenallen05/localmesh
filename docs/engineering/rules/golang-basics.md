@@ -12,7 +12,7 @@ Read this first when adding code under `localmesh_src/`.
 
 When data isn't where you expected (a missing field, an empty struct, an absent file), do not "fix" the gap by reaching for a different input — do not parse compose at build time, do not scrape labels meant for another consumer, do not introduce a new ingestion path to make the call site work. Stop, surface the question, and wait for direction.
 
-This rule is repeated in `CLAUDE.md`, `docs/engineering/rules/plugin-conventions.md`, and `docs/engineering/rules/rust-basics.md` so it is re-encountered on every stack-specific lookup.
+This rule is repeated in `CLAUDE.md`, `docs/engineering/rules/golang-basics.md`, `docs/engineering/rules/rust-basics.md`, `docs/engineering/rules/plugin-conventions.md`, `docs/engineering/rules/logging-platform.md`, and `docs/engineering/rules/katenary-top-seven.md`.
 
 ---
 

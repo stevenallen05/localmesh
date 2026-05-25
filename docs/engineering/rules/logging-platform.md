@@ -6,7 +6,7 @@
 
 When data isn't where you expected, do not "fix" the gap by reaching for a different input. Do not scrape a label meant for another consumer; do not parse a runtime artifact at build time; do not introduce a new ingestion path to make the call site work. Stop, surface the question, and wait for direction.
 
-This rule is repeated in `CLAUDE.md`, `docs/engineering/rules/golang-basics.md`, `docs/engineering/rules/plugin-conventions.md`, and `docs/engineering/rules/rust-basics.md`.
+This rule is repeated in `CLAUDE.md`, `docs/engineering/rules/golang-basics.md`, `docs/engineering/rules/rust-basics.md`, `docs/engineering/rules/plugin-conventions.md`, `docs/engineering/rules/logging-platform.md`, and `docs/engineering/rules/katenary-top-seven.md`.
 
 ---
 
@@ -74,10 +74,10 @@ The agent (per-node sidecar / daemonset) is where the platform earns its keep. A
 
 | Signal | Canonical agent | Why |
 |---|---|---|
-| Traces, metrics | `opentelemetry-collector(-contrib)` | OTel-native; receivers, processors, exporters for every wire format |
-| Logs | `vector` (with `docker_logs` / `kubernetes_logs` source) | Has container/pod-label discovery as a first-class source primitive in both docker and k8s; the otel-collector equivalent exists for k8s (`k8sattributesprocessor`) but not docker, so vector is the portable pick. VRL is also more readable than OTTL for per-source extractor work. |
+| Logs | Grafana Alloy | Single collection agent for LocalMesh; docker-discovery native; Alloy's log pipeline lives in the observability plugin |
+| Traces, metrics | Grafana Alloy | OTel-native; receivers and exporters for every wire format; same agent as logs (see `config.alloy`) |
 
-Either tool can technically do either job; the omakase pick reflects "what's the least painful path that works in both dev compose and prod k8s, today." Teams shouldn't mix agents for the same signal in the same environment.
+Teams shouldn't mix agents for the same signal in the same environment.
 
 ## 4. Per-language emitter recipe
 
@@ -148,13 +148,13 @@ The agent's enrichment job for sources that **don't** emit the envelope themselv
 | Source | Native format | Recipe |
 |---|---|---|
 | **PostgreSQL 15+** | configurable | `log_destination = 'jsonlog'` → log lines already JSON; agent maps `error_severity` → `level`, `message` passes through, `query_id` → attribute |
-| **PostgreSQL ≤14** | logfmt-ish | Vector `parse_regex` against `log_line_prefix`, then synthesise envelope |
+| **PostgreSQL ≤14** | logfmt-ish | Regex parse against `log_line_prefix`; synthesise envelope |
 | **nginx (access)** | configurable | `log_format` with JSON template; agent extracts `request_method`/`uri`/`status` as attributes; `status>=500 → level=error` |
 | **nginx (error)** | text | regex parse; severity word → `level` enum |
-| **Grafana** | logfmt | Vector `parse_logfmt` → already structured; `lvl` → `level` |
-| **Loki / Tempo / Mimir / VictoriaMetrics** | logfmt or JSON | varies by version; same pattern — parse, map `level`, set `service.name` from container label |
+| **Grafana** | logfmt | Parse logfmt; already structured; map `lvl` → `level` |
+| **Loki / Tempo / Mimir** | logfmt or JSON | varies by version; same pattern — parse, map `level`, set `service.name` from container label |
 | **redis** | text with `LOG_LEVEL` prefix | regex; severity letter (`*` / `#` / `-` / `.`) → `level` enum |
-| **otel-collector self-logs** | zap JSON | direct field map: `level`, `msg`→`message`, `ts`→`timestamp` |
+| **Alloy self-logs** | logfmt | direct field map: `level`, `msg`→`message`, `ts`→`timestamp` |
 | **Kafka / ZooKeeper (JVM)** | log4j pattern | Either reconfigure log4j to JSON layout (preferred) or per-pattern regex at the agent |
 | **k8s controller manager / kubelet / etc.** | klog JSON when `--logtostderr=true --log-json=true` | Direct field map |
 | **Generic JSON-emitting container** | JSON, unknown schema | Parse + field-name normalisation table; carry unknown fields as attributes |

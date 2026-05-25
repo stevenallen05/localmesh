@@ -12,7 +12,7 @@ Long-form rationale: [`../../superpowers/specs/2026-05-18-localmesh-namespacing-
 
 A plugin or tool reads only the inputs explicitly designated for it. Compose files are runtime, not build inputs. Labels carry meaning for their declared consumer only — do not scrape them from another layer. When data isn't where you expected, do not invent an ingestion path. Stop, surface the question, and wait for direction.
 
-This rule is repeated in `CLAUDE.md`, `docs/engineering/rules/golang-basics.md`, and `docs/engineering/rules/rust-basics.md`.
+This rule is repeated in `CLAUDE.md`, `docs/engineering/rules/golang-basics.md`, `docs/engineering/rules/rust-basics.md`, `docs/engineering/rules/plugin-conventions.md`, `docs/engineering/rules/logging-platform.md`, and `docs/engineering/rules/katenary-top-seven.md`.
 
 ## 1. Bare-minimum plugin contents
 
@@ -37,8 +37,8 @@ This rule is documented, not currently CLI-linted.
 
 Every service in this project — app-tier or catalog plugin — declares an **identity tuple** of three values: `service_name`, `module_name`, `owned_by`. The tuple already exists in the compose files; this rule binds it.
 
-- `service_name` — the OTel `service.name` for the running service. One per container role (`server`, `www`, `postgres`, `otel-collector`, ...). Matches whatever the OTel SDK reports.
-- `module_name` — the LocalMesh namespace axis. `app` for app-tier services. `<plugin-slug>` for catalog-plugin services, where the slug matches the `localmesh/service_catalog/<plugin>/` directory name (`postgres16`, `observability`, `logging`, `security`, `auth`, `localmesh`). The single value `app` is reserved for app-tier services. Plugin slugs cannot be `app`.
+- `service_name` — the OTel `service.name` for the running service. One per container role (`server`, `www`, `redis`, ...). Matches whatever the OTel SDK reports.
+- `module_name` — the LocalMesh namespace axis. `app` for app-tier services. `<plugin-slug>` for catalog-plugin services, where the slug matches the `localmesh/service_catalog/<plugin>/` directory name. Live plugins: `localmesh`, `mesh`, `observability`, `postgres16`, `redis`. Archived: `auth` (in `archive/legacy_plugins/`). The single value `app` is reserved for app-tier services. Plugin slugs cannot be `app`.
 - `owned_by` — contact email for ownership. App-tier uses `${TECH_LEAD_EMAIL}` (sourced from `.env`, mirroring `project.toml`'s `tech_lead_email`). Plugins use the platform team's email.
 
 Each value lives in two places. `plugin.toml` is now the source of truth for the per-plugin halves; the `.env` interpolation bridge written by `localmesh build` (`internal/envwriter`) is the working substitute for a proper compose-extension (tracked as the *Identity source consolidation* Open item in [`../../stakeholder/DESIGN_DECISIONS.md`](../../stakeholder/DESIGN_DECISIONS.md)). The two channels carrying identity:
@@ -61,16 +61,16 @@ server:
     metrics.owned_by: ${TECH_LEAD_EMAIL}
 ```
 
-### Example — catalog plugin service (`postgres16/`)
+### Example — catalog plugin service (`redis/`)
 
 ```yaml
-postgres:
+redis:
   environment:
-    OTEL_SERVICE_NAME: postgres
-    OTEL_RESOURCE_ATTRIBUTES: "module_name=postgres16,owned_by=sre@example.com"
+    OTEL_SERVICE_NAME: redis
+    OTEL_RESOURCE_ATTRIBUTES: "module_name=redis,owned_by=sre@example.com"
   labels:
-    metrics.service_name: postgres
-    metrics.module_name: postgres16
+    metrics.service_name: redis
+    metrics.module_name: redis
     metrics.owned_by: sre@example.com
 ```
 
@@ -115,16 +115,14 @@ Drop-in YAML composing every section above into one consumer service definition.
 
 Sections that do not apply for a given plugin write `None` rather than being omitted — the dev's eye lands at a predictable spot every time.
 
-Worked example for the `postgres16/` plugin lives at [`../../../localmesh/service_catalog/postgres16/README.md`](../../../localmesh/service_catalog/postgres16/README.md).
-
 ## 4. Overlap with `plugin.toml`
 
-`plugin.toml` owns identity (`module_name`, `owned_by`), service definitions (`container`, `port`, `scheme`), exposure (`expose_via_ingress`, `ingress`), and auth gating (`requires_auth`, default `true` — services that opt out of the ingress auth gate set `requires_auth = false`; the IdP itself is the canonical opt-out). `README.md` cites these values by reference (link to §2 above or to `plugin.toml` itself) and never redeclares them. Plugin-internal env vars derived from `plugin.toml` by `localmesh build` do not appear in `README.md`'s Environment table:
+`plugin.toml` owns identity (`module_name`, `owned_by`), service definitions (`container`, `port`), exposure (`expose_via_ingress`, `ingress`), and auth gating (`requires_auth`, default `true` — services that opt out of the ingress auth gate set `requires_auth = false`; the IdP itself is the canonical opt-out). `README.md` cites these values by reference (link to §2 above or to `plugin.toml` itself) and never redeclares them. Plugin-internal env vars derived from `plugin.toml` by `localmesh build` do not appear in `README.md`'s Environment table:
 
 - From `[identity]`, keyed by **plugin slug**: `<PLUGIN>_MODULE_NAME`, `<PLUGIN>_OWNED_BY`.
 - From `[[services]]`, keyed by **container slug**: `<CONTAINER>_PORT`, `<CONTAINER>_EXPOSE_VIA_INGRESS`, `<CONTAINER>_INGRESS`.
 
-Mesh membership is the `needs_mtls_sidecar` field in each `[[services]]` entry (default `true`; `false` opts a service out of the mesh data plane). `kuma-cp`, `ingress`, `dex`, `postgres`, and `postgres-exporter` set it to `false`. The CLI reads the field at build time to populate `.Services[*].Meshed` in the template context; the `security/` plugin's compose template iterates that list to emit sidecars.
+Every `[[services]]` entry is a meshed dataplane by construction — there is no membership flag. The `mesh/` plugin's compose template iterates the `.Services` template context and emits a `<name>-mesh` kuma-dp dataplane per entry, skipping those whose originating plugin slug is `mesh` (kuma-cp and ingress, which the mesh plugin emits directly).
 
 `README.md`'s Environment table is for env vars the **consumer app** sets, not values exported into the platform's `.env`.
 
@@ -161,13 +159,13 @@ Templates receive a `*Context` (`localmesh_src/internal/template/template.go`) w
 - `.Project` — the typed `project.toml` view. Fields: `.Project.Name`, `.Project.Namespace`, `.Project.TechLead`, `.Project.ExternalDomain`, `.Project.LocalDomain`, `.Project.Plugins`, `.Project.Services` (the app-tier `[[services]]`).
 - `.Plugin` — this plugin's own typed `plugin.toml`. Fields: `.Plugin.Name` (the directory-derived slug), `.Plugin.Identity.ModuleName`, `.Plugin.Identity.OwnedBy`, `.Plugin.Plugins` (meta-dependencies; empty for leaf plugins), `.Plugin.Services`.
 - `.Env` — `map[string]string` of the `.env`-managed values the CLI emitted (`internal/envwriter`). This carries CA / OIDC material, not the per-plugin `<PLUGIN>_*` vars from §4 — those reach compose through `${}` interpolation at runtime, not the template map.
-- `.Services` — `[]ServiceCtx` (`Name`, `Port`, `Meshed`, `ExposeViaIngress`) of every registry-known service (project `[[services]]` + every plugin `[[services]]`), sorted by name. `Meshed` is true when the service's `needs_mtls_sidecar` field is true (the default). `ExposeViaIngress` mirrors `expose_via_ingress`. Plugins that don't need the list ignore it. The `security/` template is the canonical consumer: it ranges over `.Services`, emits a `<name>-mesh` kuma-dp sidecar for each `Meshed` entry, and emits a `MeshHTTPRoute` for each `ExposeViaIngress` entry.
+- `.Services` — `[]ServiceCtx` (`Name`, `Port`, `Protocol`, `Plugin`, `ExposeViaIngress`) of every registry-known service (project `[[services]]` + every plugin `[[services]]`), sorted by name. `Protocol` is the `kuma.io/protocol` value mapped from `scheme`. `Plugin` is the originating plugin slug (`"app"` for project services). `ExposeViaIngress` mirrors `expose_via_ingress`. Plugins that don't need the list ignore it. The `mesh/` template is the canonical consumer: it ranges over `.Services`, emits a `<name>-mesh` kuma-dp dataplane per entry (skipping those whose `Plugin` is `mesh` — kuma-cp and ingress are emitted directly), and emits a `MeshHTTPRoute` for each `ExposeViaIngress` entry.
 
 ### Custom functions
 
 Two functions are registered on top of sprig (`localmesh_src/internal/template/funcs.go`):
 
-- `spiffeURI <container> <project> <local_domain>` → `spiffe://<container>.<project>.<local_domain>`. Built from the container name, never the plugin slug — renames like `database` → `postgres16` do not move the SPIFFE identity.
+- `spiffeURI <container> <project> <local_domain>` → `spiffe://<container>.<project>.<local_domain>`. Built from the container name, never the plugin slug — renames like `database` → `redis` do not move the SPIFFE identity.
 - `identityLabels <plugin> <service_name>` → a three-key YAML block (`metrics.service_name`, `metrics.module_name`, `metrics.owned_by`) drawn from the plugin's identity tuple. The caller indents the result.
 
 ### Data-source discipline

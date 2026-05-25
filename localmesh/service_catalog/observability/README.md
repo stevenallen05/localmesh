@@ -31,13 +31,13 @@ Within the stack, the dependency order is:
 ```yaml
 alloy:
   depends_on:
-    tempo:      { condition: service_healthy }
+    tempo:      { condition: service_started }  # distroless — no probe binary
     loki:       { condition: service_healthy }
     prometheus: { condition: service_healthy }
 
 grafana:
   depends_on:
-    tempo:      { condition: service_healthy }
+    tempo:      { condition: service_started }  # distroless — no probe binary
     loki:       { condition: service_healthy }
     prometheus: { condition: service_healthy }
 ```
@@ -95,3 +95,6 @@ These container DNS names are part of this plugin's external surface — apps an
 ## Notes
 
 The cleanroom `noise-generator` is intentionally not ported. The demo arc lives on a real user app. Pyroscope is not ported either — the fourth pillar drops from this distribution.
+
+## Example app service block
+None. Apps do not wire to the observability stack directly. OTel env vars are injected by the plugin template; the scrape labels are the only consumer-side surface (see Labels above).
