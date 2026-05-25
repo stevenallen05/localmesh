@@ -24,3 +24,31 @@ func TestIdentityLabels(t *testing.T) {
 		}
 	}
 }
+
+func TestSchemeProtocol(t *testing.T) {
+	tests := []struct {
+		scheme  string
+		want    string
+		wantErr bool
+	}{
+		{"http", "http", false},
+		{"https", "http", false},
+		{"grpc", "grpc", false},
+		{"tcp", "tcp", false},
+		{"postgresql", "tcp", false},
+		{"", "", true},
+		{"redis", "", true},   // sanity: 'redis' is not a valid scheme per manifest validator
+		{"frobnitz", "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.scheme, func(t *testing.T) {
+			got, err := SchemeProtocol(tt.scheme)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("SchemeProtocol(%q) error = %v, wantErr %v", tt.scheme, err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("SchemeProtocol(%q) = %q, want %q", tt.scheme, got, tt.want)
+			}
+		})
+	}
+}

@@ -42,34 +42,38 @@ func TestRun_sampleCatalog(t *testing.T) {
 	}
 }
 
-func TestServiceList_meshedAndIngress(t *testing.T) {
-	f := false
+func TestServiceList_protocolAndIngress(t *testing.T) {
 	proj := &manifest.Project{Services: []manifest.Service{
-		{Container: "www", Port: 3443, ExposeViaIngress: true}, // default → meshed
-		{Container: "server", Port: 50051},                     // default → meshed
+		{Container: "www", Port: 3443, Scheme: "http", ExposeViaIngress: true},
+		{Container: "server", Port: 50051, Scheme: "grpc"},
 	}}
 	plugins := []*manifest.Plugin{{Name: "postgres16", Services: []manifest.Service{
-		{Container: "postgres", Port: 5432, NeedsMTLSSidecar: &f}, // exempt
+		{Container: "postgres", Port: 5432, Scheme: "postgresql"},
 	}}}
-	got := serviceList(proj, plugins)
+	got, err := serviceList(proj, plugins)
+	if err != nil {
+		t.Fatalf("serviceList: %v", err)
+	}
 	by := map[string]struct {
-		meshed, ingress bool
-		port            int
+		protocol, plugin string
+		ingress          bool
+		port             int
 	}{}
 	for _, s := range got {
 		by[s.Name] = struct {
-			meshed, ingress bool
-			port            int
-		}{s.Meshed, s.ExposeViaIngress, s.Port}
+			protocol, plugin string
+			ingress          bool
+			port             int
+		}{s.Protocol, s.Plugin, s.ExposeViaIngress, s.Port}
 	}
-	if !by["www"].meshed || !by["www"].ingress || by["www"].port != 3443 {
+	if by["www"].protocol != "http" || by["www"].plugin != "app" || !by["www"].ingress || by["www"].port != 3443 {
 		t.Errorf("www: %+v", by["www"])
 	}
-	if !by["server"].meshed || by["server"].ingress {
+	if by["server"].protocol != "grpc" || by["server"].plugin != "app" || by["server"].ingress {
 		t.Errorf("server: %+v", by["server"])
 	}
-	if by["postgres"].meshed {
-		t.Errorf("postgres should be exempt: %+v", by["postgres"])
+	if by["postgres"].protocol != "tcp" || by["postgres"].plugin != "postgres16" {
+		t.Errorf("postgres: %+v", by["postgres"])
 	}
 	if got[0].Name != "postgres" { // sorted by name
 		t.Errorf("not sorted: %v", got)

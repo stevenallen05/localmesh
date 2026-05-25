@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"math/big"
 	"net"
-	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -64,75 +63,6 @@ func New(repoRoot, projectName, localDomain string) (*Minter, error) {
 		caCert:      caCert,
 		caKey:       caKey,
 	}, nil
-}
-
-// Mint writes id.crt / id.key / trust.ca.crt for one container.
-// Always overwrites — assumes regular rotation.
-func (m *Minter) Mint(container string) error {
-	leafKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return fmt.Errorf("generate key for %s: %w", container, err)
-	}
-	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
-	if err != nil {
-		return fmt.Errorf("serial for %s: %w", container, err)
-	}
-	spiffe := &url.URL{Scheme: "spiffe", Host: fmt.Sprintf("%s.%s.%s", container, m.projectName, m.localDomain)}
-	dnsNames := []string{
-		container,
-		fmt.Sprintf("%s.%s.%s", container, m.projectName, m.localDomain),
-	}
-	template := x509.Certificate{
-		SerialNumber: serial,
-		Subject:      pkix.Name{CommonName: container},
-		NotBefore:    time.Now().Add(-time.Minute),
-		NotAfter:     time.Now().Add(LeafLifetime),
-		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		ExtKeyUsage: []x509.ExtKeyUsage{
-			x509.ExtKeyUsageServerAuth,
-			x509.ExtKeyUsageClientAuth,
-		},
-		BasicConstraintsValid: true,
-		IsCA:                  false,
-		DNSNames:              dnsNames,
-		IPAddresses:           IPSANs,
-		URIs:                  []*url.URL{spiffe},
-	}
-	der, err := x509.CreateCertificate(rand.Reader, &template, m.caCert, &leafKey.PublicKey, m.caKey)
-	if err != nil {
-		return fmt.Errorf("sign cert for %s: %w", container, err)
-	}
-	outDir := filepath.Join(m.outputRoot, container)
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
-		return fmt.Errorf("mkdir %s: %w", outDir, err)
-	}
-	// id.crt
-	if err := writePEM(filepath.Join(outDir, "id.crt"), "CERTIFICATE", der, 0o644); err != nil {
-		return err
-	}
-	// id.key (0600 — postgres + similar consumers enforce strict perms)
-	keyDER, err := x509.MarshalECPrivateKey(leafKey)
-	if err != nil {
-		return fmt.Errorf("marshal key for %s: %w", container, err)
-	}
-	if err := writePEM(filepath.Join(outDir, "id.key"), "EC PRIVATE KEY", keyDER, 0o600); err != nil {
-		return err
-	}
-	// trust.ca.crt — copy of the root CA cert for the consumer
-	if err := writePEMFromCert(filepath.Join(outDir, "trust.ca.crt"), m.caCert); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MintAll runs Mint for every container in the list, returning the first error.
-func (m *Minter) MintAll(containers []string) error {
-	for _, c := range containers {
-		if err := m.Mint(c); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // IngressEdgeDir is the per-cert directory holding the browser-facing

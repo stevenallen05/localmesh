@@ -788,22 +788,35 @@ service_name = "x"
 	}
 }
 
-func TestService_Meshed(t *testing.T) {
-	tr, fa := true, false
-	tests := []struct {
-		name string
-		in   *bool
-		want bool
-	}{
-		{"absent defaults meshed", nil, true},
-		{"explicit true", &tr, true},
-		{"explicit false exempt", &fa, false},
+
+// TestLoadPlugin_RejectsDeprecatedNeedsMtlsSidecar guards against silent
+// reintroduction of the dropped per-service `needs_mtls_sidecar` flag.
+// strict-decode on LoadPlugin should surface it as an unknown field.
+func TestLoadPlugin_RejectsDeprecatedNeedsMtlsSidecar(t *testing.T) {
+	root := t.TempDir()
+	pluginDir := filepath.Join(root, "stale")
+	if err := os.MkdirAll(pluginDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := (Service{NeedsMTLSSidecar: tt.in}).Meshed(); got != tt.want {
-				t.Errorf("Meshed() = %v, want %v", got, tt.want)
-			}
-		})
+	body := []byte(`
+[identity]
+module_name = "stale"
+owned_by    = "test@example.com"
+
+[[services]]
+container          = "x"
+port               = 1234
+scheme             = "http"
+needs_mtls_sidecar = false
+`)
+	if err := os.WriteFile(filepath.Join(pluginDir, "plugin.toml"), body, 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	_, err := LoadPlugin(root, "stale")
+	if err == nil {
+		t.Fatal("expected LoadPlugin to reject needs_mtls_sidecar, got nil")
+	}
+	if !strings.Contains(err.Error(), "needs_mtls_sidecar") && !strings.Contains(err.Error(), "unknown") {
+		t.Fatalf("err = %v, want substring 'needs_mtls_sidecar' or 'unknown'", err)
 	}
 }

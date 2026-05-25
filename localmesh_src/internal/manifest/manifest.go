@@ -53,8 +53,7 @@ type Service struct {
 	Scheme           string `toml:"scheme"` // grpc | http | https | tcp | postgresql — app's loopback bind protocol
 	ExposeViaIngress bool   `toml:"expose_via_ingress"`
 	Ingress          bool   `toml:"ingress"`
-	RequiresAuth     *bool  `toml:"requires_auth"`      // pointer: default true unless explicit false
-	NeedsMTLSSidecar *bool  `toml:"needs_mtls_sidecar"` // pointer: default true unless explicit false
+	RequiresAuth     *bool  `toml:"requires_auth"` // pointer: default true unless explicit false
 }
 
 // ConfigVar is a plugin-author-declared knob. The default `value` lives in
@@ -78,11 +77,6 @@ type Export struct {
 	Env         string `toml:"env"`
 	Required    bool   `toml:"required"`
 }
-
-// Meshed reports whether this service gets a kuma-dp sidecar. Default true;
-// needs_mtls_sidecar=false opts out — native mTLS (postgres) or local-dev-only
-// infra (kuma-cp, the ingress gateway).
-func (s Service) Meshed() bool { return s.NeedsMTLSSidecar == nil || *s.NeedsMTLSSidecar }
 
 // validSchemes is the closed set of supported [[services]].scheme values.
 var validSchemes = map[string]bool{"grpc": true, "http": true, "https": true, "tcp": true, "postgresql": true}
@@ -205,8 +199,16 @@ func LoadPlugin(catalogRoot, name string) (*Plugin, error) {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
 	var p Plugin
-	if err := toml.Unmarshal(data, &p); err != nil {
+	md, err := toml.Decode(string(data), &p)
+	if err != nil {
 		return nil, fmt.Errorf("parse %s: %w", path, ErrMalformed)
+	}
+	if undec := md.Undecoded(); len(undec) > 0 {
+		keys := make([]string, len(undec))
+		for i, k := range undec {
+			keys[i] = k.String()
+		}
+		return nil, fmt.Errorf("%s: unknown field(s) %v (deprecated or misspelled?): %w", path, keys, ErrMalformed)
 	}
 	p.Name = name
 	if p.Identity.ModuleName == "" {

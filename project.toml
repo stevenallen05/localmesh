@@ -17,11 +17,11 @@ local_domain      = "lvh.me"               # dev DNS suffix; TODO: needs_prod_de
 
 # Plugins the team consumes. Paths resolve to localmesh/service_catalog/<name>/.
 # TODO: needs_prod_decisions service_catalog distribution
-plugins = ["localmesh", "redis", "postgres16"]
+plugins = ["localmesh", "redis", "postgres16", "mesh"]
 
 
 [[services]]
 container          = "www"
 port               = 3443
-scheme             = "https"
+scheme             = "http"                        # mesh dataplane terminates browser-visible TLS at the ingress
 expose_via_ingress = true                          # https://www.${PROJECT_NAME}.${LOCAL_DOMAIN}:8443 → www:3443

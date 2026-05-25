@@ -107,6 +107,105 @@ services:
             metrics.service_name: grafana
             metrics.module_name: observability
             metrics.owned_by: sre@example.com
+    grafana-mesh:
+        build:
+            context: ./service_catalog/mesh
+            dockerfile: Dockerfile.dataplane
+        image: localmesh-dataplane:dev
+        network_mode: "service:grafana"
+        cap_add:
+            - NET_ADMIN
+            - NET_RAW
+        configs:
+            - source: transparent_proxy
+              target: /etc/kuma/transparent-proxy.yaml
+        environment:
+            WORKLOAD_NAME: grafana
+            APP_PORT: "3000"
+            APP_PROTOCOL: "http"
+            CP_HOST: kuma-cp:5678
+        depends_on:
+            grafana:
+                condition: service_started
+            kuma-cp:
+                condition: service_started
+            localmesh-dataplane-bootstrap:
+                condition: service_completed_successfully
+        restart: unless-stopped
+    ingress:
+        build:
+            context: ./service_catalog/mesh
+            dockerfile: Dockerfile.dataplane
+        image: localmesh-dataplane:dev
+        # BUILTIN gateway dataplane. Gateways don't transparent-proxy, so no
+        # NET_ADMIN; kuma fills the dataplane address var via --dataplane-var.
+        # entrypoint:[] overrides the image's dataplane-init.sh ENTRYPOINT so
+        # the command below runs kuma-dp directly (no workload init).
+        # `$$` is Compose's variable-escape (renders to `$` at runtime); `\$$1`
+        # reaches awk as `$1`.
+        entrypoint: []
+        command:
+            - /bin/bash
+            - -c
+            - 'APP_ADDR=$$(hostname -i | awk "{print \$$1}"); exec /usr/local/bin/kuma-dp run --cp-address=https://kuma-cp:5678 --dataplane-file=/etc/kuma/ingress.yaml --dataplane-var=address=$$APP_ADDR'
+        configs:
+            - source: ingress_dataplane
+              target: /etc/kuma/ingress.yaml
+        ports:
+            - "8443:8443"
+        depends_on:
+            kuma-cp:
+                condition: service_started
+            localmesh-dataplane-bootstrap:
+                condition: service_completed_successfully
+        restart: unless-stopped
+    kuma-cp:
+        image: docker.io/kumahq/kuma-cp:2.13.6
+        # kuma-cp's auto-generated TLS cert SANs are derived from the container
+        # hostname; dataplanes dial https://kuma-cp:5678 and reject the cert
+        # without a matching SAN.
+        hostname: kuma-cp
+        command: ["run"]
+        environment:
+            KUMA_MODE: standalone
+            KUMA_ENVIRONMENT: universal
+            KUMA_STORE_TYPE: memory
+            KUMA_API_SERVER_HTTP_INTERFACE: 0.0.0.0
+            KUMA_API_SERVER_HTTP_PORT: "5681"
+            KUMA_DP_SERVER_PORT: "5678"
+            KUMA_DP_SERVER_AUTHN_DP_PROXY_TYPE: none
+            # Dev-only: allow unauthenticated callers to manage admin resources
+            # (Secrets, MeshGateway) so the bootstrap container needs no token.
+            KUMA_ACCESS_STATIC_ADMIN_RESOURCES_GROUPS: "mesh-system:admin,mesh-system:unauthenticated"
+        expose:
+            - "5678"
+        ports:
+            - "25681:5681"
+    localmesh-dataplane-bootstrap:
+        build:
+            context: ./service_catalog/mesh
+            dockerfile: Dockerfile.dataplane
+        image: localmesh-dataplane:dev
+        entrypoint: ["/bin/bash", "/usr/local/bin/bootstrap.sh"]
+        depends_on:
+            kuma-cp:
+                condition: service_started
+        configs:
+            - source: mesh_defaults
+              target: /etc/localmesh/bootstrap/00-mesh-and-identity.yaml
+            - source: ingress_tls_secret
+              target: /etc/localmesh/bootstrap/05-ingress-tls.yaml
+            - source: allow_all
+              target: /etc/localmesh/bootstrap/10-traffic-permission.yaml
+            - source: passthrough_policy
+              target: /etc/localmesh/bootstrap/15-passthrough.yaml
+            - source: mesh_trace_policy
+              target: /etc/localmesh/bootstrap/20-trace.yaml
+            - source: ingress_gateway
+              target: /etc/localmesh/bootstrap/30-ingress-mesh-gateway.yaml
+            - source: ingress_routes
+              target: /etc/localmesh/bootstrap/40-ingress-routes.yaml
+        restart: "no"
     # ──── loki: log store ───────────────────────────────────────────────
     # TODO: needs_prod_decisions retention + persistent volumes
     loki:
@@ -188,6 +287,56 @@ services:
             metrics.service_name: postgres-exporter
             metrics.module_name: postgres16
             metrics.owned_by: sre@example.com
+    postgres-exporter-mesh:
+        build:
+            context: ./service_catalog/mesh
+            dockerfile: Dockerfile.dataplane
+        image: localmesh-dataplane:dev
+        network_mode: "service:postgres-exporter"
+        cap_add:
+            - NET_ADMIN
+            - NET_RAW
+        configs:
+            - source: transparent_proxy
+              target: /etc/kuma/transparent-proxy.yaml
+        environment:
+            WORKLOAD_NAME: postgres-exporter
+            APP_PORT: "9187"
+            APP_PROTOCOL: "http"
+            CP_HOST: kuma-cp:5678
+        depends_on:
+            postgres-exporter:
+                condition: service_started
+            kuma-cp:
+                condition: service_started
+            localmesh-dataplane-bootstrap:
+                condition: service_completed_successfully
+        restart: unless-stopped
+    postgres-mesh:
+        build:
+            context: ./service_catalog/mesh
+            dockerfile: Dockerfile.dataplane
+        image: localmesh-dataplane:dev
+        network_mode: "service:postgres"
+        cap_add:
+            - NET_ADMIN
+            - NET_RAW
+        configs:
+            - source: transparent_proxy
+              target: /etc/kuma/transparent-proxy.yaml
+        environment:
+            WORKLOAD_NAME: postgres
+            APP_PORT: "5432"
+            APP_PROTOCOL: "tcp"
+            CP_HOST: kuma-cp:5678
+        depends_on:
+            postgres:
+                condition: service_started
+            kuma-cp:
+                condition: service_started
+            localmesh-dataplane-bootstrap:
+                condition: service_completed_successfully
+        restart: unless-stopped
     # ──── prometheus: metrics store (Mimir stand-in for local dev) ──────
     # TODO: needs_prod_decisions retention + persistent volumes
     prometheus:
@@ -234,6 +383,31 @@ services:
             metrics.service_name: redis
             metrics.module_name: redis
             metrics.owned_by: sre@example.com
+    redis-mesh:
+        build:
+            context: ./service_catalog/mesh
+            dockerfile: Dockerfile.dataplane
+        image: localmesh-dataplane:dev
+        network_mode: "service:redis"
+        cap_add:
+            - NET_ADMIN
+            - NET_RAW
+        configs:
+            - source: transparent_proxy
+              target: /etc/kuma/transparent-proxy.yaml
+        environment:
+            WORKLOAD_NAME: redis
+            APP_PORT: "6379"
+            APP_PROTOCOL: "tcp"
+            CP_HOST: kuma-cp:5678
+        depends_on:
+            redis:
+                condition: service_started
+            kuma-cp:
+                condition: service_started
+            localmesh-dataplane-bootstrap:
+                condition: service_completed_successfully
+        restart: unless-stopped
     # ──── tempo: trace store ────────────────────────────────────────────
     # TODO: needs_prod_decisions retention + persistent volumes
     # No healthcheck: tempo ships as a distroless image with no probe binary
@@ -263,5 +437,141 @@ services:
             OTEL_SERVICE_NAME: "www"
             OTEL_EXPORTER_OTLP_ENDPOINT: "http://alloy:4317"
             OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+    www-mesh:
+        build:
+            context: ./service_catalog/mesh
+            dockerfile: Dockerfile.dataplane
+        image: localmesh-dataplane:dev
+        network_mode: "service:www"
+        cap_add:
+            - NET_ADMIN
+            - NET_RAW
+        configs:
+            - source: transparent_proxy
+              target: /etc/kuma/transparent-proxy.yaml
+        environment:
+            WORKLOAD_NAME: www
+            APP_PORT: "3443"
+            APP_PROTOCOL: "http"
+            CP_HOST: kuma-cp:5678
+        depends_on:
+            www:
+                condition: service_started
+            kuma-cp:
+                condition: service_started
+            localmesh-dataplane-bootstrap:
+                condition: service_completed_successfully
+        restart: unless-stopped
 volumes:
     postgres-data: {}
+configs:
+    mesh_defaults:
+        file: ./service_catalog/mesh/bootstrap/00-mesh-and-identity.yaml
+    # Rendered inline (not file:) so the listener `hostname` field can use
+    # template substitution. Adopts the same pattern as ingress_routes.
+    ingress_gateway:
+        content: |
+            type: MeshGateway
+            mesh: default
+            name: ingress
+            selectors:
+              - match:
+                  kuma.io/service: ingress
+            conf:
+              listeners:
+                - port: 8443
+                  protocol: HTTPS
+                  hostname: '*.metrics-collector.lvh.me'
+                  tls:
+                    mode: TERMINATE
+                    certificates:
+                      - secret: ingress-tls
+                  tags:
+                    port: https-ingress
+    ingress_tls_secret:
+        file: ./secrets/ingress-tls/secret.yaml
+    allow_all:
+        file: ./service_catalog/mesh/bootstrap/10-traffic-permission.yaml
+    mesh_trace_policy:
+        file: ./service_catalog/mesh/bootstrap/20-trace.yaml
+    # Rendered inline so the appendMatch domain interpolates from project.toml.
+    # type: Domain requires an explicit protocol (tcp is invalid for Domain);
+    # the wildcard + port: 443 covers browser-visible egress over HTTPS.
+    passthrough_policy:
+        content: |
+            type: MeshPassthrough
+            mesh: default
+            name: allow-external-apex
+            spec:
+              targetRef:
+                kind: Mesh
+              default:
+                passthroughMode: Matched
+                appendMatch:
+                  - type: Domain
+                    value: "*.metrics.example.com"
+                    protocol: tls
+                    port: 443
+    ingress_dataplane:
+        file: ./service_catalog/mesh/dataplane/ingress.yaml
+    transparent_proxy:
+        content: |
+            kumaDPUser: kuma-data-plane-proxy
+            redirect:
+              dns:
+                enabled: true
+            verbose: true
+    # Rendered inline (not file:) so per-service routes use the template context.
+    # Block-scalar body: indentation is content; `---` separates each route doc.
+    ingress_routes:
+        content: |
+            ---
+            type: MeshHTTPRoute
+            mesh: default
+            name: ingress-route-grafana
+            spec:
+              targetRef:
+                kind: MeshGateway
+                name: ingress
+                tags:
+                  port: https-ingress
+              to:
+                - targetRef:
+                    kind: Mesh
+                  hostnames:
+                    - grafana.metrics-collector.lvh.me
+                  rules:
+                    - matches:
+                        - path:
+                            type: PathPrefix
+                            value: "/"
+                      default:
+                        backendRefs:
+                          - kind: MeshService
+                            name: grafana
+                            port: 3000
+            ---
+            type: MeshHTTPRoute
+            mesh: default
+            name: ingress-route-www
+            spec:
+              targetRef:
+                kind: MeshGateway
+                name: ingress
+                tags:
+                  port: https-ingress
+              to:
+                - targetRef:
+                    kind: Mesh
+                  hostnames:
+                    - www.metrics-collector.lvh.me
+                  rules:
+                    - matches:
+                        - path:
+                            type: PathPrefix
+                            value: "/"
+                      default:
+                        backendRefs:
+                          - kind: MeshService
+                            name: www
+                            port: 3443

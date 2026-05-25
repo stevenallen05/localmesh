@@ -1,0 +1,27 @@
+type: Mesh
+name: default
+meshServices:
+  mode: Exclusive
+networking:
+  outbound:
+    passthrough: false
+---
+type: MeshIdentity
+mesh: default
+name: default-identity
+spec:
+  selector:
+    dataplane:
+      matchLabels: {}
+  spiffeID:
+    trustDomain: "{{ .Mesh }}.mesh.local"
+    path: "/workload/{{ .Workload }}"
+  provider:
+    type: Bundled
+    bundled:
+      meshTrustCreation: Enabled
+      insecureAllowSelfSigned: true
+      autogenerate:
+        enabled: true
+      certificateParameters:
+        expiry: 24h

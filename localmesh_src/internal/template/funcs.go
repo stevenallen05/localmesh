@@ -26,3 +26,19 @@ func identityLabels(plugin *manifest.Plugin, serviceName string) string {
 		serviceName, plugin.Identity.ModuleName, plugin.Identity.OwnedBy,
 	)
 }
+
+// SchemeProtocol maps a [[services]].scheme value to a Kuma kuma.io/protocol
+// dataplane inbound tag. Closed map; unknown scheme is a build error so a
+// new app-tier protocol doesn't fall back to a silent "tcp" default.
+func SchemeProtocol(scheme string) (string, error) {
+	switch scheme {
+	case "http", "https":
+		return "http", nil
+	case "grpc":
+		return "grpc", nil
+	case "tcp", "postgresql":
+		return "tcp", nil
+	default:
+		return "", fmt.Errorf("scheme %q has no kuma.io/protocol mapping", scheme)
+	}
+}

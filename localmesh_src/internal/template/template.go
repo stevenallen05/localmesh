@@ -16,14 +16,17 @@ import (
 	"github.com/stevenallen05/localmesh/internal/manifest"
 )
 
-// ServiceCtx is a per-service entry surfaced to plugin templates. The security
-// plugin's compose template iterates it: a kuma-dp sidecar per Meshed service,
-// a MeshHTTPRoute per ExposeViaIngress service. Populated by render.RunWith
-// from the loaded manifests (project + plugin [[services]]).
+// ServiceCtx is a per-service entry surfaced to plugin templates. The mesh
+// plugin's compose template iterates it: a kuma-dp dataplane per service
+// (except those whose Plugin slug is "mesh" — kuma-cp and ingress are emitted
+// by the mesh template's own services: block). A MeshHTTPRoute is emitted per
+// ExposeViaIngress service. Populated by render.RunWith from the loaded
+// manifests (project + plugin [[services]]).
 type ServiceCtx struct {
 	Name             string
 	Port             int
-	Meshed           bool
+	Protocol         string // kuma.io/protocol value mapped from scheme via schemeProtocol
+	Plugin           string // originating plugin slug ("app" for project services)
 	ExposeViaIngress bool
 }
 

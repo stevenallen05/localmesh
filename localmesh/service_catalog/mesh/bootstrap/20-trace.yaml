@@ -1,0 +1,13 @@
+type: MeshTrace
+mesh: default
+name: trace-all
+spec:
+  targetRef:
+    kind: Mesh
+  default:
+    sampling:
+      overall: 100
+    backends:
+      - type: OpenTelemetry
+        openTelemetry:
+          endpoint: alloy:4317

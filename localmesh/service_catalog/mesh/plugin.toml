@@ -1,0 +1,22 @@
+[identity]
+module_name = "mesh"
+owned_by    = "sre@example.com"
+
+# kuma-cp is the control plane. It is NOT a dataplane participant — the
+# mesh template's per-workload loop filters out services whose Plugin
+# slug is "mesh".
+[[services]]
+container          = "kuma-cp"
+port               = 5681
+scheme             = "http"
+expose_via_ingress = false
+
+# ingress is itself a kuma-dp running a BUILTIN gateway Dataplane. It is
+# also filtered out of the per-workload loop; its compose stanza is
+# emitted directly by docker-compose.yaml.gotmpl.
+[[services]]
+container          = "ingress"
+port               = 8443
+scheme             = "https"
+expose_via_ingress = false
+ingress            = true
